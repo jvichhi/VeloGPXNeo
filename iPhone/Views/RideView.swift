@@ -627,7 +627,7 @@ struct RideView: View {
                 .tracking(1)
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.system(size: accent ? 36 : 28, weight: .bold, design: .rounded))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(accent ? Color.blue : Color.primary)
                 if !unit.isEmpty {
@@ -636,8 +636,15 @@ struct RideView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            // Reserve space equivalent to the unit label so tiles without
+            // a unit string still match the height of tiles that have one.
+            if unit.isEmpty {
+                Text(" ")
+                    .font(.system(size: 13, weight: .medium))
+                    .hidden()
+            }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 70)
         .padding(.vertical, 10)
         .background(Color(.systemBackground).opacity(0.6))
     }
