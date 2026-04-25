@@ -1,0 +1,14 @@
+override init() {
+    super.init()
+    manager.delegate = self
+    manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+    manager.distanceFilter = 5
+    #if !targetEnvironment(simulator)
+    manager.allowsBackgroundLocationUpdates = true
+    manager.pausesLocationUpdatesAutomatically = false
+    #endif
+    if WCSession.isSupported() {
+        WCSession.default.delegate = self
+        WCSession.default.activate()
+    }
+}
