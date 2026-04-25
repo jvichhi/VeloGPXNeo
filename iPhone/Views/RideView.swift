@@ -62,6 +62,8 @@ struct RideView: View {
     @State private var lastSpurRefreshLocation: CLLocationCoordinate2D?
     @State private var isFollowing: Bool = true
     @State private var suppressNextCameraChange: Bool = false
+    @State private var rideSummary: RideSummary? = nil
+    @State private var showRideSummary = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -137,6 +139,14 @@ struct RideView: View {
                         }
                 }
             }
+            .fullScreenCover(isPresented: $showRideSummary) {
+                if let summary = rideSummary {
+                    RideSummaryView(summary: summary) {
+                        showRideSummary = false
+                        rideSummary = nil
+                    }
+                }
+            }
             .onAppear {
                 rideStore.prepare()
                 if let route = routeStore.selectedRoute {
@@ -158,7 +168,7 @@ struct RideView: View {
                 withAnimation(.spring(duration: 0.4)) {
                     viewMode = newValue ? .riding : .birdseye
                 }
-                isFollowing = true   // ← add this
+                isFollowing = true
                 if newValue, let coord = rideStore.rideState.currentCoordinate {
                     updateRidingCamera(coord: coord.clCoordinate)
                 } else if let route = routeStore.selectedRoute {
@@ -172,7 +182,6 @@ struct RideView: View {
                     UIApplication.shared.isIdleTimerDisabled = false
                 }
             }
-            
             .onChange(of: rideStore.rideState.currentCoordinate) { _, newValue in
                 guard viewMode == .riding, let newValue else { return }
                 updateRidingCamera(coord: newValue.clCoordinate)
@@ -232,9 +241,6 @@ struct RideView: View {
 
     // MARK: - Shortest Road Route Back to GPX
 
-    /// Picks the top `candidateCount` GPX points nearest by straight-line distance,
-    /// fires MKDirections concurrently for each, and returns the one with the
-    /// shortest actual travel distance. Falls back to a straight line if all fail.
     private func shortestRouteBackToGPX(
         from poiCoord: CLLocationCoordinate2D,
         routeCoords: [CLLocationCoordinate2D],
@@ -242,16 +248,11 @@ struct RideView: View {
     ) async -> [CLLocationCoordinate2D] {
 
         guard !routeCoords.isEmpty else { return [poiCoord] }
-
-        // Deduplicate/subsample so we don't test 1000 nearly-identical points
         let subsampledCoords = subsample(routeCoords, maxPoints: 200)
-
-        // Take the N geometrically nearest as candidates
         let candidates = subsampledCoords
             .sorted { $0.distance(to: poiCoord) < $1.distance(to: poiCoord) }
             .prefix(candidateCount)
 
-        // Fire all MKDirections calls concurrently
         let results: [CandidateRoute] = await withTaskGroup(of: CandidateRoute?.self) { group in
             for candidate in candidates {
                 group.addTask {
@@ -263,17 +264,10 @@ struct RideView: View {
                     do {
                         let response = try await MKDirections(request: request).calculate()
                         if let route = response.routes.first {
-                            return CandidateRoute(
-                                coordinates: route.polyline.coordinates,
-                                distance: route.distance
-                            )
+                            return CandidateRoute(coordinates: route.polyline.coordinates, distance: route.distance)
                         }
                     } catch { }
-                    // Straight-line fallback for this candidate
-                    return CandidateRoute(
-                        coordinates: [poiCoord, candidate],
-                        distance: poiCoord.distance(to: candidate)
-                    )
+                    return CandidateRoute(coordinates: [poiCoord, candidate], distance: poiCoord.distance(to: candidate))
                 }
             }
             var collected: [CandidateRoute] = []
@@ -282,14 +276,11 @@ struct RideView: View {
             }
             return collected
         }
-
-        // Return the routed path with shortest real distance
         return results.min(by: { $0.distance < $1.distance })?.coordinates ?? [poiCoord]
     }
 
     // MARK: - Helpers
 
-    /// Plain straight-line nearest — used only for inbound origin in bird's-eye mode
     private func geometricNearest(
         in polyline: [CLLocationCoordinate2D],
         to target: CLLocationCoordinate2D
@@ -297,7 +288,6 @@ struct RideView: View {
         polyline.min(by: { $0.distance(to: target) < $1.distance(to: target) }) ?? target
     }
 
-    /// Reduce a large coordinate array to at most `maxPoints` evenly spaced points
     private func subsample(_ coords: [CLLocationCoordinate2D], maxPoints: Int) -> [CLLocationCoordinate2D] {
         guard coords.count > maxPoints else { return coords }
         let stride = coords.count / maxPoints
@@ -358,13 +348,11 @@ struct RideView: View {
 
             // ── POI spurs ────────────────────────────────────────────────
             ForEach(poiSpurs) { spur in
-                // Green dashed: you → POI
                 MapPolyline(coordinates: spur.inbound)
                     .stroke(
                         spur.isNext ? Color.green : Color.green.opacity(0.65),
                         style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5])
                     )
-                // Red dashed: POI → shortest road path back to GPX route
                 MapPolyline(coordinates: spur.outbound)
                     .stroke(
                         spur.isNext ? Color.red : Color.red.opacity(0.5),
@@ -532,10 +520,18 @@ struct RideView: View {
             }
             statGrid
             elevationStrip(route: route)
-            Button("Stop Ride") { rideStore.stop() }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .padding(.vertical, 10)
+            Button("Stop Ride") {
+                // Build summary BEFORE stopping so breadcrumbs are intact
+                if let summary = rideStore.stopAndBuildSummary() {
+                    rideSummary = summary
+                    showRideSummary = true
+                } else {
+                    rideStore.stop()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .padding(.vertical, 10)
         }
         .background(.thinMaterial)
     }

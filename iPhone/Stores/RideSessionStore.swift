@@ -30,6 +30,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var nearestTrackIndex: Int = 0
     private var lastRerouteTime: Date?
 
+    // MARK: - Breadcrumb trail
+    /// Every accepted GPS fix recorded during the active ride.
+    /// Persisted here so buildSummary() can hand it to RideSummary.
+    private var breadcrumbs: [CLLocationCoordinate2D] = []
+
     override init() {
         super.init()
         // CLLocationManager MUST be created after super.init() and on the main thread.
@@ -64,6 +69,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.routeProgress = nil
         self.progressPercent = 0
         self.reroutePolyline = []
+        self.breadcrumbs = []          // ← reset trail on new ride
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
     }
@@ -81,6 +87,33 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         sendWatchUpdate()
     }
 
+    /// Stops tracking and returns a RideSummary ready for the summary sheet.
+    /// Caller is responsible for showing RideSummaryView.
+    @discardableResult
+    func stopAndBuildSummary() -> RideSummary? {
+        UIApplication.shared.isIdleTimerDisabled = false
+        manager.stopUpdatingLocation()
+        manager.stopUpdatingHeading()
+        rideState.isActive = false
+        reroutePolyline = []
+        sendWatchUpdate()
+
+        guard let route, let startTime else { return nil }
+        return RideSummary(
+            routeName: route.name,
+            startDate: startTime,
+            endDate: Date(),
+            totalDistance: rideState.totalDistance,
+            elevationGain: rideState.elevationGain,
+            maxSpeed: rideState.maxSpeed,
+            elapsedTime: rideState.elapsedTime,
+            actualTrack: breadcrumbs,
+            plannedTrack: route.trackPoints.map { $0.coordinate.clCoordinate },
+            pois: pois
+        )
+    }
+
+    /// Legacy stop — used when no summary is needed.
     func stop() {
         UIApplication.shared.isIdleTimerDisabled = false
         manager.stopUpdatingLocation()
@@ -102,9 +135,17 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
         if let lastLocation {
             let delta = location.distance(from: lastLocation)
-            if delta < 200 { rideState.totalDistance += delta }
+            if delta < 200 {
+                rideState.totalDistance += delta
+                // Only record breadcrumb if we moved more than 5 m (distanceFilter)
+                // and the fix is plausible (< 200 m jump, which we already gate above).
+                breadcrumbs.append(location.coordinate)
+            }
             let elevationDelta = location.altitude - lastLocation.altitude
             if elevationDelta > 0 { rideState.elevationGain += elevationDelta }
+        } else {
+            // First fix of the ride — record it.
+            breadcrumbs.append(location.coordinate)
         }
         self.lastLocation = location
 
