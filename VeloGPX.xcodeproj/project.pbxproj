@@ -13,6 +13,11 @@
 		978915292F9C9B090047D8F7 /* POISearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915272F9C9B090047D8F7 /* POISearchService.swift */; };
 		9789152A2F9C9B090047D8F7 /* RouteStore+POI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915282F9C9B090047D8F7 /* RouteStore+POI.swift */; };
 		9789152C2F9D20410047D8F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9789152B2F9D20410047D8F7 /* Assets.xcassets */; };
+		9789154C2F9D64890047D8F7 /* RideSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154B2F9D64890047D8F7 /* RideSummary.swift */; };
+		9789154D2F9D64890047D8F7 /* RideSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154B2F9D64890047D8F7 /* RideSummary.swift */; };
+		9789154F2F9D64A40047D8F7 /* GPXExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154E2F9D64A40047D8F7 /* GPXExporter.swift */; };
+		978915502F9D64A40047D8F7 /* GPXExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154E2F9D64A40047D8F7 /* GPXExporter.swift */; };
+		978915522F9D64D00047D8F7 /* RideSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915512F9D64D00047D8F7 /* RideSummaryView.swift */; };
 		97F812862F9468CE0068A42A /* GeoJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127D2F9468CE0068A42A /* GeoJSONParser.swift */; };
 		97F812872F9468CE0068A42A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8126F2F9468CE0068A42A /* RootView.swift */; };
 		97F812882F9468CE0068A42A /* RouteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127A2F9468CE0068A42A /* RouteModel.swift */; };
@@ -73,6 +78,9 @@
 		978915272F9C9B090047D8F7 /* POISearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POISearchService.swift; sourceTree = "<group>"; };
 		978915282F9C9B090047D8F7 /* RouteStore+POI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RouteStore+POI.swift"; sourceTree = "<group>"; };
 		9789152B2F9D20410047D8F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9789154B2F9D64890047D8F7 /* RideSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSummary.swift; sourceTree = "<group>"; };
+		9789154E2F9D64A40047D8F7 /* GPXExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPXExporter.swift; sourceTree = "<group>"; };
+		978915512F9D64D00047D8F7 /* RideSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSummaryView.swift; sourceTree = "<group>"; };
 		97F8125B2F9468570068A42A /* VeloGPX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VeloGPX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97F8126B2F9468CE0068A42A /* RideSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionStore.swift; sourceTree = "<group>"; };
 		97F8126C2F9468CE0068A42A /* RouteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteStore.swift; sourceTree = "<group>"; };
@@ -97,22 +105,9 @@
 		97F812B82F948CB00068A42A /* RideSessionStore.swift (corrected section) */ = {isa = PBXFileReference; lastKnownFileType = text; path = "RideSessionStore.swift (corrected section)"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		9789152E2F9D22130047D8F7 /* Exceptions for "VeloGPXWatch Watch App" folder in "VeloGPXWatch Watch App" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"VeloGPXWatch-Watch-App-Info.plist",
-			);
-			target = 97F8129B2F9469470068A42A /* VeloGPXWatch Watch App */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		97F8129D2F9469470068A42A /* VeloGPXWatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				9789152E2F9D22130047D8F7 /* Exceptions for "VeloGPXWatch Watch App" folder in "VeloGPXWatch Watch App" target */,
-			);
 			path = "VeloGPXWatch Watch App";
 			sourceTree = "<group>";
 		};
@@ -171,6 +166,7 @@
 		97F812732F9468CE0068A42A /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				978915512F9D64D00047D8F7 /* RideSummaryView.swift */,
 				978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */,
 				978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */,
 				978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */,
@@ -205,6 +201,7 @@
 		97F8127C2F9468CE0068A42A /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				9789154B2F9D64890047D8F7 /* RideSummary.swift */,
 				97F812782F9468CE0068A42A /* POIModel.swift */,
 				97F812792F9468CE0068A42A /* RideState.swift */,
 				97F8127A2F9468CE0068A42A /* RouteModel.swift */,
@@ -225,6 +222,7 @@
 		97F812802F9468CE0068A42A /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				9789154E2F9D64A40047D8F7 /* GPXExporter.swift */,
 				97F812772F9468CE0068A42A /* Extensions */,
 				97F8127C2F9468CE0068A42A /* Models */,
 				97F8127F2F9468CE0068A42A /* Parsers */,
@@ -361,10 +359,13 @@
 			files = (
 				97F812862F9468CE0068A42A /* GeoJSONParser.swift in Sources */,
 				97F812872F9468CE0068A42A /* RootView.swift in Sources */,
+				9789154F2F9D64A40047D8F7 /* GPXExporter.swift in Sources */,
 				97F812882F9468CE0068A42A /* RouteModel.swift in Sources */,
 				97F812892F9468CE0068A42A /* WatchRideSummary.swift in Sources */,
 				97F8128B2F9468CE0068A42A /* CLLocationCoordinate2D+Extensions.swift in Sources */,
+				978915522F9D64D00047D8F7 /* RideSummaryView.swift in Sources */,
 				97F8128C2F9468CE0068A42A /* VeloGPXApp.swift in Sources */,
+				9789154D2F9D64890047D8F7 /* RideSummary.swift in Sources */,
 				97F8128D2F9468CE0068A42A /* POIModel.swift in Sources */,
 				97F8128F2F9468CE0068A42A /* RouteLibraryView.swift in Sources */,
 				978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */,
@@ -389,10 +390,12 @@
 				97F812B42F9470660068A42A /* WatchRideSummary.swift in Sources */,
 				97F812AF2F9470400068A42A /* VeloGPXWatchApp.swift in Sources */,
 				97F812B62F9470700068A42A /* GPXParser.swift in Sources */,
+				9789154C2F9D64890047D8F7 /* RideSummary.swift in Sources */,
 				97F812B02F94704F0068A42A /* CLLocationCoordinate2D+Extensions.swift in Sources */,
 				97F812AE2F94702E0068A42A /* WatchRideView.swift in Sources */,
 				97F812B32F9470600068A42A /* RouteModel.swift in Sources */,
 				97F812B52F94706B0068A42A /* GeoJSONParser.swift in Sources */,
+				978915502F9D64A40047D8F7 /* GPXExporter.swift in Sources */,
 				97F812B12F9470550068A42A /* POIModel.swift in Sources */,
 				97F812AD2F94701E0068A42A /* WatchRideStore.swift in Sources */,
 				97F812B22F94705A0068A42A /* RideState.swift in Sources */,
