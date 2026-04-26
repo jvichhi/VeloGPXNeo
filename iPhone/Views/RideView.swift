@@ -164,7 +164,7 @@ struct RideView: View {
                         Text(route.name)
                             .font(.headline)
                             .lineLimit(1)
-                        Text("\(String(format: "%.1f km", route.totalDistance / 1000))  \u{00B7}  \u{2191}\(String(format: "%.0f m", route.elevationGain))  \u{2193}\(String(format: "%.0f m", route.elevationLoss))")
+                        Text("\(String(format: "%.1f km", route.totalDistance / 1000))  ·  ↑\(String(format: "%.0f m", route.elevationGain))  ↓\(String(format: "%.0f m", route.elevationLoss))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -577,10 +577,6 @@ struct RideView: View {
             MapPitchToggle()
             MapUserLocationButton()
         }
-        // Push native map controls below the Dynamic Island / status bar.
-        // 60pt clears the status bar on all current iPhone models;
-        // adjust if you add a custom top bar later.
-        .mapControlsOffset(y: 60)
     }
 
     // MARK: - Top Banners
