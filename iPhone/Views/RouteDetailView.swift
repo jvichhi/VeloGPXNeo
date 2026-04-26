@@ -206,6 +206,10 @@ struct RouteDetailView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
                     .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
                 }
+
+                // MARK: Cycling Route Card
+                CyclingRouteOverlay(route: route)
+
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
