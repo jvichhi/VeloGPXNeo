@@ -54,6 +54,7 @@ struct RideView: View {
     @State private var rideSummary: RideSummary? = nil
     @State private var showRideSummary = false
     @State private var statsExpanded: Bool = false
+    @State private var hudHeight: CGFloat = 0
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -211,10 +212,17 @@ struct RideView: View {
 
     @ViewBuilder
     private func ridingLayout(route: RouteModel) -> some View {
+        // hudHeight is measured via GeometryReader inside ridingHUDPanel.
+        // All overlays use this value so nothing is ever buried under the panel.
+        let controlsBottom = hudHeight + 12   // 12pt gap above panel top edge
+
         ZStack(alignment: .bottom) {
+
+            // ── Full-screen map ──────────────────────────────────────────
             mapLayer(route: route)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            // ── Top banners (off-route / next POI) ──────────────────────
             VStack(spacing: 8) {
                 topBanners
                     .padding(.top, 56)
@@ -222,43 +230,39 @@ struct RideView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .allowsHitTesting(false)
 
-            if !isFollowing {
-                HStack {
-                    Spacer()
-                    Button {
-                        if let coord = rideStore.rideState.currentCoordinate {
-                            updateRidingCamera(coord: coord.clCoordinate)
-                        }
-                    } label: {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.blue)
-                            .padding(13)
-                            .background(.ultraThickMaterial, in: Circle())
-                            .shadow(radius: 6)
+            // ── Right-side control rail ──────────────────────────────────
+            //    Always visible above the HUD, never hardcoded.
+            VStack(spacing: 10) {
+                // Centre / re-follow — always shown, dims when already following
+                mapControlButton(
+                    icon: isFollowing ? "location.fill" : "location.north.fill",
+                    tint: isFollowing ? .blue : .primary,
+                    accessibilityLabel: isFollowing ? "Following" : "Re-centre map"
+                ) {
+                    if let coord = rideStore.rideState.currentCoordinate {
+                        updateRidingCamera(coord: coord.clCoordinate)
                     }
                 }
-                .padding(.trailing, 16)
-                .padding(.bottom, statsExpanded ? 310 : 210)
-                .transition(.scale.combined(with: .opacity))
-                .animation(.spring(duration: 0.3), value: isFollowing)
-            }
+                .opacity(isFollowing ? 0.45 : 1)
+                .animation(.easeInOut(duration: 0.2), value: isFollowing)
 
-            HStack(spacing: 12) {
-                Button {
+                // POI search
+                mapControlButton(
+                    icon: "mappin.and.ellipse",
+                    tint: .primary,
+                    accessibilityLabel: "Search nearby POIs"
+                ) {
                     showNearbySearch = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThickMaterial, in: Circle())
-                        .shadow(radius: 4)
                 }
                 .disabled(rideStore.rideState.currentCoordinate == nil)
+            }
+            .padding(.trailing, 14)
+            .padding(.bottom, controlsBottom)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .animation(.spring(duration: 0.35), value: hudHeight)
 
-                Spacer()
-
+            // ── Stop ride button — left-aligned above HUD ────────────────
+            HStack {
                 Button {
                     if let summary = rideStore.stopAndBuildSummary() {
                         rideSummary = summary
@@ -267,26 +271,48 @@ struct RideView: View {
                         rideStore.stop()
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 7) {
                         Image(systemName: "stop.fill")
-                        Text("Stop")
-                            .fontWeight(.semibold)
+                            .font(.system(size: 13, weight: .bold))
+                        Text("End Ride")
+                            .font(.system(size: 15, weight: .semibold))
                     }
-                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 13)
                     .background(Color.red, in: Capsule())
-                    .shadow(radius: 4)
+                    .shadow(color: .red.opacity(0.35), radius: 8, x: 0, y: 3)
                 }
+                Spacer()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, statsExpanded ? 302 : 202)
-            .animation(.spring(duration: 0.35), value: statsExpanded)
+            .padding(.leading, 14)
+            .padding(.bottom, controlsBottom)
+            .animation(.spring(duration: 0.35), value: hudHeight)
 
+            // ── HUD panel ────────────────────────────────────────────────
             ridingHUDPanel(route: route)
         }
         .animation(.spring(duration: 0.3), value: isFollowing)
+    }
+
+    // MARK: - Map Control Button helper
+
+    @ViewBuilder
+    private func mapControlButton(
+        icon: String,
+        tint: Color,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 46, height: 46)
+                .background(.ultraThickMaterial, in: Circle())
+                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+        }
+        .accessibilityLabel(accessibilityLabel)
     }
 
     // MARK: - Riding HUD Panel
@@ -294,6 +320,7 @@ struct RideView: View {
     @ViewBuilder
     private func ridingHUDPanel(route: RouteModel) -> some View {
         VStack(spacing: 0) {
+            // Drag handle + expand toggle
             Button {
                 withAnimation(.spring(duration: 0.35)) {
                     statsExpanded.toggle()
@@ -334,6 +361,23 @@ struct RideView: View {
                     .padding(.bottom, 8)
             }
         }
+        // Measure real panel height so overlays can sit exactly above it
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { hudHeight = geo.size.height }
+                    .onChange(of: statsExpanded) { _, _ in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            hudHeight = geo.size.height
+                        }
+                    }
+                    .onChange(of: rideStore.rideState.rerouteSteps.count) { _, _ in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            hudHeight = geo.size.height
+                        }
+                    }
+            }
+        )
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
