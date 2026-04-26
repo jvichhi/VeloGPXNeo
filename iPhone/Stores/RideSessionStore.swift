@@ -11,6 +11,18 @@ struct RouteProgress {
     let remaining: [CLLocationCoordinate2D]
 }
 
+// MARK: - Reroute metadata (WWDC 2025 additions)
+struct RerouteStep {
+    let instructions: String
+    let distanceMeters: Double
+}
+
+struct RouteNotice {
+    let title: String
+    let kind: Kind
+    enum Kind { case closure, other }
+}
+
 @MainActor
 final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDelegate, WCSessionDelegate {
     @Published var rideState = RideState()
@@ -18,6 +30,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var routeProgress: RouteProgress?
     @Published var progressPercent: Double = 0
     @Published var reroutePolyline: [CLLocationCoordinate2D] = []
+
+    // WWDC 2025: localized cycling path name + road closure notices from MKRoute
+    @Published var rerouteRouteName: String? = nil
+    @Published var rerouteNotices: [RouteNotice] = []
 
     private var manager: CLLocationManager!
     private var route: RouteModel?
@@ -29,7 +45,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
 
-    // MARK: - Breadcrumb trail
     private var breadcrumbs: [CLLocationCoordinate2D] = []
 
     override init() {
@@ -65,6 +80,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.routeProgress = nil
         self.progressPercent = 0
         self.reroutePolyline = []
+        self.rerouteRouteName = nil
+        self.rerouteNotices = []
         self.breadcrumbs = []
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
@@ -86,6 +103,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.stopUpdatingHeading()
         rideState.isActive = false
         reroutePolyline = []
+        rerouteRouteName = nil
+        rerouteNotices = []
         sendWatchUpdate()
 
         guard let route, let startTime else { return nil }
@@ -112,6 +131,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.stopUpdatingHeading()
         rideState.isActive = false
         reroutePolyline = []
+        rerouteRouteName = nil
+        rerouteNotices = []
         sendWatchUpdate()
     }
 
@@ -172,6 +193,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             rideState.bearingToRoute = nil
             rideState.rerouteSteps = []
             reroutePolyline = []
+            rerouteRouteName = nil
+            rerouteNotices = []
             return
         }
 
@@ -181,6 +204,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
             rideState.rerouteSteps = []
             reroutePolyline = []
+            rerouteRouteName = nil
+            rerouteNotices = []
         } else {
             rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
             let now = Date()
@@ -195,18 +220,36 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: from))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
-        request.transportType = .cycling  // Uses MapKit cycling routing (WWDC25)
+        request.transportType = .cycling  // MapKit cycling routing (WWDC 2025)
         request.requestsAlternateRoutes = false
 
         Task {
             do {
                 let directions = MKDirections(request: request)
                 let response = try await directions.calculate()
-                guard let mkRoute = response.routes.first else { return }
+                guard let mkRoute = response.routes.first else {
+                    rideState.isRerouting = false
+                    return
+                }
+
                 reroutePolyline = mkRoute.polyline.coordinates
-                rideState.rerouteSteps = mkRoute.steps.map {
-                    RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
-                }.filter { !$0.instructions.isEmpty }
+
+                // WWDC 2025: MKRoute.name — localized cycling path name (e.g. "Route Verte")
+                rerouteRouteName = mkRoute.name.isEmpty ? nil : mkRoute.name
+
+                // WWDC 2025: MKRoute.notices — road closures and other alerts
+                if #available(iOS 19.0, *) {
+                    rerouteNotices = mkRoute.notices.map { notice in
+                        let isClosure = notice.title.localizedCaseInsensitiveContains("closed") ||
+                                        notice.title.localizedCaseInsensitiveContains("closure")
+                        return RouteNotice(title: notice.title, kind: isClosure ? .closure : .other)
+                    }
+                }
+
+                rideState.rerouteSteps = mkRoute.steps
+                    .map { RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance) }
+                    .filter { !$0.instructions.isEmpty }
+
             } catch {}
             rideState.isRerouting = false
         }

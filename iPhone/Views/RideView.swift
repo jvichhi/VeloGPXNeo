@@ -65,6 +65,8 @@ struct RideView: View {
     @State private var showRideSummary = false
     @State private var statsExpanded: Bool = false
     @State private var hudHeight: CGFloat = 0
+    // WWDC 2025: Place Card sheet state
+    @State private var selectedMapItem: MKMapItem? = nil
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -104,6 +106,12 @@ struct RideView: View {
                         rideSummary = nil
                     }
                 }
+            }
+            // WWDC 2025: Native Place Card for tapped POI pins
+            .sheet(item: $selectedMapItem) { item in
+                MapItemDetailView(item: item)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
             .onAppear {
                 rideStore.prepare()
@@ -174,7 +182,7 @@ struct RideView: View {
                         Text(route.name)
                             .font(.headline)
                             .lineLimit(1)
-                        Text("\(String(format: "%.1f km", route.totalDistance / 1000))  \u{00B7}  \u{2191}\(String(format: "%.0f m", route.elevationGain))  \u{2193}\(String(format: "%.0f m", route.elevationLoss))")
+                        Text("\(String(format: "%.1f km", route.totalDistance / 1000))  ·  ↑\(String(format: "%.0f m", route.elevationGain))  ↓\(String(format: "%.0f m", route.elevationLoss))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -225,12 +233,9 @@ struct RideView: View {
         let controlsBottom = hudHeight + 12
 
         ZStack(alignment: .bottom) {
-
-            // Full-screen map
             mapLayer(route: route)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // ── Top overlay: compact chips (off-route + next POI) ─────────
             VStack(alignment: .leading, spacing: 8) {
                 topBanners
             }
@@ -239,7 +244,6 @@ struct RideView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .allowsHitTesting(false)
 
-            // ── Right control rail — grouped pill ─────────────────────────
             VStack(spacing: 0) {
                 Button {
                     if let coord = rideStore.rideState.currentCoordinate {
@@ -253,9 +257,7 @@ struct RideView: View {
                 }
                 .accessibilityLabel(isFollowing ? "Following location" : "Re-centre map")
 
-                Divider()
-                    .frame(width: 28)
-                    .padding(.horizontal, 8)
+                Divider().frame(width: 28).padding(.horizontal, 8)
 
                 Button {
                     showNearbySearch = true
@@ -276,7 +278,6 @@ struct RideView: View {
             .animation(.spring(duration: 0.35), value: hudHeight)
             .animation(.easeInOut(duration: 0.2), value: isFollowing)
 
-            // ── End Ride — bottom-left, above HUD ─────────────────────────
             Button {
                 if let summary = rideStore.stopAndBuildSummary() {
                     rideSummary = summary
@@ -302,7 +303,6 @@ struct RideView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .animation(.spring(duration: 0.35), value: hudHeight)
 
-            // ── HUD panel ─────────────────────────────────────────────────
             ridingHUDPanel(route: route)
         }
         .animation(.spring(duration: 0.3), value: isFollowing)
@@ -314,9 +314,7 @@ struct RideView: View {
     private func ridingHUDPanel(route: RouteModel) -> some View {
         VStack(spacing: 0) {
             Button {
-                withAnimation(.spring(duration: 0.35)) {
-                    statsExpanded.toggle()
-                }
+                withAnimation(.spring(duration: 0.35)) { statsExpanded.toggle() }
             } label: {
                 VStack(spacing: 6) {
                     Capsule()
@@ -341,13 +339,9 @@ struct RideView: View {
             primaryMetricsRow
 
             if statsExpanded {
-                Divider()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
+                Divider().padding(.horizontal, 16).padding(.vertical, 6)
                 expandedStatsGrid
-                Divider()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
+                Divider().padding(.horizontal, 16).padding(.vertical, 6)
                 elevationStrip(route: route)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
@@ -358,14 +352,10 @@ struct RideView: View {
                 Color.clear
                     .onAppear { hudHeight = geo.size.height }
                     .onChange(of: statsExpanded) { _, _ in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            hudHeight = geo.size.height
-                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { hudHeight = geo.size.height }
                     }
                     .onChange(of: rideStore.rideState.rerouteSteps.count) { _, _ in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            hudHeight = geo.size.height
-                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { hudHeight = geo.size.height }
                     }
             }
         )
@@ -381,83 +371,60 @@ struct RideView: View {
     private var primaryMetricsRow: some View {
         let s = rideStore.rideState
         HStack(spacing: 0) {
-
             VStack(spacing: 2) {
                 Text("SPEED")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(1.2)
                 HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", s.speedKmh))
                         .font(.system(size: 38, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.blue)
+                        .monospacedDigit().foregroundStyle(.blue)
                     Text("km/h")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 5)
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).padding(.bottom, 5)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
 
             Divider().frame(height: 44)
 
             VStack(spacing: 2) {
                 Text("DISTANCE")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(1.2)
                 HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(String(format: "%.2f", s.distanceKm))
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .monospacedDigit()
+                        .font(.system(size: 26, weight: .bold, design: .rounded)).monospacedDigit()
                     Text("km")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 2)
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).padding(.bottom, 2)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
 
             Divider().frame(height: 44)
 
             VStack(spacing: 2) {
                 Text("TIME")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(1.2)
                 Text(s.elapsedTime.formattedDuration)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .monospacedDigit()
+                    .font(.system(size: 26, weight: .bold, design: .rounded)).monospacedDigit()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity).padding(.vertical, 14)
 
             Divider().frame(height: 44)
 
             VStack(spacing: 2) {
                 Text("ROUTE")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(1.2)
                 ZStack {
-                    Circle()
-                        .stroke(Color.blue.opacity(0.18), lineWidth: 4)
-                        .frame(width: 32, height: 32)
+                    Circle().stroke(Color.blue.opacity(0.18), lineWidth: 4).frame(width: 32, height: 32)
                     Circle()
                         .trim(from: 0, to: rideStore.progressPercent)
                         .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .frame(width: 32, height: 32)
                         .rotationEffect(.degrees(-90))
                     Text("\(Int(rideStore.progressPercent * 100))%")
-                        .font(.system(size: 9, weight: .bold))
-                        .monospacedDigit()
+                        .font(.system(size: 9, weight: .bold)).monospacedDigit()
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity).padding(.vertical, 10)
         }
         .padding(.horizontal, 4)
     }
@@ -482,59 +449,42 @@ struct RideView: View {
         VStack(spacing: 2) {
             HStack(spacing: 3) {
                 if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    Image(systemName: icon).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
                 }
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1)
+                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(1)
             }
             HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Text(unit)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                Text(value).font(.system(size: 20, weight: .bold, design: .rounded)).monospacedDigit()
+                Text(unit).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity).padding(.vertical, 6)
     }
 
-    // MARK: - Map
+    // MARK: - Map Layer
 
     @ViewBuilder
     private func mapLayer(route: RouteModel) -> some View {
-        Map(position: $position) {
+        Map(position: $position, selection: $selectedMapItem) {
             if let progress = rideStore.routeProgress {
-                MapPolyline(coordinates: progress.ridden)
-                    .stroke(.blue.opacity(0.3), lineWidth: 4)
-                MapPolyline(coordinates: progress.remaining)
-                    .stroke(.blue, lineWidth: 5)
+                MapPolyline(coordinates: progress.ridden).stroke(.blue.opacity(0.3), lineWidth: 4)
+                MapPolyline(coordinates: progress.remaining).stroke(.blue, lineWidth: 5)
             } else {
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
                     .stroke(.blue, lineWidth: 5)
             }
 
             if !rideStore.reroutePolyline.isEmpty {
-                MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.orange, lineWidth: 4)
+                MapPolyline(coordinates: rideStore.reroutePolyline).stroke(.orange, lineWidth: 4)
             }
 
             ForEach(poiSpurs) { spur in
                 MapPolyline(coordinates: spur.inbound)
-                    .stroke(
-                        spur.isNext ? Color.green : Color.green.opacity(0.65),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5])
-                    )
+                    .stroke(spur.isNext ? Color.green : Color.green.opacity(0.65),
+                            style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5]))
                 MapPolyline(coordinates: spur.outbound)
-                    .stroke(
-                        spur.isNext ? Color.red : Color.red.opacity(0.5),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 3.5 : 2, dash: [7, 5])
-                    )
+                    .stroke(spur.isNext ? Color.red : Color.red.opacity(0.5),
+                            style: StrokeStyle(lineWidth: spur.isNext ? 3.5 : 2, dash: [7, 5]))
             }
 
             ForEach(route.waypoints) { waypoint in
@@ -543,9 +493,13 @@ struct RideView: View {
                 }
             }
 
+            // WWDC 2025: POI pins with native Place Card callout accessory
+            // Tap pin → sheet(item: $selectedMapItem) shows full MKMapItemDetailViewController
             ForEach(routeStore.selectedPOIs) { poi in
                 let isNext = poi.id == rideStore.rideState.nextPOI?.id
-                Annotation(poi.name, coordinate: poi.coordinate.clCoordinate) {
+                let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: poi.coordinate.clCoordinate))
+                mapItem.name = poi.name
+                Annotation(poi.name, coordinate: poi.coordinate.clCoordinate, anchor: .bottom) {
                     ZStack {
                         Circle()
                             .fill(isNext ? Color.green : Color.white)
@@ -555,6 +509,7 @@ struct RideView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(isNext ? .white : .orange)
                     }
+                    .onTapGesture { selectedMapItem = mapItem }
                 }
             }
 
@@ -568,11 +523,8 @@ struct RideView: View {
             }
         }
         .onMapCameraChange(frequency: .onEnd) { _ in
-            if suppressNextCameraChange {
-                suppressNextCameraChange = false
-            } else if viewMode == .riding {
-                isFollowing = false
-            }
+            if suppressNextCameraChange { suppressNextCameraChange = false }
+            else if viewMode == .riding { isFollowing = false }
         }
         .mapStyle(.standard(elevation: .realistic))
         .mapControls {
@@ -588,12 +540,10 @@ struct RideView: View {
     private var topBanners: some View {
         VStack(alignment: .leading, spacing: 8) {
             if rideStore.rideState.isOffRoute {
-                offRouteChip
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                offRouteChip.transition(.move(edge: .top).combined(with: .opacity))
             }
             if let poi = rideStore.rideState.nextPOI,
-               let dist = rideStore.rideState.nextPOIDistance,
-               dist <= 2000 {
+               let dist = rideStore.rideState.nextPOIDistance, dist <= 2000 {
                 nextPOIChip(poi: poi, distance: dist)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -608,36 +558,26 @@ struct RideView: View {
     private var offRouteChip: some View {
         HStack(spacing: 7) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Off Route")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
                 Text("\(Int(rideStore.rideState.offRouteDistance))m from route")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.82))
             }
-
             if let bearing = rideStore.rideState.bearingToRoute,
                rideStore.rideState.offRouteDistance <= 200 {
                 let relativeBearing = (bearing - rideStore.rideState.currentHeading + 360)
                     .truncatingRemainder(dividingBy: 360)
                 Image(systemName: "arrow.up")
                     .rotationEffect(.degrees(relativeBearing))
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(.white)
-                    .padding(.leading, 2)
+                    .font(.system(size: 15, weight: .black)).foregroundStyle(.white).padding(.leading, 2)
             }
-
             if rideStore.rideState.isRerouting {
-                ProgressView().tint(.white).scaleEffect(0.75)
-                    .padding(.leading, 2)
+                ProgressView().tint(.white).scaleEffect(0.75).padding(.leading, 2)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 14).padding(.vertical, 9)
         .background(Color.red, in: Capsule())
         .shadow(color: .red.opacity(0.35), radius: 8, x: 0, y: 3)
     }
@@ -648,38 +588,49 @@ struct RideView: View {
     private func nextPOIChip(poi: POIModel, distance: CLLocationDistance) -> some View {
         HStack(spacing: 9) {
             ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.2))
-                    .frame(width: 30, height: 30)
+                Circle().fill(Color.green.opacity(0.2)).frame(width: 30, height: 30)
                 Image(systemName: poi.category.systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.green)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(poi.name)
-                    .font(.system(size: 13, weight: .bold))
-                    .lineLimit(1)
+                Text(poi.name).font(.system(size: 13, weight: .bold)).lineLimit(1)
                 Text(distance < 1000
                      ? "\(Int(distance))m ahead"
                      : String(format: "%.1f km ahead", distance / 1000))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.regularMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 2)
     }
 
-    // MARK: - Re-route Steps
+    // MARK: - Re-route Steps (with WWDC 2025 route name + notices)
 
     @ViewBuilder
     private var rerouteStepsList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Back to route", systemImage: "arrow.triangle.turn.up.right.circle.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
+
+            // WWDC 2025: Show localized cycling path name from MKRoute.name
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.orange)
+                Text(rideStore.rerouteRouteName ?? "Back to route")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.orange)
+                    .lineLimit(1)
+            }
+
+            // WWDC 2025: Road closure / notice chips from MKRoute.notices
+            ForEach(rideStore.rerouteNotices.prefix(2), id: \.title) { notice in
+                HStack(spacing: 5) {
+                    Image(systemName: notice.kind == .closure ? "xmark.octagon.fill" : "info.circle.fill")
+                        .font(.system(size: 11)).foregroundStyle(notice.kind == .closure ? .red : .orange)
+                    Text(notice.title)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(notice.kind == .closure ? .red : .secondary)
+                        .lineLimit(1)
+                }
+            }
 
             ForEach(
                 Array(rideStore.rideState.rerouteSteps.prefix(3).enumerated()),
@@ -691,13 +642,11 @@ struct RideView: View {
                         .foregroundStyle(index == 0 ? Color.primary : Color.secondary)
                     Spacer()
                     Text("\(Int(step.distanceMeters))m")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12).padding(.vertical, 10)
         .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -712,23 +661,18 @@ struct RideView: View {
                 ForEach(samples) { s in
                     AreaMark(x: .value("km", s.distance), y: .value("m", s.elevation))
                         .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.35), .blue.opacity(0.05)],
-                                startPoint: .top, endPoint: .bottom
-                            )
+                            LinearGradient(colors: [.blue.opacity(0.35), .blue.opacity(0.05)],
+                                           startPoint: .top, endPoint: .bottom)
                         )
                     LineMark(x: .value("km", s.distance), y: .value("m", s.elevation))
-                        .foregroundStyle(.blue)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                        .foregroundStyle(.blue).lineStyle(StrokeStyle(lineWidth: 1.5))
                 }
                 if let maxDist = samples.last?.distance {
                     RuleMark(x: .value("pos", maxDist * progress))
-                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [4]))
-                        .foregroundStyle(.orange)
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [4])).foregroundStyle(.orange)
                 }
             }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
+            .chartXAxis(.hidden).chartYAxis(.hidden)
             .frame(height: 52)
         }
     }
@@ -739,12 +683,7 @@ struct RideView: View {
         let heading = rideStore.rideState.currentHeading
         suppressNextCameraChange = true
         isFollowing = true
-        position = .camera(MapCamera(
-            centerCoordinate: coord,
-            distance: 400,
-            heading: heading,
-            pitch: 45
-        ))
+        position = .camera(MapCamera(centerCoordinate: coord, distance: 400, heading: heading, pitch: 45))
     }
 
     // MARK: - POI Spur Computation
@@ -754,40 +693,31 @@ struct RideView: View {
         guard !pois.isEmpty else { poiSpurs = []; return }
 
         let routeCoords: [CLLocationCoordinate2D] = {
-            if let remaining = rideStore.routeProgress?.remaining, !remaining.isEmpty {
-                return remaining
-            }
+            if let remaining = rideStore.routeProgress?.remaining, !remaining.isEmpty { return remaining }
             return route.trackPoints.map { $0.coordinate.clCoordinate }
         }()
 
         let nextPOIID = rideStore.rideState.nextPOI?.id
-
         let inboundOrigin: (POIModel) -> CLLocationCoordinate2D = { poi in
-            if let current = rideStore.rideState.currentCoordinate {
-                return current.clCoordinate
-            }
+            if let current = rideStore.rideState.currentCoordinate { return current.clCoordinate }
             return geometricNearest(in: routeCoords, to: poi.coordinate.clCoordinate)
         }
 
         var spurs: [POISpur] = []
         await withTaskGroup(of: POISpur?.self) { group in
             for poi in pois {
-                let origin   = inboundOrigin(poi)
+                let origin = inboundOrigin(poi)
                 let poiCoord = poi.coordinate.clCoordinate
                 group.addTask {
-                    async let inCoords  = fetchSpurCoordinates(from: origin,   to: poiCoord)
+                    async let inCoords  = fetchSpurCoordinates(from: origin, to: poiCoord)
                     async let outResult = shortestRouteBackToGPX(from: poiCoord, routeCoords: routeCoords)
-                    return POISpur(
-                        id: poi.id,
-                        inbound:  await inCoords,
-                        outbound: await outResult,
-                        isNext: poi.id == nextPOIID
-                    )
+                    return POISpur(id: poi.id,
+                                  inbound: await inCoords,
+                                  outbound: await outResult,
+                                  isNext: poi.id == nextPOIID)
                 }
             }
-            for await result in group {
-                if let spur = result { spurs.append(spur) }
-            }
+            for await result in group { if let spur = result { spurs.append(spur) } }
         }
         poiSpurs = spurs.sorted { !$0.isNext && $1.isNext }
     }
@@ -802,37 +732,31 @@ struct RideView: View {
         let candidates = subsampledCoords
             .sorted { $0.distance(to: poiCoord) < $1.distance(to: poiCoord) }
             .prefix(candidateCount)
-
         let results: [CandidateRoute] = await withTaskGroup(of: CandidateRoute?.self) { group in
             for candidate in candidates {
                 group.addTask {
                     let request = MKDirections.Request()
                     request.source      = MKMapItem(placemark: MKPlacemark(coordinate: poiCoord))
                     request.destination = MKMapItem(placemark: MKPlacemark(coordinate: candidate))
-                    request.transportType = .cycling  // Uses MapKit cycling routing (WWDC25)
+                    request.transportType = .cycling
                     request.requestsAlternateRoutes = false
                     do {
                         let response = try await MKDirections(request: request).calculate()
                         if let route = response.routes.first {
                             return CandidateRoute(coordinates: route.polyline.coordinates, distance: route.distance)
                         }
-                    } catch { }
+                    } catch {}
                     return CandidateRoute(coordinates: [poiCoord, candidate], distance: poiCoord.distance(to: candidate))
                 }
             }
             var collected: [CandidateRoute] = []
-            for await r in group {
-                if let r { collected.append(r) }
-            }
+            for await r in group { if let r { collected.append(r) } }
             return collected
         }
         return results.min(by: { $0.distance < $1.distance })?.coordinates ?? [poiCoord]
     }
 
-    private func geometricNearest(
-        in polyline: [CLLocationCoordinate2D],
-        to target: CLLocationCoordinate2D
-    ) -> CLLocationCoordinate2D {
+    private func geometricNearest(in polyline: [CLLocationCoordinate2D], to target: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
         polyline.min(by: { $0.distance(to: target) < $1.distance(to: target) }) ?? target
     }
 
@@ -842,14 +766,11 @@ struct RideView: View {
         return coords.enumerated().filter { $0.offset % stride == 0 }.map { $0.element }
     }
 
-    private func fetchSpurCoordinates(
-        from: CLLocationCoordinate2D,
-        to: CLLocationCoordinate2D
-    ) async -> [CLLocationCoordinate2D] {
+    private func fetchSpurCoordinates(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D] {
         let request = MKDirections.Request()
         request.source      = MKMapItem(placemark: MKPlacemark(coordinate: from))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
-        request.transportType = .cycling  // Uses MapKit cycling routing (WWDC25)
+        request.transportType = .cycling
         request.requestsAlternateRoutes = false
         do {
             let response = try await MKDirections(request: request).calculate()
@@ -860,14 +781,8 @@ struct RideView: View {
     }
 
     private func shouldRefreshSpurs(for coord: CLLocationCoordinate2D) -> Bool {
-        guard let last = lastSpurRefreshLocation else {
-            lastSpurRefreshLocation = coord
-            return true
-        }
-        if coord.distance(to: last) > 100 {
-            lastSpurRefreshLocation = coord
-            return true
-        }
+        guard let last = lastSpurRefreshLocation else { lastSpurRefreshLocation = coord; return true }
+        if coord.distance(to: last) > 100 { lastSpurRefreshLocation = coord; return true }
         return false
     }
 
@@ -877,9 +792,7 @@ struct RideView: View {
         let points = route.trackPoints
         for (i, point) in points.enumerated() {
             guard let ele = point.elevation else { continue }
-            if i > 0 {
-                cumulative += point.coordinate.clCoordinate.distance(to: points[i-1].coordinate.clCoordinate)
-            }
+            if i > 0 { cumulative += point.coordinate.clCoordinate.distance(to: points[i-1].coordinate.clCoordinate) }
             samples.append(ElevSample(distance: cumulative / 1000, elevation: ele))
         }
         if samples.count > 200 {
@@ -888,4 +801,26 @@ struct RideView: View {
         }
         return samples
     }
+}
+
+// MARK: - MapItemDetailView (WWDC 2025 native Place Card)
+
+@available(iOS 18.0, *)
+private struct MapItemDetailView: UIViewControllerRepresentable {
+    let item: MKMapItem
+
+    func makeUIViewController(context: Context) -> MKMapItemDetailViewController {
+        let vc = MKMapItemDetailViewController()
+        vc.mapItem = item
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: MKMapItemDetailViewController, context: Context) {
+        uiViewController.mapItem = item
+    }
+}
+
+// MKMapItem must conform to Identifiable for sheet(item:)
+extension MKMapItem: @retroactive Identifiable {
+    public var id: String { self.name ?? self.placemark.title ?? UUID().uuidString }
 }

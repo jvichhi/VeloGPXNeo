@@ -8,10 +8,12 @@ struct NearbySearchSheet: View {
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
     @State private var selectedCategory = "Café"
+    @State private var selectedMapItem: MKMapItem? = nil
+    @State private var showPlaceCard = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
         ("Café",       "cup.and.saucer.fill",      "Café"),
-        ("Water",      "drop.fill",                "Water"),
+        ("Water",      "drop.fill",                "Water Fountain"),
         ("Bike Shop",  "wrench.and.screwdriver",   "Bike Shop"),
         ("Restaurant", "fork.knife",               "Restaurant")
     ]
@@ -51,7 +53,6 @@ struct NearbySearchSheet: View {
 
                 Divider()
 
-                // Content
                 Group {
                     if isLoading {
                         ProgressView("Searching…")
@@ -75,7 +76,11 @@ struct NearbySearchSheet: View {
                                         searchCoordinate: coordinate,
                                         categoryIcon: categories.first(where: { $0.query == selectedCategory })?.icon ?? "mappin",
                                         isAdded: isAdded(item),
-                                        onToggle: { toggle(item) }
+                                        onToggle: { toggle(item) },
+                                        onInfoTap: {
+                                            selectedMapItem = item
+                                            showPlaceCard = true
+                                        }
                                     )
                                 }
                             }
@@ -86,6 +91,14 @@ struct NearbySearchSheet: View {
             }
             .navigationTitle("Near This Point")
             .navigationBarTitleDisplayMode(.inline)
+            // WWDC 2025: Native Apple Maps Place Card sheet
+            .sheet(isPresented: $showPlaceCard) {
+                if let item = selectedMapItem {
+                    MapItemDetailView(item: item)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
+            }
         }
         .task { await load() }
     }
@@ -100,12 +113,20 @@ struct NearbySearchSheet: View {
         if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.name == name }) {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
+            // WWDC 2025: use MKAddressRepresentations for rich address display
+            let address: String?
+            if #available(iOS 19.0, *),
+               let addr = item.placemark.addressRepresentation {
+                address = addr.formattedAddressLines.first
+            } else {
+                address = item.placemark.thoroughfare
+            }
             let poi = POIModel(
                 name: name,
                 category: category(for: selectedCategory),
                 coordinate: item.placemark.coordinate,
                 distanceFromRoute: 0,
-                address: item.placemark.thoroughfare,
+                address: address,
                 phone: item.phoneNumber,
                 website: item.url?.absoluteString
             )
@@ -121,12 +142,30 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Café":       return .cafe
-        case "Water":      return .water
-        case "Bike Shop":  return .bikeRepair
-        case "Restaurant": return .restaurant
-        default:           return .custom
+        case "Café":          return .cafe
+        case "Water Fountain": return .water
+        case "Bike Shop":      return .bikeRepair
+        case "Restaurant":     return .restaurant
+        default:               return .custom
         }
+    }
+}
+
+// MARK: - Native MapKit Place Card wrapper (WWDC 2025)
+
+/// Wraps MapItemDetailViewController — the same full Place Card Apple Maps shows.
+@available(iOS 18.0, *)
+private struct MapItemDetailView: UIViewControllerRepresentable {
+    let item: MKMapItem
+
+    func makeUIViewController(context: Context) -> MKMapItemDetailViewController {
+        let vc = MKMapItemDetailViewController()
+        vc.mapItem = item
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: MKMapItemDetailViewController, context: Context) {
+        uiViewController.mapItem = item
     }
 }
 
@@ -138,6 +177,7 @@ private struct NearbyResultCard: View {
     let categoryIcon: String
     let isAdded: Bool
     let onToggle: () -> Void
+    let onInfoTap: () -> Void
 
     private var distanceMeters: CLLocationDistance {
         CLLocation(latitude: searchCoordinate.latitude, longitude: searchCoordinate.longitude)
@@ -151,9 +191,17 @@ private struct NearbyResultCard: View {
             : String(format: "%.1f km away", distanceMeters / 1000)
     }
 
+    // WWDC 2025: MKAddressRepresentations for richer, context-aware address strings
+    private var addressLine: String? {
+        if #available(iOS 19.0, *),
+           let addr = item.placemark.addressRepresentation {
+            return addr.formattedAddressLines.first
+        }
+        return item.placemark.thoroughfare
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            // Category icon circle
             ZStack {
                 Circle()
                     .fill(Color.blue.opacity(0.12))
@@ -167,7 +215,7 @@ private struct NearbyResultCard: View {
                 Text(item.name ?? "Unknown")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                if let address = item.placemark.thoroughfare {
+                if let address = addressLine {
                     Text(address)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -178,6 +226,14 @@ private struct NearbyResultCard: View {
             }
 
             Spacer()
+
+            // Info button → Apple Maps Place Card
+            Button(action: onInfoTap) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.blue.opacity(0.8))
+                    .frame(width: 34, height: 34)
+            }
 
             Button(action: onToggle) {
                 ZStack {

@@ -23,27 +23,44 @@ final class POISearchService {
         return response.mapItems
     }
 
+    // MARK: - Reverse geocode using MKReverseGeocodingRequest (WWDC 2025, replaces CLGeocoder)
+    /// Returns a full MKMapItem with rich MKAddressRepresentations instead of a plain placemark.
+    func reverseGeocode(coordinate: CLLocationCoordinate2D) async -> MKMapItem? {
+        if #available(iOS 19.0, *) {
+            let request = MKReverseGeocodingRequest(coordinate: coordinate)
+            let items = try? await request.mapItems
+            return items?.first
+        } else {
+            // Fallback: wrap CLGeocoder result in MKMapItem
+            return await withCheckedContinuation { continuation in
+                let geocoder = CLGeocoder()
+                geocoder.reverseGeocodeLocation(
+                    CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                ) { placemarks, _ in
+                    if let placemark = placemarks?.first {
+                        let mkPlacemark = MKPlacemark(placemark: placemark)
+                        continuation.resume(returning: MKMapItem(placemark: mkPlacemark))
+                    } else {
+                        continuation.resume(returning: nil)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Route-aware search (used in POI discovery)
     /// Searches at evenly-spaced sample points along the route, deduplicates,
-    /// then keeps only results whose perpendicular distance to the route is ≤ maxOffRouteMeters.
+    /// then keeps only results whose perpendicular distance to the route is <= maxOffRouteMeters.
     func searchAlongRoute(
         query: String,
         coordinates: [CLLocationCoordinate2D],
         maxOffRouteMeters: CLLocationDistance = 200
     ) async throws -> [MKMapItem] {
         guard !coordinates.isEmpty else { return [] }
-
-        // More sample points needed for a tight 200 m corridor —
-        // gaps between samples could otherwise let distant results slip through the filter.
         let samplePoints = coordinates.sampled(maxCount: 12)
-
-        // Search radius per sample: just wide enough to catch anything
-        // within the corridor from that point, with a small buffer.
         let searchRadius = maxOffRouteMeters * 2.5
-
         var seen = Set<String>()
         var combined: [MKMapItem] = []
-
         for point in samplePoints {
             let results = (try? await search(query: query, near: point, radius: searchRadius)) ?? []
             for item in results {
@@ -53,8 +70,6 @@ final class POISearchService {
                 }
             }
         }
-
-        // Hard filter: drop anything further than maxOffRouteMeters from the route polyline
         return combined.filter { item in
             minimumDistanceToRoute(
                 from: item.placemark.coordinate,
@@ -92,7 +107,6 @@ extension Array {
         return self[count / 2]
     }
 
-    /// Returns up to `maxCount` evenly-spaced elements, always including first and last.
     func sampled(maxCount: Int) -> [Element] {
         guard count > maxCount else { return self }
         var result: [Element] = []
