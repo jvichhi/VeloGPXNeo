@@ -1,9 +1,11 @@
 import Foundation
 import MapKit
+import CoreLocation
 
 @MainActor
-class POISearchService: ObservableObject {
+final class POISearchService {
     static let shared = POISearchService()
+    private init() {}
 
     func search(query: String, near coordinate: CLLocationCoordinate2D, radius: CLLocationDistance = 5000) async throws -> [MKMapItem] {
         let request = MKLocalSearch.Request()
@@ -24,7 +26,7 @@ class POISearchService: ObservableObject {
     }
 }
 
-extension Array {
+private extension Array {
     var middle: Element? {
         guard !isEmpty else { return nil }
         return self[count / 2]
