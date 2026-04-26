@@ -6,7 +6,7 @@
 //  1. Shows a "Get Cycling Route" button inside RouteDetailView
 //  2. Computes the route start→end via CyclingRouteService
 //  3. Displays the route as a MapPolyline on an inline Map
-//  4. Shows route name, distance, ETA, and any road notices
+//  4. Shows route name, distance, and ETA
 //
 
 import SwiftUI
@@ -69,7 +69,7 @@ struct CyclingRouteOverlay: View {
                 }
                 .padding(.vertical, 8)
 
-                // MARK: Route Name (iOS 26+)
+                // MARK: Route Name
                 if let name = result.routeName {
                     Divider().padding(.leading, 14)
                     HStack(spacing: 10) {
@@ -84,12 +84,6 @@ struct CyclingRouteOverlay: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                }
-
-                // MARK: Road Notices (iOS 26+)
-                if !result.notices.isEmpty {
-                    Divider().padding(.leading, 14)
-                    RouteNoticeView(notices: result.notices)
                 }
 
                 // MARK: Toggle Map
@@ -121,7 +115,7 @@ struct CyclingRouteOverlay: View {
                         HStack(spacing: 10) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Calculating cycling route…")
+                            Text("Calculating cycling route\u{2026}")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
