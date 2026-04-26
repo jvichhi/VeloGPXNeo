@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 // MARK: - AppLanguage
 
@@ -42,7 +43,6 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Native name shown as subtitle
     var nativeName: String {
         switch self {
         case .arabic:     return "\u{202A}\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629}\u{202C}"
@@ -83,7 +83,10 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Alphabetically sorted list used by the picker
+    var layoutDirection: LayoutDirection {
+        self == .arabic ? .rightToLeft : .leftToRight
+    }
+
     static var alphabetical: [AppLanguage] {
         allCases.sorted { $0.displayName < $1.displayName }
     }
@@ -95,6 +98,9 @@ final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
     @Published private(set) var currentLanguage: AppLanguage
+    /// The bundle to use for all localized string lookups.
+    /// Rebuilds whenever currentLanguage changes.
+    @Published private(set) var bundle: Bundle = .main
 
     private let key = "velogpx.language"
 
@@ -103,25 +109,61 @@ final class LocalizationManager: ObservableObject {
            let lang = AppLanguage(rawValue: saved) {
             currentLanguage = lang
         } else {
-            // Match system language, fall back to English
             let preferred = Locale.preferredLanguages.first ?? "en"
             currentLanguage = AppLanguage.allCases.first {
                 preferred.hasPrefix($0.rawValue)
             } ?? .english
         }
+        bundle = Self.makeBundle(for: currentLanguage)
     }
 
     func set(_ language: AppLanguage) {
         guard language != currentLanguage else { return }
         currentLanguage = language
+        // Persist so the next cold launch starts in the right language
         UserDefaults.standard.set(language.rawValue, forKey: key)
+        // Tell iOS which language to use for system APIs (e.g. date formatters)
+        UserDefaults.standard.set([language.rawValue], forKey: "AppleLanguages")
+        UserDefaults.standard.synchronize()
+        // Swap the bundle — all .localized calls will now return strings
+        // from the matching .lproj folder once those catalogs exist.
+        bundle = Self.makeBundle(for: language)
+    }
+
+    // MARK: Private helpers
+
+    private static func makeBundle(for language: AppLanguage) -> Bundle {
+        // Look for an .lproj inside the main bundle
+        guard let path = Bundle.main.path(forResource: language.rawValue, ofType: "lproj"),
+              let lprojBundle = Bundle(path: path)
+        else {
+            // No .lproj yet — fall back to main bundle (strings stay in English)
+            return .main
+        }
+        return lprojBundle
     }
 }
 
 // MARK: - String localization helper
 
 extension String {
-    /// Returns the string itself for now; swap for Bundle-based lookup
-    /// once .lproj string files are added to the project.
-    var localized: String { self }
+    /// Returns the localized version of this string using LocalizationManager's
+    /// active bundle. Falls back to `self` when no translation is found.
+    var localized: String {
+        LocalizationManager.shared.bundle
+            .localizedString(forKey: self, value: self, table: nil)
+    }
+}
+
+// MARK: - Environment key so views can read the active layout direction
+
+struct AppLanguageKey: EnvironmentKey {
+    static let defaultValue: AppLanguage = .english
+}
+
+extension EnvironmentValues {
+    var appLanguage: AppLanguage {
+        get { self[AppLanguageKey.self] }
+        set { self[AppLanguageKey.self] = newValue }
+    }
 }
