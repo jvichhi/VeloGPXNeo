@@ -27,7 +27,7 @@ actor PlaceDescriptorService {
     private init() {}
 
     /// Resolves a single waypoint coordinate to a named MKMapItem.
-    func resolve(_ waypoint: WaypointModel) async -> ResolvedWaypoint {
+    func resolve(_ waypoint: WaypointPoint) async -> ResolvedWaypoint {
         let coord = waypoint.coordinate.clCoordinate
 
         if #available(iOS 26.0, *) {
@@ -38,7 +38,7 @@ actor PlaceDescriptorService {
     }
 
     /// Resolves an array of waypoints concurrently.
-    func resolveAll(_ waypoints: [WaypointModel]) async -> [ResolvedWaypoint] {
+    func resolveAll(_ waypoints: [WaypointPoint]) async -> [ResolvedWaypoint] {
         await withTaskGroup(of: ResolvedWaypoint.self) { group in
             for wp in waypoints {
                 group.addTask { await self.resolve(wp) }
@@ -54,10 +54,7 @@ actor PlaceDescriptorService {
     // MARK: - iOS 26+ path
 
     @available(iOS 26.0, *)
-    private func resolveModern(waypoint: WaypointModel, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
-        // Build a PlaceDescriptor from the waypoint coordinate + optional name.
-        let descriptor = MKMapItem.ForCurrentLocation.self as AnyObject
-        // Use MKMapItemRequest with coordinate-based lookup.
+    private func resolveModern(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
         let placemark = MKPlacemark(coordinate: coordinate)
         let mapItem = MKMapItem(placemark: placemark)
         mapItem.name = waypoint.name ?? "Waypoint"
@@ -85,7 +82,7 @@ actor PlaceDescriptorService {
 
     // MARK: - iOS 18 fallback path
 
-    private func resolveLegacy(waypoint: WaypointModel, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
+    private func resolveLegacy(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
         let region = MKCoordinateRegion(
             center: coordinate,
             latitudinalMeters: 100,
