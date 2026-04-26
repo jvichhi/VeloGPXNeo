@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Danish (da) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "Ruter";
 "Ride" = "Cykeltur";
 "My Rides" = "Mine ture";
 "Settings" = "Indstillinger";
+
+/* Settings */
+"settings.language.title" = "Sprog";
+"settings.language.subtitle" = "Appens visningssprog";
+"settings.import.title" = "Importer ruter";
+"settings.import.subtitle" = "Importer GPX-filer fra Filer-appen";
+"settings.map.title" = "Kortmotor";
+"settings.map.subtitle" = "Apple Maps standard med realistisk højde";
+"settings.birdseye.title" = "Fugleperspektiv";
+"settings.birdseye.subtitle" = "Oversigtsmodus inden start af tur";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "Synkroniser målinger og kontroller til dit Watch";
+"settings.poi.title" = "Sevsværdigheder";
+"settings.poi.subtitle" = "Administrer POI-kategorier og visning";
+"settings.export.title" = "Eksporter";
+"settings.export.subtitle" = "Eksporter ture som GPX- eller FIT-filer";
+
+/* Language Picker */
+"language.search.prompt" = "Søg efter sprog";
+"language.picker.title" = "Sprog";
+"language.picker.done" = "Færdig";
+
+/* Route Library */
+"route.library.empty.title" = "Ingen ruter endnu";
+"route.library.empty.subtitle" = "Importer en GPX- eller GeoJSON-fil fra\nSafari, Filer eller Mail.";
+"route.library.import.button" = "Importer rute";
+"route.library.ride.button" = "Cykl denne rute";
+"route.library.import.cancelled" = "Import annulleret";
+"route.library.delete" = "Slet";
+
+/* Route Detail */
+"route.detail.title" = "Rutedetaljer";
+"route.detail.elevation.profile" = "Højdeprofil";
+"route.detail.stat.distance" = "AFSTAND";
+"route.detail.stat.gain" = "STIGNING";
+"route.detail.stat.loss" = "FALD";
+"route.detail.section.route" = "Rute";
+"route.detail.name.placeholder" = "Rutenavn";
+"route.detail.save" = "Gem";
+"route.detail.cancel" = "Annuller";
+"route.detail.row.name" = "Navn";
+"route.detail.row.format" = "Format";
+"route.detail.row.trackpoints" = "Trackpunkter";
+"route.detail.row.file" = "Fil";
+"route.detail.reverse.button" = "Vend ruteretning";
+"route.detail.reverse.confirm.title" = "Vende denne rute?";
+"route.detail.reverse.confirm.action" = "Vend";
+"route.detail.reverse.confirm.message" = "Start- og slutpunkter byttes om. Dette kan ikke fortrydes.";
+"route.detail.section.poi" = "Sevsværdigheder";
+"route.detail.poi.empty" = "Ingen POI'er tilføjet endnu";
+"route.detail.poi.discover" = "Opdag POI'er langs ruten";
+"route.detail.section.waypoints" = "Indlejrede waypoints";
+"route.detail.waypoint.fallback" = "Waypoint";
+
+/* Ride View */
+"ride.no.route.title" = "Vælg en rute";
+"ride.no.route.subtitle" = "Importer eller vælg en GPX-rute fra dit bibliotek.";
+"ride.start.button" = "Start tur";
+"ride.center.map" = "Centrer kort";
+"ride.metric.speed" = "FART";
+"ride.metric.distance" = "AFSTAND";
+"ride.metric.time" = "TID";
+"ride.metric.route" = "RUTE";
+"ride.metric.avg.speed" = "GNSN. FART";
+"ride.metric.elev.gain" = "STIGNING";
+"ride.metric.elev.loss" = "FALD";
+"ride.offroute.title" = "Uden for rute";
+"ride.offroute.distance" = "%dm fra ruten";
+"ride.reroute.back" = "Tilbage til ruten";
+"ride.end.button" = "Afslut tur";
+"ride.location.following" = "Følger placering";
+"ride.location.recentre" = "Centrer kort igen";
+"ride.poi.search.label" = "Søg efter nærtliggende POI'er";
+"ride.poi.ahead.meters" = "%dm foran";
+"ride.poi.ahead.km" = "%.1f km foran";
+
+/* Ride History */
+"history.title" = "Mine ture";
+"history.empty.title" = "Ingen ture endnu";
+"history.empty.subtitle" = "Dine færdige ture vises her.\nStig op og begynd at trampe!";
+"history.record.longest" = "Længste";
+"history.record.fastest" = "Hurtigste gnsn.";
+"history.record.climb" = "Mest klatring";
+"history.delete" = "Slet";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "Omdøb tur";
+"history.detail.rename.placeholder" = "Turnavn";
+"history.detail.rename.save" = "Gem";
+"history.detail.rename.cancel" = "Annuller";
+"history.detail.menu.rename" = "Omdøb";
+"history.detail.menu.delete" = "Slet tur";
+"history.detail.delete.confirm.title" = "Slette denne tur?";
+"history.detail.delete.confirm.message" = "Dette kan ikke fortrydes.";
+"history.detail.delete.action" = "Slet";
+"history.detail.planned.toggle.title" = "Planlagt vs faktisk";
+"history.detail.planned.toggle.subtitle" = "Vis overlejring af den originale planlagte rute";
+"history.detail.section.poi" = "Sevsværdigheder";
+"history.detail.section.share" = "Del tur";
+"history.detail.share.card.button" = "Del som billedkort";
+"history.detail.section.export" = "Eksporter GPX";
+"history.detail.export.poi.title" = "Inkluder POI'er";
+"history.detail.export.poi.subtitle.one" = "%d stop som waypoint";
+"history.detail.export.poi.subtitle.other" = "%d stop som waypoints";
+"history.detail.export.gpx.button" = "Del GPX-fil";
+
+/* Ride Summary */
+"summary.title" = "Tur færdig";
+"summary.done" = "Færdig";
+"summary.section.save" = "Gem tur";
+"summary.gps.track.title" = "GPS-spor";
+"summary.gps.track.subtitle" = "Din faktiske tur — %d punkter registreret";
+"summary.export.no.track" = "Intet GPS-spor registreret for denne tur.";
+"summary.export.poi.title" = "Inkluder POI'er";
+"summary.export.gpx.button" = "Del GPX-fil";
+
+/* Metric Labels */
+"metric.time" = "TID";
+"metric.avg" = "GNSN";
+"metric.max" = "MAX";
+"metric.gain" = "STIGNING";
+"metric.loss" = "FALD";
+"metric.pois" = "POI'er";
+"metric.visited" = "besøgt";
+"metric.kmh" = "km/t";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "I nærheden";
+"nearby.searching" = "Søger…";
+"nearby.empty" = "Ingen resultater i nærheden";
+"nearby.category.cafe" = "Café";
+"nearby.category.water" = "Vand";
+"nearby.category.bikeshop" = "Cykelhandler";
+"nearby.category.restaurant" = "Restaurant";
+"nearby.unknown" = "Ukendt";
+"nearby.distance.meters" = "%.0f m væk";
+"nearby.distance.km" = "%.1f km væk";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Annuller";
+"common.save" = "Gem";
+"common.delete" = "Slet";
+"common.done" = "Færdig";
+"common.cancel.action" = "Annuller";

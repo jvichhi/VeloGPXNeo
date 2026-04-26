@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Arabic (ar) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "المسارات";
 "Ride" = "ركوب";
 "My Rides" = "جولاتي";
 "Settings" = "الإعدادات";
+
+/* Settings */
+"settings.language.title" = "اللغة";
+"settings.language.subtitle" = "لغة عرض التطبيق";
+"settings.import.title" = "استيراد المسارات";
+"settings.import.subtitle" = "استيراد ملفات GPX من تطبيق الملفات";
+"settings.map.title" = "محرك الخريطة";
+"settings.map.subtitle" = "خرائط Apple القياسية مع ارتفاع واقعي";
+"settings.birdseye.title" = "منظور عين الطائر";
+"settings.birdseye.subtitle" = "وضع نظرة عامة قبل بدء الجولة";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "مزامنة المقاييس والتحكمات مع ساعتك";
+"settings.poi.title" = "نقاط الاهتمام";
+"settings.poi.subtitle" = "إدارة فئات وعرض نقاط الاهتمام";
+"settings.export.title" = "تصدير";
+"settings.export.subtitle" = "تصدير الجولات كملفات GPX أو FIT";
+
+/* Language Picker */
+"language.search.prompt" = "بحث عن لغة";
+"language.picker.title" = "اللغة";
+"language.picker.done" = "تم";
+
+/* Route Library */
+"route.library.empty.title" = "لا توجد مسارات";
+"route.library.empty.subtitle" = "استورد ملف GPX أو GeoJSON\nمن Safari أو الملفات أو البريد.";
+"route.library.import.button" = "استيراد مسار";
+"route.library.ride.button" = "ركوب هذا المسار";
+"route.library.import.cancelled" = "تم إلغاء الاستيراد";
+"route.library.delete" = "حذف";
+
+/* Route Detail */
+"route.detail.title" = "تفاصيل المسار";
+"route.detail.elevation.profile" = "ملف الارتفاع";
+"route.detail.stat.distance" = "المسافة";
+"route.detail.stat.gain" = "الصعود";
+"route.detail.stat.loss" = "الهبوط";
+"route.detail.section.route" = "المسار";
+"route.detail.name.placeholder" = "اسم المسار";
+"route.detail.save" = "حفظ";
+"route.detail.cancel" = "إلغاء";
+"route.detail.row.name" = "الاسم";
+"route.detail.row.format" = "التنسيق";
+"route.detail.row.trackpoints" = "نقاط المسار";
+"route.detail.row.file" = "الملف";
+"route.detail.reverse.button" = "عكس اتجاه المسار";
+"route.detail.reverse.confirm.title" = "عكس هذا المسار؟";
+"route.detail.reverse.confirm.action" = "عكس";
+"route.detail.reverse.confirm.message" = "سيتم تبديل نقطتي البداية والنهاية. لا يمكن التراجع عن هذا الإجراء.";
+"route.detail.section.poi" = "نقاط الاهتمام";
+"route.detail.poi.empty" = "لم تُضف نقاط اهتمام بعد";
+"route.detail.poi.discover" = "اكتشف نقاط الاهتمام على طول المسار";
+"route.detail.section.waypoints" = "نقاط الطريق المدمجة";
+"route.detail.waypoint.fallback" = "نقطة طريق";
+
+/* Ride View */
+"ride.no.route.title" = "اختر مساراً";
+"ride.no.route.subtitle" = "استورد أو اختر مسار GPX من مكتبتك.";
+"ride.start.button" = "بدء الجولة";
+"ride.center.map" = "توسيط الخريطة";
+"ride.metric.speed" = "السرعة";
+"ride.metric.distance" = "المسافة";
+"ride.metric.time" = "الوقت";
+"ride.metric.route" = "المسار";
+"ride.metric.avg.speed" = "متوسط السرعة";
+"ride.metric.elev.gain" = "الصعود";
+"ride.metric.elev.loss" = "الهبوط";
+"ride.offroute.title" = "خارج المسار";
+"ride.offroute.distance" = "%dm من المسار";
+"ride.reroute.back" = "العودة إلى المسار";
+"ride.end.button" = "إنهاء الجولة";
+"ride.location.following" = "متابعة الموقع";
+"ride.location.recentre" = "إعادة توسيط الخريطة";
+"ride.poi.search.label" = "البحث عن نقاط اهتمام قريبة";
+"ride.poi.ahead.meters" = "%dm أمامك";
+"ride.poi.ahead.km" = "%.1f km أمامك";
+
+/* Ride History */
+"history.title" = "جولاتي";
+"history.empty.title" = "لا توجد جولات";
+"history.empty.subtitle" = "ستظهر جولاتك المكتملة هنا.\nاركب دراجتك وانطلق!";
+"history.record.longest" = "الأطول";
+"history.record.fastest" = "أسرع متوسط";
+"history.record.climb" = "أكثر تسلقاً";
+"history.delete" = "حذف";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "إعادة تسمية الجولة";
+"history.detail.rename.placeholder" = "اسم الجولة";
+"history.detail.rename.save" = "حفظ";
+"history.detail.rename.cancel" = "إلغاء";
+"history.detail.menu.rename" = "إعادة تسمية";
+"history.detail.menu.delete" = "حذف الجولة";
+"history.detail.delete.confirm.title" = "حذف هذه الجولة؟";
+"history.detail.delete.confirm.message" = "لا يمكن التراجع عن هذا الإجراء.";
+"history.detail.delete.action" = "حذف";
+"history.detail.planned.toggle.title" = "مخطط مقابل فعلي";
+"history.detail.planned.toggle.subtitle" = "عرض تغطية المسار المخطط الأصلي";
+"history.detail.section.poi" = "نقاط الاهتمام";
+"history.detail.section.share" = "مشاركة الجولة";
+"history.detail.share.card.button" = "مشاركة كبطاقة صورة";
+"history.detail.section.export" = "تصدير GPX";
+"history.detail.export.poi.title" = "تضمين نقاط الاهتمام";
+"history.detail.export.poi.subtitle.one" = "%d توقف كنقطة طريق";
+"history.detail.export.poi.subtitle.other" = "%d توقفات كنقاط طريق";
+"history.detail.export.gpx.button" = "مشاركة ملف GPX";
+
+/* Ride Summary */
+"summary.title" = "اكتملت الجولة";
+"summary.done" = "تم";
+"summary.section.save" = "حفظ الجولة";
+"summary.gps.track.title" = "مسار GPS";
+"summary.gps.track.subtitle" = "مسارك الفعلي — تم تسجيل %d نقطة";
+"summary.export.no.track" = "لم يتم تسجيل مسار GPS لهذه الجولة.";
+"summary.export.poi.title" = "تضمين نقاط الاهتمام";
+"summary.export.gpx.button" = "مشاركة ملف GPX";
+
+/* Metric Labels */
+"metric.time" = "الوقت";
+"metric.avg" = "متوسط";
+"metric.max" = "أقصى";
+"metric.gain" = "صعود";
+"metric.loss" = "هبوط";
+"metric.pois" = "POI";
+"metric.visited" = "زيارة";
+"metric.kmh" = "كم/س";
+"metric.km" = "كم";
+"metric.meters" = "م";
+
+/* Nearby Search */
+"nearby.title" = "بالقرب";
+"nearby.searching" = "جاري البحث…";
+"nearby.empty" = "لا توجد نتائج قريبة";
+"nearby.category.cafe" = "مقهى";
+"nearby.category.water" = "مياه";
+"nearby.category.bikeshop" = "محل دراجات";
+"nearby.category.restaurant" = "مطعم";
+"nearby.unknown" = "غير معروف";
+"nearby.distance.meters" = "%.0f م";
+"nearby.distance.km" = "%.1f كم";
+
+/* Common */
+"common.ok" = "حسناً";
+"common.cancel" = "إلغاء";
+"common.save" = "حفظ";
+"common.delete" = "حذف";
+"common.done" = "تم";
+"common.cancel.action" = "إلغاء";

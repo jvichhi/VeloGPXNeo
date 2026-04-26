@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Norwegian Bokmål (nb) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "Ruter";
-"Ride" = "Sykkel";
+"Ride" = "Sykkeltur";
 "My Rides" = "Mine turer";
 "Settings" = "Innstillinger";
+
+/* Settings */
+"settings.language.title" = "Språk";
+"settings.language.subtitle" = "Appens visningsspråk";
+"settings.import.title" = "Importer ruter";
+"settings.import.subtitle" = "Importer GPX-filer fra Filer-appen";
+"settings.map.title" = "Kartmotor";
+"settings.map.subtitle" = "Apple Maps standard med realistisk høyde";
+"settings.birdseye.title" = "Fugleperspektiv";
+"settings.birdseye.subtitle" = "Oversiktsmodus før start av tur";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "Synkroniser målinger og kontroller til Watch";
+"settings.poi.title" = "Severdighe ter";
+"settings.poi.subtitle" = "Administrer POI-kategorier og visning";
+"settings.export.title" = "Eksporter";
+"settings.export.subtitle" = "Eksporter turer som GPX- eller FIT-filer";
+
+/* Language Picker */
+"language.search.prompt" = "Søk etter språk";
+"language.picker.title" = "Språk";
+"language.picker.done" = "Ferdig";
+
+/* Route Library */
+"route.library.empty.title" = "Ingen ruter ennå";
+"route.library.empty.subtitle" = "Importer en GPX- eller GeoJSON-fil fra\nSafari, Filer eller E-post.";
+"route.library.import.button" = "Importer rute";
+"route.library.ride.button" = "Sykle denne ruten";
+"route.library.import.cancelled" = "Import avbrutt";
+"route.library.delete" = "Slett";
+
+/* Route Detail */
+"route.detail.title" = "Rutedetaljer";
+"route.detail.elevation.profile" = "Høydeprofil";
+"route.detail.stat.distance" = "AVSTAND";
+"route.detail.stat.gain" = "STIGNING";
+"route.detail.stat.loss" = "FALL";
+"route.detail.section.route" = "Rute";
+"route.detail.name.placeholder" = "Rutenavn";
+"route.detail.save" = "Lagre";
+"route.detail.cancel" = "Avbryt";
+"route.detail.row.name" = "Navn";
+"route.detail.row.format" = "Format";
+"route.detail.row.trackpoints" = "Trackpunkter";
+"route.detail.row.file" = "Fil";
+"route.detail.reverse.button" = "Snu ruteretning";
+"route.detail.reverse.confirm.title" = "Snu denne ruten?";
+"route.detail.reverse.confirm.action" = "Snu";
+"route.detail.reverse.confirm.message" = "Start- og sluttpunkter byttes. Dette kan ikke angres.";
+"route.detail.section.poi" = "Severdighe ter";
+"route.detail.poi.empty" = "Ingen POI-er lagt til ennå";
+"route.detail.poi.discover" = "Oppdage POI-er langs ruten";
+"route.detail.section.waypoints" = "Innebygde veipunkter";
+"route.detail.waypoint.fallback" = "Veipunkt";
+
+/* Ride View */
+"ride.no.route.title" = "Velg en rute";
+"ride.no.route.subtitle" = "Importer eller velg en GPX-rute fra biblioteket ditt.";
+"ride.start.button" = "Start tur";
+"ride.center.map" = "Sentrer kart";
+"ride.metric.speed" = "FART";
+"ride.metric.distance" = "AVSTAND";
+"ride.metric.time" = "TID";
+"ride.metric.route" = "RUTE";
+"ride.metric.avg.speed" = "GJENNOM. FART";
+"ride.metric.elev.gain" = "STIGNING";
+"ride.metric.elev.loss" = "FALL";
+"ride.offroute.title" = "Utenfor rute";
+"ride.offroute.distance" = "%dm fra ruten";
+"ride.reroute.back" = "Tilbake til ruten";
+"ride.end.button" = "Avslutt tur";
+"ride.location.following" = "Følger posisjon";
+"ride.location.recentre" = "Sentrer kart igjen";
+"ride.poi.search.label" = "Søk etter nærliggende POI-er";
+"ride.poi.ahead.meters" = "%dm foran";
+"ride.poi.ahead.km" = "%.1f km foran";
+
+/* Ride History */
+"history.title" = "Mine turer";
+"history.empty.title" = "Ingen turer ennå";
+"history.empty.subtitle" = "De ferdige turene dine vises her.\nSett deg i salen og sykle!";
+"history.record.longest" = "Lengste";
+"history.record.fastest" = "Raskeste gjennom.";
+"history.record.climb" = "Mest klatring";
+"history.delete" = "Slett";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "Gi turen nytt navn";
+"history.detail.rename.placeholder" = "Turnavn";
+"history.detail.rename.save" = "Lagre";
+"history.detail.rename.cancel" = "Avbryt";
+"history.detail.menu.rename" = "Gi nytt navn";
+"history.detail.menu.delete" = "Slett tur";
+"history.detail.delete.confirm.title" = "Slette denne turen?";
+"history.detail.delete.confirm.message" = "Dette kan ikke angres.";
+"history.detail.delete.action" = "Slett";
+"history.detail.planned.toggle.title" = "Planlagt vs faktisk";
+"history.detail.planned.toggle.subtitle" = "Vis overlegg av den opprinnelige planlagte ruten";
+"history.detail.section.poi" = "Severdighe ter";
+"history.detail.section.share" = "Del tur";
+"history.detail.share.card.button" = "Del som bildekort";
+"history.detail.section.export" = "Eksporter GPX";
+"history.detail.export.poi.title" = "Inkluder POI-er";
+"history.detail.export.poi.subtitle.one" = "%d stopp som veipunkt";
+"history.detail.export.poi.subtitle.other" = "%d stopp som veipunkter";
+"history.detail.export.gpx.button" = "Del GPX-fil";
+
+/* Ride Summary */
+"summary.title" = "Tur fullført";
+"summary.done" = "Ferdig";
+"summary.section.save" = "Lagre tur";
+"summary.gps.track.title" = "GPS-spor";
+"summary.gps.track.subtitle" = "Din faktiske tur — %d punkter registrert";
+"summary.export.no.track" = "Ingen GPS-spor registrert for denne turen.";
+"summary.export.poi.title" = "Inkluder POI-er";
+"summary.export.gpx.button" = "Del GPX-fil";
+
+/* Metric Labels */
+"metric.time" = "TID";
+"metric.avg" = "GJENNOM";
+"metric.max" = "MAKS";
+"metric.gain" = "STIGNING";
+"metric.loss" = "FALL";
+"metric.pois" = "POI-er";
+"metric.visited" = "besøkt";
+"metric.kmh" = "km/t";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "I nærheten";
+"nearby.searching" = "Søker…";
+"nearby.empty" = "Ingen resultater i nærheten";
+"nearby.category.cafe" = "Kafé";
+"nearby.category.water" = "Vann";
+"nearby.category.bikeshop" = "Sykkelforretning";
+"nearby.category.restaurant" = "Restaurant";
+"nearby.unknown" = "Ukjent";
+"nearby.distance.meters" = "%.0f m unna";
+"nearby.distance.km" = "%.1f km unna";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Avbryt";
+"common.save" = "Lagre";
+"common.delete" = "Slett";
+"common.done" = "Ferdig";
+"common.cancel.action" = "Avbryt";
