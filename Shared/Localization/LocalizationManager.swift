@@ -31,6 +31,27 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .english:    return "English"
+        case .french:     return "French"
+        case .spanish:    return "Spanish"
+        case .portuguese: return "Portuguese"
+        case .italian:    return "Italian"
+        case .german:     return "German"
+        case .dutch:      return "Dutch"
+        case .danish:     return "Danish"
+        case .swedish:    return "Swedish"
+        case .polish:     return "Polish"
+        case .japanese:   return "Japanese"
+        case .chinese:    return "Chinese (Simplified)"
+        case .korean:     return "Korean"
+        case .norwegian:  return "Norwegian"
+        case .arabic:     return "Arabic"
+        }
+    }
+
+    /// Name of the language in that language itself
+    var nativeName: String {
+        switch self {
+        case .english:    return "English"
         case .french:     return "Français"
         case .spanish:    return "Español"
         case .portuguese: return "Português"
@@ -68,8 +89,20 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// SwiftUI layout direction for this language
+    var layoutDirection: LayoutDirection {
+        self == .arabic ? .rightToLeft : .leftToRight
+    }
+
     /// Returns true for RTL languages
     var isRTL: Bool { self == .arabic }
+
+    /// The Locale for this language (used for formatters + SwiftUI .environment(\.locale))
+    var locale: Locale { Locale(identifier: rawValue) }
+
+    static var alphabetical: [AppLanguage] {
+        allCases.sorted { $0.displayName < $1.displayName }
+    }
 }
 
 // MARK: - LocalizationManager
@@ -78,7 +111,7 @@ final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
     @Published private(set) var currentLanguage: AppLanguage
-    private var bundle: Bundle = .main
+    private(set) var bundle: Bundle = .main
 
     private let storageKey = "velogpx.language"
 
@@ -90,7 +123,6 @@ final class LocalizationManager: ObservableObject {
         } else {
             let preferred = Locale.preferredLanguages.first ?? "en"
             let code = String(preferred.prefix(2))
-            // Match zh specially
             if preferred.hasPrefix("zh") {
                 currentLanguage = .chinese
             } else {
@@ -102,10 +134,10 @@ final class LocalizationManager: ObservableObject {
 
     func set(_ language: AppLanguage) {
         guard language != currentLanguage else { return }
-        currentLanguage = language
         UserDefaults.standard.set(language.rawValue, forKey: storageKey)
         bundle = resolveBundle(for: language)
-        objectWillChange.send()
+        // Publish change — triggers .id(lm.currentLanguage) rebuild in VeloGPXApp
+        currentLanguage = language
     }
 
     func string(_ key: String) -> String {
@@ -113,7 +145,7 @@ final class LocalizationManager: ObservableObject {
     }
 
     private func resolveBundle(for language: AppLanguage) -> Bundle {
-        // Try exact code first, then 2-char prefix
+        // Try exact code first (e.g. "zh-Hans"), then 2-char prefix (e.g. "zh")
         let codes = [language.rawValue, String(language.rawValue.prefix(2))]
         for code in codes {
             if let path = Bundle.main.path(forResource: code, ofType: "lproj"),
@@ -131,5 +163,18 @@ extension String {
     /// Shorthand: "key".localized
     var localized: String {
         LocalizationManager.shared.string(self)
+    }
+}
+
+// MARK: - EnvironmentKey for current AppLanguage
+
+private struct AppLanguageKey: EnvironmentKey {
+    static let defaultValue: AppLanguage = .english
+}
+
+extension EnvironmentValues {
+    var appLanguage: AppLanguage {
+        get { self[AppLanguageKey.self] }
+        set { self[AppLanguageKey.self] = newValue }
     }
 }

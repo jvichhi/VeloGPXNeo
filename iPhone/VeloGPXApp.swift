@@ -14,12 +14,17 @@ struct VeloGPXApp: App {
                 .environmentObject(routeStore)
                 .environmentObject(historyStore)
                 .environmentObject(lm)
-                // Force the entire view tree to rebuild when language changes.
-                // SwiftUI re-creates every view that holds @EnvironmentObject lm,
-                // so all Text() calls re-evaluate with the new bundle.
-                .id(lm.currentLanguage)
+                // Inject locale so SwiftUI Text(), formatters, and
+                // date/number formatting all use the selected language.
+                .environment(\.locale, lm.currentLanguage.locale)
+                // Inject layout direction for RTL support (Arabic etc.)
                 .environment(\.layoutDirection, lm.currentLanguage.layoutDirection)
+                // Expose language as a custom EnvironmentKey for child views.
                 .environment(\.appLanguage, lm.currentLanguage)
+                // Force the ENTIRE view tree to recreate when language changes.
+                // This is the key mechanism — without .id(), views cache their
+                // Text() renders and won't re-evaluate even if @Published fires.
+                .id(lm.currentLanguage)
                 .task {
                     routeStore.loadFromDisk()
                 }
