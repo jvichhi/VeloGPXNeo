@@ -3,14 +3,12 @@ import MapKit
 
 /// Full-screen sheet shown after a ride ends.
 /// Displays stats, a map snapshot of the actual track, visited POIs,
-/// and export options (track + optional planned route + POIs).
+/// and a one-tap GPX export of the ride.
 struct RideSummaryView: View {
     let summary: RideSummary
     var onDismiss: () -> Void
 
     @State private var mapSnapshot: UIImage?
-    @State private var exportActualTrack = true
-    @State private var exportPlannedRoute = false
     @State private var exportPOIs = true
     @State private var showShareSheet = false
     @State private var gpxFileURL: URL?
@@ -106,11 +104,11 @@ struct RideSummaryView: View {
             columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
             spacing: 10
         ) {
-            MetricTile(label: "TIME",      value: summary.elapsedTime.hhmm,              unit: summary.elapsedTime.unit,     icon: "clock.fill",                           color: .purple)
-            MetricTile(label: "AVG",       value: String(format: "%.1f", summary.avgSpeedKmh), unit: "km/h",                 icon: "speedometer",                          color: .blue)
-            MetricTile(label: "MAX",       value: String(format: "%.1f", summary.maxSpeedKmh), unit: "km/h",                 icon: "gauge.with.dots.needle.67percent",      color: .red)
-            MetricTile(label: "GAIN",      value: String(format: "%.0f", summary.elevationGain), unit: "m",                 icon: "mountain.2.fill",                      color: .green)
-            MetricTile(label: "POIs",      value: "\(summary.pois.count)",               unit: "visited",                    icon: "mappin.circle.fill",                   color: .orange)
+            MetricTile(label: "TIME",  value: summary.elapsedTime.hhmm,                    unit: summary.elapsedTime.unit, icon: "clock.fill",                        color: .purple)
+            MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh), unit: "km/h",                   icon: "speedometer",                       color: .blue)
+            MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh), unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
+            MetricTile(label: "GAIN",  value: String(format: "%.0f", summary.elevationGain), unit: "m",                   icon: "mountain.2.fill",                    color: .green)
+            MetricTile(label: "POIs",  value: "\(summary.pois.count)",                     unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
         }
     }
 
@@ -140,17 +138,58 @@ struct RideSummaryView: View {
     @ViewBuilder
     private var exportSection: some View {
         VStack(spacing: 0) {
-            DetailSectionHeader(title: "Export as GPX", systemImage: "square.and.arrow.up")
+            DetailSectionHeader(title: "Save Ride", systemImage: "square.and.arrow.up")
 
-            exportToggle("Actual Track", isOn: $exportActualTrack, alwaysOn: true)
-            Divider().padding(.leading, 14)
-            exportToggle("Original Planned Route", isOn: $exportPlannedRoute)
+            // What's always included
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.blue)
+                    .font(.system(size: 20))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("GPS Track")
+                        .font(.subheadline.weight(.medium))
+                    Text("Your actual ride path — \(summary.actualTrack.count) points recorded")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            // Optional POI toggle
             if !summary.pois.isEmpty {
                 Divider().padding(.leading, 14)
-                exportToggle("Points of Interest (\(summary.pois.count))", isOn: $exportPOIs)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Include POIs")
+                            .font(.subheadline)
+                        Text("\(summary.pois.count) stop\(summary.pois.count == 1 ? "" : "s") as waypoints")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $exportPOIs).labelsHidden()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
             }
 
             Divider()
+
+            // Empty track warning
+            if summary.actualTrack.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("No GPS track recorded for this ride.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                Divider()
+            }
 
             Button {
                 exportGPX()
@@ -159,40 +198,25 @@ struct RideSummaryView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                    .background(
+                        summary.actualTrack.isEmpty ? Color(.systemGray4) : .blue,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
                     .foregroundStyle(.white)
             }
             .padding(14)
-            .disabled(!exportActualTrack && !exportPlannedRoute)
+            .disabled(summary.actualTrack.isEmpty)
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
-    @ViewBuilder
-    private func exportToggle(_ label: String, isOn: Binding<Bool>, alwaysOn: Bool = false) -> some View {
-        HStack {
-            Text(label)
-                .font(.subheadline)
-            Spacer()
-            if alwaysOn {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.blue)
-                    .font(.system(size: 22))
-            } else {
-                Toggle("", isOn: isOn).labelsHidden()
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-    }
-
-    // MARK: - Actions
+    // MARK: - Export Action
 
     private func exportGPX() {
         let options = GPXExporter.Options(
-            includeActualTrack: exportActualTrack,
-            includePlannedRoute: exportPlannedRoute,
+            includeActualTrack: true,
+            includePlannedRoute: false,
             includePOIs: exportPOIs && !summary.pois.isEmpty
         )
         let gpxString = GPXExporter.export(summary, options: options)
@@ -244,17 +268,6 @@ struct RideSummaryView: View {
                 path.lineCapStyle = .round
                 path.lineJoinStyle = .round
                 path.stroke()
-                if !summary.plannedTrack.isEmpty {
-                    let planned = UIBezierPath()
-                    for (i, coord) in summary.plannedTrack.enumerated() {
-                        let point = snapshot.point(for: coord)
-                        if i == 0 { planned.move(to: point) } else { planned.addLine(to: point) }
-                    }
-                    UIColor.systemBlue.withAlphaComponent(0.25).setStroke()
-                    planned.lineWidth = 2
-                    planned.setLineDash([6, 4], count: 2, phase: 0)
-                    planned.stroke()
-                }
                 for poi in summary.pois {
                     let pt = snapshot.point(for: poi.coordinate.clCoordinate)
                     let dot = UIBezierPath(ovalIn: CGRect(x: pt.x - 5, y: pt.y - 5, width: 10, height: 10))
