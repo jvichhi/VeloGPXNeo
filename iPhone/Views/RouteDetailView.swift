@@ -10,10 +10,21 @@ struct RouteDetailView: View {
     @State private var pendingName = ""
     @State private var showPOIDiscovery = false
     @State private var showReverseConfirm = false
+    // WWDC 2025: LookAround
+    @State private var lookAroundScene: MKLookAroundScene? = nil
+    @State private var showLookAround = false
+    @State private var lookAroundUnavailable = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+
+                // MARK: LookAround Preview (WWDC 2025)
+                // Shows a tappable street-level preview of the route start.
+                // Hidden automatically when LookAround has no imagery for the location.
+                if !lookAroundUnavailable {
+                    lookAroundCard
+                }
 
                 // MARK: Hero Elevation Card
                 if hasElevationData {
@@ -217,6 +228,99 @@ struct RouteDetailView: View {
             POIDiscoverySheet(route: route)
                 .onDisappear { routeStore.savePOIs() }
         }
+        // WWDC 2025: LookAround full-screen viewer
+        .fullScreenCover(isPresented: $showLookAround) {
+            if let scene = lookAroundScene {
+                LookAroundViewer(scene: scene)
+                    .ignoresSafeArea()
+                    .overlay(alignment: .topTrailing) {
+                        Button { showLookAround = false } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .shadow(radius: 4)
+                        }
+                        .padding(20)
+                    }
+            }
+        }
+        .task { await fetchLookAroundScene() }
+    }
+
+    // MARK: - LookAround Card
+
+    @ViewBuilder
+    private var lookAroundCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.blue)
+                Text("Street Preview")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("Route Start")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color(.systemGray6).opacity(0.6))
+
+            if let scene = lookAroundScene {
+                // SwiftUI-native LookAroundPreview (iOS 17+)
+                LookAroundPreview(initialScene: scene)
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 0))
+                    .overlay(alignment: .bottomTrailing) {
+                        Button {
+                            showLookAround = true
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Expand")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.ultraThinMaterial, in: Capsule())
+                        }
+                        .padding(10)
+                    }
+            } else {
+                // Shimmer placeholder while fetching
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(Color(.systemGray5))
+                    .frame(height: 180)
+                    .overlay {
+                        ProgressView()
+                    }
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.07), radius: 8, y: 3)
+    }
+
+    // MARK: - LookAround Fetch
+
+    private func fetchLookAroundScene() async {
+        guard let firstPoint = route.trackPoints.first else {
+            lookAroundUnavailable = true
+            return
+        }
+        let request = MKLookAroundSceneRequest(coordinate: firstPoint.coordinate.clCoordinate)
+        do {
+            if let scene = try await request.scene {
+                lookAroundScene = scene
+            } else {
+                lookAroundUnavailable = true
+            }
+        } catch {
+            lookAroundUnavailable = true
+        }
     }
 
     private var hasElevationData: Bool {
@@ -251,6 +355,23 @@ struct RouteDetailView: View {
         guard !trimmed.isEmpty else { return }
         routeStore.renameRoute(route, to: trimmed)
         isRenaming = false
+    }
+}
+
+// MARK: - LookAround Full-Screen Viewer (UIKit bridge)
+
+private struct LookAroundViewer: UIViewControllerRepresentable {
+    let scene: MKLookAroundScene
+
+    func makeUIViewController(context: Context) -> MKLookAroundViewController {
+        let vc = MKLookAroundViewController(scene: scene)
+        vc.showsRoadLabels = true
+        vc.pointsOfInterestFilter = .includingAll
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: MKLookAroundViewController, context: Context) {
+        uiViewController.scene = scene
     }
 }
 

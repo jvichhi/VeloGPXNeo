@@ -65,8 +65,8 @@ struct RideView: View {
     @State private var showRideSummary = false
     @State private var statsExpanded: Bool = false
     @State private var hudHeight: CGFloat = 0
-    // WWDC 2025: Place Card sheet state
-    @State private var selectedMapItem: MKMapItem? = nil
+    // WWDC 2025: PlaceDescriptor-resolved MKMapItems keyed by POI UUID
+    @State private var resolvedPOIItems: [UUID: MKMapItem] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -96,6 +96,8 @@ struct RideView: View {
                             if let route = routeStore.selectedRoute {
                                 Task { await computePOISpurs(route: route) }
                             }
+                            // Re-warm cache after POIs change
+                            Task { await warmPOICache() }
                         }
                 }
             }
@@ -107,18 +109,13 @@ struct RideView: View {
                     }
                 }
             }
-            // WWDC 2025: Native Place Card for tapped POI pins
-            .sheet(item: $selectedMapItem) { item in
-                MapItemDetailView(item: item)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-            }
             .onAppear {
                 rideStore.prepare()
                 if let route = routeStore.selectedRoute {
                     position = .rect(route.mapRect)
                     Task { await computePOISpurs(route: route) }
                 }
+                Task { await warmPOICache() }
             }
             .onAppear {
                 rideStore.setHistoryStore(historyStore)
@@ -127,6 +124,7 @@ struct RideView: View {
                 if let route = routeStore.selectedRoute {
                     Task { await computePOISpurs(route: route) }
                 }
+                Task { await warmPOICache() }
             }
             .onChange(of: rideStore.rideState.nextPOI?.id) { _, _ in
                 if let route = routeStore.selectedRoute {
@@ -465,7 +463,10 @@ struct RideView: View {
 
     @ViewBuilder
     private func mapLayer(route: RouteModel) -> some View {
-        Map(position: $position, selection: $selectedMapItem) {
+        // WWDC 2025: Map(selection:) with no selectedMapItem binding needed —
+        // Marker(item:) + .mapItemDetailSelectionAccessory(.callout) handles
+        // the Place Card entirely within the map, no sheet required.
+        Map(position: $position) {
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden).stroke(.blue.opacity(0.3), lineWidth: 4)
                 MapPolyline(coordinates: progress.remaining).stroke(.blue, lineWidth: 5)
@@ -493,23 +494,28 @@ struct RideView: View {
                 }
             }
 
-            // WWDC 2025: POI pins with native Place Card callout accessory
-            // Tap pin → sheet(item: $selectedMapItem) shows full MKMapItemDetailViewController
+            // WWDC 2025: Marker(item:) uses Apple Maps iconography + live place data.
+            // .mapItemDetailSelectionAccessory(.callout) opens the native Place Card
+            // inline when the pin is tapped — no custom gesture or sheet needed.
             ForEach(routeStore.selectedPOIs) { poi in
                 let isNext = poi.id == rideStore.rideState.nextPOI?.id
-                let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: poi.coordinate.clCoordinate))
-                mapItem.name = poi.name
-                Annotation(poi.name, coordinate: poi.coordinate.clCoordinate, anchor: .bottom) {
-                    ZStack {
-                        Circle()
-                            .fill(isNext ? Color.green : Color.white)
-                            .frame(width: 32, height: 32)
-                            .shadow(radius: isNext ? 4 : 2)
-                        Image(systemName: poi.category.systemImage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(isNext ? .white : .orange)
+                if let resolved = resolvedPOIItems[poi.id] {
+                    Marker(item: resolved)
+                        .tint(isNext ? .green : .orange)
+                        .mapItemDetailSelectionAccessory(.callout)
+                } else {
+                    // Placeholder pin while resolution is in-flight
+                    Annotation(poi.name, coordinate: poi.coordinate.clCoordinate, anchor: .bottom) {
+                        ZStack {
+                            Circle()
+                                .fill(isNext ? Color.green : Color.white)
+                                .frame(width: 32, height: 32)
+                                .shadow(radius: isNext ? 4 : 2)
+                            Image(systemName: poi.category.systemImage)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(isNext ? .white : .orange)
+                        }
                     }
-                    .onTapGesture { selectedMapItem = mapItem }
                 }
             }
 
@@ -610,8 +616,6 @@ struct RideView: View {
     @ViewBuilder
     private var rerouteStepsList: some View {
         VStack(alignment: .leading, spacing: 6) {
-
-            // WWDC 2025: Show localized cycling path name from MKRoute.name
             HStack(spacing: 5) {
                 Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
                     .font(.system(size: 12, weight: .semibold)).foregroundStyle(.orange)
@@ -620,7 +624,6 @@ struct RideView: View {
                     .lineLimit(1)
             }
 
-            // WWDC 2025: Road closure / notice chips from MKRoute.notices
             ForEach(rideStore.rerouteNotices.prefix(2), id: \.title) { notice in
                 HStack(spacing: 5) {
                     Image(systemName: notice.kind == .closure ? "xmark.octagon.fill" : "info.circle.fill")
@@ -684,6 +687,18 @@ struct RideView: View {
         suppressNextCameraChange = true
         isFollowing = true
         position = .camera(MapCamera(centerCoordinate: coord, distance: 400, heading: heading, pitch: 45))
+    }
+
+    // MARK: - POI Cache Warming
+
+    private func warmPOICache() async {
+        let pois = routeStore.selectedPOIs
+        await POIMapItemCache.shared.warmCache(for: pois)
+        var updated: [UUID: MKMapItem] = [:]
+        for poi in pois {
+            updated[poi.id] = await POIMapItemCache.shared.item(for: poi)
+        }
+        await MainActor.run { resolvedPOIItems = updated }
     }
 
     // MARK: - POI Spur Computation
@@ -801,26 +816,4 @@ struct RideView: View {
         }
         return samples
     }
-}
-
-// MARK: - MapItemDetailView (WWDC 2025 native Place Card)
-
-@available(iOS 18.0, *)
-private struct MapItemDetailView: UIViewControllerRepresentable {
-    let item: MKMapItem
-
-    func makeUIViewController(context: Context) -> MKMapItemDetailViewController {
-        let vc = MKMapItemDetailViewController()
-        vc.mapItem = item
-        return vc
-    }
-
-    func updateUIViewController(_ uiViewController: MKMapItemDetailViewController, context: Context) {
-        uiViewController.mapItem = item
-    }
-}
-
-// MKMapItem must conform to Identifiable for sheet(item:)
-extension MKMapItem: @retroactive Identifiable {
-    public var id: String { self.name ?? self.placemark.title ?? UUID().uuidString }
 }
