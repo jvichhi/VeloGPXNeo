@@ -13,8 +13,6 @@ private struct ElevSample: Identifiable {
 }
 
 // MARK: - POI Spur
-// inbound  = you → POI           (green dashed)
-// outbound = POI → GPX route     (red dashed, shortest real-road route)
 private struct POISpur: Identifiable {
     let id: UUID
     let inbound: [CLLocationCoordinate2D]
@@ -64,48 +62,17 @@ struct RideView: View {
     @State private var suppressNextCameraChange: Bool = false
     @State private var rideSummary: RideSummary? = nil
     @State private var showRideSummary = false
+    @State private var statsExpanded: Bool = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            Group {
                 if let route = routeStore.selectedRoute {
-                    ZStack(alignment: .top) {
-                        mapLayer(route: route)
-                        topBanners
-
-                        // Re-center button — bottom trailing, only when user has panned away
-                        if viewMode == .riding && !isFollowing {
-                            VStack {
-                                Spacer()
-                                HStack {
-                                    Spacer()
-                                    Button {
-                                        if let coord = rideStore.rideState.currentCoordinate {
-                                            updateRidingCamera(coord: coord.clCoordinate)
-                                        }
-                                    } label: {
-                                        Image(systemName: "location.fill")
-                                            .font(.system(size: 18, weight: .semibold))
-                                            .foregroundStyle(.blue)
-                                            .padding(14)
-                                            .background(.thinMaterial, in: Circle())
-                                            .shadow(radius: 4)
-                                    }
-                                    .padding(.trailing, 16)
-                                    .padding(.bottom, 16)
-                                    .transition(.scale.combined(with: .opacity))
-                                }
-                            }
-                        }
-                    }
-                    .animation(.spring(duration: 0.3), value: isFollowing)
-                    .frame(maxHeight: viewMode == .riding ? .infinity : 320)
-
                     if viewMode == .riding {
-                        ridingHUD(route: route)
+                        ridingLayout(route: route)
                     } else {
-                        birdsEyeHUD(route: route)
+                        birdsEyeLayout(route: route)
                     }
                 } else {
                     ContentUnavailableView(
@@ -115,18 +82,7 @@ struct RideView: View {
                     )
                 }
             }
-            .navigationTitle(viewMode == .riding ? "Riding" : "Route Overview")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if viewMode == .riding {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showNearbySearch = true } label: {
-                            Image(systemName: "magnifyingglass")
-                        }
-                        .disabled(rideStore.rideState.currentCoordinate == nil)
-                    }
-                }
-            }
+            .ignoresSafeArea(edges: .top)
             .sheet(isPresented: $showNearbySearch) {
                 if let coord = rideStore.rideState.currentCoordinate {
                     NearbySearchSheet(coordinate: coord.clCoordinate)
@@ -167,6 +123,7 @@ struct RideView: View {
             .onChange(of: rideStore.rideState.isActive) { _, newValue in
                 withAnimation(.spring(duration: 0.4)) {
                     viewMode = newValue ? .riding : .birdseye
+                    statsExpanded = false
                 }
                 isFollowing = true
                 if newValue, let coord = rideStore.rideState.currentCoordinate {
@@ -193,13 +150,584 @@ struct RideView: View {
         }
     }
 
+    // MARK: - Bird's Eye Layout
+
+    @ViewBuilder
+    private func birdsEyeLayout(route: RouteModel) -> some View {
+        ZStack(alignment: .bottom) {
+            mapLayer(route: route)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(Color(.systemFill))
+                    .frame(width: 36, height: 4)
+                    .padding(.top, 10)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(route.name)
+                            .font(.headline)
+                            .lineLimit(1)
+                        Text("\(String(format: "%.1f km", route.totalDistance / 1000))  \u{00B7}  \u{2191}\(String(format: "%.0f m", route.elevationGain))  \u{2193}\(String(format: "%.0f m", route.elevationLoss))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "bicycle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.blue)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+
+                Divider().padding(.horizontal, 20)
+
+                elevationStrip(route: route)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+
+                Button {
+                    rideStore.start(route: route, pois: routeStore.selectedPOIs)
+                } label: {
+                    Label("Start Ride", systemImage: "play.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
+
+                Button("Center Map") { position = .rect(route.mapRect) }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 20)
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
+            .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: -4)
+        }
+    }
+
+    // MARK: - Riding Layout
+
+    @ViewBuilder
+    private func ridingLayout(route: RouteModel) -> some View {
+        ZStack(alignment: .bottom) {
+            mapLayer(route: route)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            VStack(spacing: 8) {
+                topBanners
+                    .padding(.top, 56)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
+
+            if !isFollowing {
+                HStack {
+                    Spacer()
+                    Button {
+                        if let coord = rideStore.rideState.currentCoordinate {
+                            updateRidingCamera(coord: coord.clCoordinate)
+                        }
+                    } label: {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.blue)
+                            .padding(13)
+                            .background(.ultraThickMaterial, in: Circle())
+                            .shadow(radius: 6)
+                    }
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, statsExpanded ? 310 : 210)
+                .transition(.scale.combined(with: .opacity))
+                .animation(.spring(duration: 0.3), value: isFollowing)
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    showNearbySearch = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThickMaterial, in: Circle())
+                        .shadow(radius: 4)
+                }
+                .disabled(rideStore.rideState.currentCoordinate == nil)
+
+                Spacer()
+
+                Button {
+                    if let summary = rideStore.stopAndBuildSummary() {
+                        rideSummary = summary
+                        showRideSummary = true
+                    } else {
+                        rideStore.stop()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "stop.fill")
+                        Text("Stop")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 13)
+                    .background(Color.red, in: Capsule())
+                    .shadow(radius: 4)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, statsExpanded ? 302 : 202)
+            .animation(.spring(duration: 0.35), value: statsExpanded)
+
+            ridingHUDPanel(route: route)
+        }
+        .animation(.spring(duration: 0.3), value: isFollowing)
+    }
+
+    // MARK: - Riding HUD Panel
+
+    @ViewBuilder
+    private func ridingHUDPanel(route: RouteModel) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.spring(duration: 0.35)) {
+                    statsExpanded.toggle()
+                }
+            } label: {
+                VStack(spacing: 6) {
+                    Capsule()
+                        .fill(Color(.systemFill))
+                        .frame(width: 36, height: 4)
+                    Image(systemName: statsExpanded ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 10)
+                .padding(.bottom, 2)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+
+            if !rideStore.rideState.rerouteSteps.isEmpty {
+                rerouteStepsList
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
+
+            primaryMetricsRow
+
+            if statsExpanded {
+                Divider()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                expandedStatsGrid
+                Divider()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                elevationStrip(route: route)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+        .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: -6)
+    }
+
+    // MARK: - Primary Metrics Row
+
+    @ViewBuilder
+    private var primaryMetricsRow: some View {
+        let s = rideStore.rideState
+        HStack(spacing: 0) {
+            VStack(spacing: 1) {
+                Text("SPEED")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.2)
+                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                    Text(String(format: "%.1f", s.speedKmh))
+                        .font(.system(size: 40, weight: .black, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.blue)
+                    Text("km/h")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+
+            Divider().frame(height: 48)
+
+            VStack(spacing: 1) {
+                Text("DISTANCE")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.2)
+                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                    Text(String(format: "%.2f", s.distanceKm))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("km")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+
+            Divider().frame(height: 48)
+
+            VStack(spacing: 1) {
+                Text("TIME")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.2)
+                Text(s.elapsedTime.formattedDuration)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+
+            Divider().frame(height: 48)
+
+            VStack(spacing: 1) {
+                Text("ROUTE")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.2)
+                ZStack {
+                    Circle()
+                        .stroke(Color.blue.opacity(0.18), lineWidth: 4)
+                        .frame(width: 34, height: 34)
+                    Circle()
+                        .trim(from: 0, to: rideStore.progressPercent)
+                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .frame(width: 34, height: 34)
+                        .rotationEffect(.degrees(-90))
+                    Text("\(Int(rideStore.progressPercent * 100))%")
+                        .font(.system(size: 9, weight: .bold))
+                        .monospacedDigit()
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: - Expanded Stats Grid
+
+    @ViewBuilder
+    private var expandedStatsGrid: some View {
+        let s = rideStore.rideState
+        HStack(spacing: 0) {
+            compactStat("AVG SPEED", String(format: "%.1f", s.avgSpeedKmh), unit: "km/h")
+            Divider().frame(height: 36)
+            compactStat("ELEV GAIN", String(format: "%.0f", s.elevationGain), unit: "m", icon: "arrow.up.right")
+            Divider().frame(height: 36)
+            compactStat("ELEV LOSS", String(format: "%.0f", s.elevationLoss), unit: "m", icon: "arrow.down.right")
+        }
+        .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private func compactStat(_ label: String, _ value: String, unit: String, icon: String? = nil) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 3) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+            }
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text(unit)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Map
+
+    @ViewBuilder
+    private func mapLayer(route: RouteModel) -> some View {
+        Map(position: $position) {
+            if let progress = rideStore.routeProgress {
+                MapPolyline(coordinates: progress.ridden)
+                    .stroke(.blue.opacity(0.3), lineWidth: 4)
+                MapPolyline(coordinates: progress.remaining)
+                    .stroke(.blue, lineWidth: 5)
+            } else {
+                MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
+                    .stroke(.blue, lineWidth: 5)
+            }
+
+            if !rideStore.reroutePolyline.isEmpty {
+                MapPolyline(coordinates: rideStore.reroutePolyline)
+                    .stroke(.orange, lineWidth: 4)
+            }
+
+            ForEach(poiSpurs) { spur in
+                MapPolyline(coordinates: spur.inbound)
+                    .stroke(
+                        spur.isNext ? Color.green : Color.green.opacity(0.65),
+                        style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5])
+                    )
+                MapPolyline(coordinates: spur.outbound)
+                    .stroke(
+                        spur.isNext ? Color.red : Color.red.opacity(0.5),
+                        style: StrokeStyle(lineWidth: spur.isNext ? 3.5 : 2, dash: [7, 5])
+                    )
+            }
+
+            ForEach(route.waypoints) { waypoint in
+                Annotation(waypoint.name ?? "Waypoint", coordinate: waypoint.coordinate.clCoordinate) {
+                    Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
+                }
+            }
+
+            ForEach(routeStore.selectedPOIs) { poi in
+                let isNext = poi.id == rideStore.rideState.nextPOI?.id
+                Annotation(poi.name, coordinate: poi.coordinate.clCoordinate) {
+                    ZStack {
+                        Circle()
+                            .fill(isNext ? Color.green : Color.white)
+                            .frame(width: 32, height: 32)
+                            .shadow(radius: isNext ? 4 : 2)
+                        Image(systemName: poi.category.systemImage)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(isNext ? .white : .orange)
+                    }
+                }
+            }
+
+            if let coord = rideStore.rideState.currentCoordinate {
+                Annotation("You", coordinate: coord.clCoordinate) {
+                    ZStack {
+                        Circle().fill(.white).frame(width: 24, height: 24).shadow(radius: 3)
+                        Circle().fill(.blue).frame(width: 14, height: 14)
+                    }
+                }
+            }
+        }
+        .onMapCameraChange(frequency: .onEnd) { _ in
+            if suppressNextCameraChange {
+                suppressNextCameraChange = false
+            } else if viewMode == .riding {
+                isFollowing = false
+            }
+        }
+        .mapStyle(.standard(elevation: .realistic))
+        .mapControls {
+            MapCompass()
+            MapPitchToggle()
+            MapUserLocationButton()
+        }
+    }
+
+    // MARK: - Top Banners
+
+    @ViewBuilder
+    private var topBanners: some View {
+        VStack(spacing: 8) {
+            if rideStore.rideState.isOffRoute {
+                offRouteBanner
+            }
+            if let poi = rideStore.rideState.nextPOI,
+               let dist = rideStore.rideState.nextPOIDistance,
+               dist <= 2000 {
+                nextPOIBanner(poi: poi, distance: dist)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 16)
+        .animation(.spring(duration: 0.3), value: rideStore.rideState.isOffRoute)
+        .animation(.spring(duration: 0.3), value: rideStore.rideState.nextPOI?.id)
+    }
+
+    // MARK: - Off Route Banner
+
+    @ViewBuilder
+    private var offRouteBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Off Route")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("\(Int(rideStore.rideState.offRouteDistance))m from route")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+
+            Spacer()
+
+            if let bearing = rideStore.rideState.bearingToRoute,
+               rideStore.rideState.offRouteDistance <= 200 {
+                let relativeBearing = (bearing - rideStore.rideState.currentHeading + 360)
+                    .truncatingRemainder(dividingBy: 360)
+                Image(systemName: "arrow.up")
+                    .rotationEffect(.degrees(relativeBearing))
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(.white)
+            }
+
+            if rideStore.rideState.isRerouting {
+                ProgressView().tint(.white).scaleEffect(0.8)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .red.opacity(0.4), radius: 8, x: 0, y: 3)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: - Next POI Banner
+
+    @ViewBuilder
+    private func nextPOIBanner(poi: POIModel, distance: CLLocationDistance) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.18))
+                    .frame(width: 42, height: 42)
+                Image(systemName: poi.category.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(poi.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.forward.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text(distance < 1000
+                         ? "\(Int(distance))m ahead"
+                         : String(format: "%.1f km ahead", distance / 1000))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+    }
+
+    // MARK: - Re-route Steps
+
+    @ViewBuilder
+    private var rerouteStepsList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Back to route", systemImage: "arrow.triangle.turn.up.right.circle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+            ForEach(rideStore.rideState.rerouteSteps.prefix(3), id: \.instructions) { step in
+                HStack {
+                    Text(step.instructions).font(.caption).foregroundStyle(.primary)
+                    Spacer()
+                    Text("\(Int(step.distanceMeters))m").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Elevation Strip
+
+    @ViewBuilder
+    private func elevationStrip(route: RouteModel) -> some View {
+        let samples = buildElevationSamples(route: route)
+        let progress = rideStore.progressPercent
+        if !samples.isEmpty {
+            Chart {
+                ForEach(samples) { s in
+                    AreaMark(x: .value("km", s.distance), y: .value("m", s.elevation))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.35), .blue.opacity(0.05)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                    LineMark(x: .value("km", s.distance), y: .value("m", s.elevation))
+                        .foregroundStyle(.blue)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
+                if let maxDist = samples.last?.distance {
+                    RuleMark(x: .value("pos", maxDist * progress))
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [4]))
+                        .foregroundStyle(.orange)
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 52)
+        }
+    }
+
+    // MARK: - Camera
+
+    private func updateRidingCamera(coord: CLLocationCoordinate2D) {
+        let heading = rideStore.rideState.currentHeading
+        suppressNextCameraChange = true
+        isFollowing = true
+        position = .camera(MapCamera(
+            centerCoordinate: coord,
+            distance: 400,
+            heading: heading,
+            pitch: 45
+        ))
+    }
+
     // MARK: - POI Spur Computation
 
     private func computePOISpurs(route: RouteModel) async {
         let pois = routeStore.selectedPOIs
         guard !pois.isEmpty else { poiSpurs = []; return }
 
-        // Prefer remaining route coords (ahead of rider) if riding, else full route
         let routeCoords: [CLLocationCoordinate2D] = {
             if let remaining = rideStore.routeProgress?.remaining, !remaining.isEmpty {
                 return remaining
@@ -239,14 +767,11 @@ struct RideView: View {
         poiSpurs = spurs.sorted { !$0.isNext && $1.isNext }
     }
 
-    // MARK: - Shortest Road Route Back to GPX
-
     private func shortestRouteBackToGPX(
         from poiCoord: CLLocationCoordinate2D,
         routeCoords: [CLLocationCoordinate2D],
         candidateCount: Int = 5
     ) async -> [CLLocationCoordinate2D] {
-
         guard !routeCoords.isEmpty else { return [poiCoord] }
         let subsampledCoords = subsample(routeCoords, maxPoints: 200)
         let candidates = subsampledCoords
@@ -278,8 +803,6 @@ struct RideView: View {
         }
         return results.min(by: { $0.distance < $1.distance })?.coordinates ?? [poiCoord]
     }
-
-    // MARK: - Helpers
 
     private func geometricNearest(
         in polyline: [CLLocationCoordinate2D],
@@ -322,334 +845,6 @@ struct RideView: View {
         }
         return false
     }
-
-    // MARK: - Map
-
-    @ViewBuilder
-    private func mapLayer(route: RouteModel) -> some View {
-        Map(position: $position) {
-
-            // ── Main GPX route ───────────────────────────────────────────
-            if let progress = rideStore.routeProgress {
-                MapPolyline(coordinates: progress.ridden)
-                    .stroke(.blue.opacity(0.3), lineWidth: 4)
-                MapPolyline(coordinates: progress.remaining)
-                    .stroke(.blue, lineWidth: 5)
-            } else {
-                MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
-                    .stroke(.blue, lineWidth: 5)
-            }
-
-            // ── Off-route turn-by-turn reroute (solid orange) ────────────
-            if !rideStore.reroutePolyline.isEmpty {
-                MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.orange, lineWidth: 4)
-            }
-
-            // ── POI spurs ────────────────────────────────────────────────
-            ForEach(poiSpurs) { spur in
-                MapPolyline(coordinates: spur.inbound)
-                    .stroke(
-                        spur.isNext ? Color.green : Color.green.opacity(0.65),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5])
-                    )
-                MapPolyline(coordinates: spur.outbound)
-                    .stroke(
-                        spur.isNext ? Color.red : Color.red.opacity(0.5),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 3.5 : 2, dash: [7, 5])
-                    )
-            }
-
-            // ── Waypoints ────────────────────────────────────────────────
-            ForEach(route.waypoints) { waypoint in
-                Annotation(waypoint.name ?? "Waypoint", coordinate: waypoint.coordinate.clCoordinate) {
-                    Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
-                }
-            }
-
-            // ── POI pins ─────────────────────────────────────────────────
-            ForEach(routeStore.selectedPOIs) { poi in
-                let isNext = poi.id == rideStore.rideState.nextPOI?.id
-                Annotation(poi.name, coordinate: poi.coordinate.clCoordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(isNext ? Color.green : Color.white)
-                            .frame(width: 32, height: 32)
-                            .shadow(radius: isNext ? 4 : 2)
-                        Image(systemName: poi.category.systemImage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(isNext ? .white : .orange)
-                    }
-                }
-            }
-
-            // ── Current position ─────────────────────────────────────────
-            if let coord = rideStore.rideState.currentCoordinate {
-                Annotation("You", coordinate: coord.clCoordinate) {
-                    ZStack {
-                        Circle().fill(.white).frame(width: 24, height: 24).shadow(radius: 3)
-                        Circle().fill(.blue).frame(width: 14, height: 14)
-                    }
-                }
-            }
-        }
-        .onMapCameraChange(frequency: .onEnd) { _ in
-            if suppressNextCameraChange {
-                suppressNextCameraChange = false
-            } else if viewMode == .riding {
-                isFollowing = false
-            }
-        }
-        .mapStyle(.standard(elevation: .realistic))
-        .mapControls {
-            MapCompass()
-            MapPitchToggle()
-            MapUserLocationButton()
-        }
-    }
-
-    // MARK: - Top Banners
-
-    @ViewBuilder
-    private var topBanners: some View {
-        VStack(spacing: 8) {
-            if rideStore.rideState.isOffRoute {
-                offRouteBanner
-            }
-            if let poi = rideStore.rideState.nextPOI,
-               let dist = rideStore.rideState.nextPOIDistance,
-               dist <= 2000 {
-                NextPOIBanner(item: makeMapItem(from: poi), distance: dist)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .padding(.top, 8)
-        .animation(.spring(duration: 0.3), value: rideStore.rideState.isOffRoute)
-        .animation(.spring(duration: 0.3), value: rideStore.rideState.nextPOI?.id)
-    }
-
-    private func makeMapItem(from poi: POIModel) -> MKMapItem {
-        let item = MKMapItem(placemark: MKPlacemark(coordinate: poi.coordinate.clCoordinate))
-        item.name = poi.name
-        return item
-    }
-
-    // MARK: - Off Route Banner
-
-    @ViewBuilder
-    private var offRouteBanner: some View {
-        HStack(spacing: 8) {
-            Label(
-                "Off Route \(Int(rideStore.rideState.offRouteDistance))m",
-                systemImage: "exclamationmark.triangle.fill"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-
-            if let bearing = rideStore.rideState.bearingToRoute,
-               rideStore.rideState.offRouteDistance <= 200 {
-                let relativeBearing = (bearing - rideStore.rideState.currentHeading + 360)
-                    .truncatingRemainder(dividingBy: 360)
-                Image(systemName: "arrow.up")
-                    .rotationEffect(.degrees(relativeBearing))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-            }
-
-            if rideStore.rideState.isRerouting {
-                ProgressView().tint(.white).scaleEffect(0.8)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.red, in: Capsule())
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
-
-    // MARK: - Re-route Steps
-
-    @ViewBuilder
-    private var rerouteStepsList: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label("Back to route", systemImage: "arrow.triangle.turn.up.right.circle.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
-            ForEach(rideStore.rideState.rerouteSteps.prefix(3), id: \.instructions) { step in
-                HStack {
-                    Text(step.instructions).font(.caption).foregroundStyle(.primary)
-                    Spacer()
-                    Text("\(Int(step.distanceMeters))m").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.orange.opacity(0.12))
-    }
-
-    // MARK: - Bird's Eye HUD
-
-    @ViewBuilder
-    private func birdsEyeHUD(route: RouteModel) -> some View {
-        VStack(spacing: 10) {
-            HStack {
-                metricTile("Distance", String(format: "%.1f km", route.totalDistance / 1000))
-                metricTile("Elevation ↑", String(format: "%.0f m", route.elevationGain))
-                metricTile("Elevation ↓", String(format: "%.0f m", route.elevationLoss))
-            }
-            HStack(spacing: 12) {
-                Button("Start Ride") {
-                    rideStore.start(route: route, pois: routeStore.selectedPOIs)
-                }
-                .buttonStyle(.borderedProminent)
-                Button("Center") { position = .rect(route.mapRect) }
-                    .buttonStyle(.bordered)
-            }
-        }
-        .padding()
-        .background(.thinMaterial)
-    }
-
-    // MARK: - Riding HUD
-
-    @ViewBuilder
-    private func ridingHUD(route: RouteModel) -> some View {
-        VStack(spacing: 0) {
-            if !rideStore.rideState.rerouteSteps.isEmpty {
-                rerouteStepsList
-            }
-            statGrid
-            elevationStrip(route: route)
-            Button("Stop Ride") {
-                // Build summary BEFORE stopping so breadcrumbs are intact
-                if let summary = rideStore.stopAndBuildSummary() {
-                    rideSummary = summary
-                    showRideSummary = true
-                } else {
-                    rideStore.stop()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .padding(.vertical, 10)
-        }
-        .background(.thinMaterial)
-    }
-
-    // MARK: - Stat Grid
-
-    @ViewBuilder
-    private var statGrid: some View {
-        let s = rideStore.rideState
-        VStack(spacing: 1) {
-            HStack(spacing: 1) {
-                bigMetricTile("SPEED", String(format: "%.1f", s.speedKmh), unit: "km/h", accent: true)
-                bigMetricTile("TIME", s.elapsedTime.formattedDuration, unit: "")
-            }
-            HStack(spacing: 1) {
-                bigMetricTile("DISTANCE", String(format: "%.2f", s.distanceKm), unit: "km")
-                bigMetricTile("AVG SPEED", String(format: "%.1f", s.avgSpeedKmh), unit: "km/h")
-            }
-            HStack(spacing: 1) {
-                bigMetricTile("ELEV GAIN", String(format: "%.0f", s.elevationGain), unit: "m")
-                bigMetricTile("PROGRESS", String(format: "%.0f%%", rideStore.progressPercent * 100), unit: "")
-            }
-        }
-        .padding(.horizontal, 1)
-        .padding(.top, 8)
-    }
-
-    // MARK: - Elevation Strip
-
-    @ViewBuilder
-    private func elevationStrip(route: RouteModel) -> some View {
-        let samples = buildElevationSamples(route: route)
-        let progress = rideStore.progressPercent
-        if !samples.isEmpty {
-            Chart {
-                ForEach(samples) { s in
-                    AreaMark(x: .value("km", s.distance), y: .value("m", s.elevation))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.35), .blue.opacity(0.05)],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
-                    LineMark(x: .value("km", s.distance), y: .value("m", s.elevation))
-                        .foregroundStyle(.blue)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
-                }
-                if let maxDist = samples.last?.distance {
-                    RuleMark(x: .value("pos", maxDist * progress))
-                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [4]))
-                        .foregroundStyle(.orange)
-                }
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .frame(height: 52)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-        }
-    }
-
-    // MARK: - Camera
-
-    private func updateRidingCamera(coord: CLLocationCoordinate2D) {
-        let heading = rideStore.rideState.currentHeading
-        suppressNextCameraChange = true
-        isFollowing = true
-        position = .camera(MapCamera(
-            centerCoordinate: coord,
-            distance: 400,
-            heading: heading,
-            pitch: 45
-        ))
-    }
-
-    // MARK: - Metric Tiles
-
-    @ViewBuilder
-    private func metricTile(_ label: String, _ value: String) -> some View {
-        VStack(spacing: 4) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.monospacedDigit()).fontWeight(.semibold)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder
-    private func bigMetricTile(_ label: String, _ value: String, unit: String, accent: Bool = false) -> some View {
-        VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(1)
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(accent ? Color.blue : Color.primary)
-                if !unit.isEmpty {
-                    Text(unit)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            // Reserve space equivalent to the unit label so tiles without
-            // a unit string still match the height of tiles that have one.
-            if unit.isEmpty {
-                Text(" ")
-                    .font(.system(size: 13, weight: .medium))
-                    .hidden()
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 70)
-        .padding(.vertical, 10)
-        .background(Color(.systemBackground).opacity(0.6))
-    }
-
-    // MARK: - Elevation Data Builder
 
     private func buildElevationSamples(route: RouteModel) -> [ElevSample] {
         var samples: [ElevSample] = []
