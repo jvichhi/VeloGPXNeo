@@ -16,7 +16,7 @@ struct VeloGPXApp: App {
                 .environmentObject(lm)
                 // Inject locale so SwiftUI Text(), formatters, and
                 // date/number formatting all use the selected language.
-                .environment(\.locale, lm.currentLanguage.locale)
+                .environment(\.locale, Locale(identifier: lm.currentLanguage.rawValue))
                 // Inject layout direction for RTL support (Arabic etc.)
                 .environment(\.layoutDirection, lm.currentLanguage.layoutDirection)
                 // Expose language as a custom EnvironmentKey for child views.
