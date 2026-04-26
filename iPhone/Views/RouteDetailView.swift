@@ -12,145 +12,205 @@ struct RouteDetailView: View {
     @State private var showReverseConfirm = false
 
     var body: some View {
-        List {
-            if hasElevationData {
-                Section("Elevation Profile") {
-                    Chart(elevationSamples, id: \.distance) { sample in
-                        AreaMark(
-                            x: .value("Distance", sample.distance),
-                            y: .value("Elevation", sample.elevation)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.4), .blue.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
+        ScrollView {
+            VStack(spacing: 16) {
+
+                // MARK: Hero Elevation Card
+                if hasElevationData {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Elevation Profile", systemImage: "mountain.2.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Chart(elevationSamples, id: \.distance) { sample in
+                            AreaMark(
+                                x: .value("Distance", sample.distance),
+                                y: .value("Elevation", sample.elevation)
                             )
-                        )
-                        LineMark(
-                            x: .value("Distance", sample.distance),
-                            y: .value("Elevation", sample.elevation)
-                        )
-                        .foregroundStyle(.blue)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                    }
-                    .chartXAxisLabel("Distance (km)")
-                    .chartYAxisLabel("m")
-                    .frame(height: 160)
-                    .padding(.vertical, 8)
-                }
-            }
-
-            Section("Route") {
-                if isRenaming {
-                    HStack {
-                        TextField("Route name", text: $pendingName)
-                            .onSubmit { commitRename() }
-                        Button("Save", action: commitRename)
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        Button("Cancel") { isRenaming = false }
-                            .controlSize(.small)
-                    }
-                } else {
-                    LabeledContent("Name", value: route.name)
-                        .onTapGesture {
-                            pendingName = route.name
-                            isRenaming = true
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.35), .blue.opacity(0.04)],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                            LineMark(
+                                x: .value("Distance", sample.distance),
+                                y: .value("Elevation", sample.elevation)
+                            )
+                            .foregroundStyle(.blue)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
                         }
-                        .overlay(alignment: .trailing) {
-                            Image(systemName: "pencil")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.trailing, 4)
+                        .chartXAxisLabel("km")
+                        .chartYAxisLabel("m")
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 4)) {
+                                AxisGridLine().foregroundStyle(Color(.systemGray5))
+                                AxisValueLabel()
+                            }
                         }
-                }
-                LabeledContent("Format", value: route.sourceFormat.rawValue.uppercased())
-                LabeledContent("Distance", value: String(format: "%.1f km", route.totalDistance / 1000))
-                LabeledContent("Elevation Gain", value: String(format: "%.0f m", route.elevationGain))
-                LabeledContent("Elevation Loss", value: String(format: "%.0f m", route.elevationLoss))
-                LabeledContent("Track Points", value: "\(route.trackPoints.count)")
-                if let originalFilename = route.originalFilename {
-                    LabeledContent("File", value: originalFilename)
+                        .chartYAxis {
+                            AxisMarks(values: .automatic(desiredCount: 3)) {
+                                AxisGridLine().foregroundStyle(Color(.systemGray5))
+                                AxisValueLabel()
+                            }
+                        }
+                        .frame(height: 160)
+                    }
+                    .padding(16)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .shadow(color: .black.opacity(0.07), radius: 8, y: 3)
                 }
 
-                Button(role: .destructive) {
-                    showReverseConfirm = true
-                } label: {
-                    Label("Reverse Route Direction", systemImage: "arrow.triangle.2.circlepath")
+                // MARK: Key Stats Grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    MetricTile(label: "DISTANCE", value: String(format: "%.1f", route.totalDistance / 1000), unit: "km", icon: "arrow.left.and.right", color: .blue)
+                    MetricTile(label: "GAIN", value: String(format: "%.0f", route.elevationGain), unit: "m", icon: "arrow.up", color: .green)
+                    MetricTile(label: "LOSS", value: String(format: "%.0f", route.elevationLoss), unit: "m", icon: "arrow.down", color: .orange)
+                }
+
+                // MARK: Route Info Card
+                VStack(spacing: 0) {
+                    DetailSectionHeader(title: "Route", systemImage: "map")
+
+                    if isRenaming {
+                        HStack {
+                            TextField("Route name", text: $pendingName)
+                                .onSubmit { commitRename() }
+                            Button("Save", action: commitRename)
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                            Button("Cancel") { isRenaming = false }
+                                .controlSize(.small)
+                        }
+                        .padding(14)
+                    } else {
+                        DetailRow(label: "Name", value: route.name)
+                            .onTapGesture {
+                                pendingName = route.name
+                                isRenaming = true
+                            }
+                            .overlay(alignment: .trailing) {
+                                Image(systemName: "pencil")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.trailing, 14)
+                            }
+                    }
+                    Divider().padding(.leading, 14)
+                    DetailRow(label: "Format", value: route.sourceFormat.rawValue.uppercased())
+                    Divider().padding(.leading, 14)
+                    DetailRow(label: "Track Points", value: "\(route.trackPoints.count)")
+                    if let filename = route.originalFilename {
+                        Divider().padding(.leading, 14)
+                        DetailRow(label: "File", value: filename)
+                    }
+                    Divider().padding(.leading, 14)
+                    Button(role: .destructive) {
+                        showReverseConfirm = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .frame(width: 20)
+                            Text("Reverse Route Direction")
+                            Spacer()
+                        }
+                        .font(.subheadline)
                         .foregroundStyle(.orange)
+                        .padding(14)
+                    }
                 }
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
                 .confirmationDialog(
                     "Reverse this route?",
                     isPresented: $showReverseConfirm,
                     titleVisibility: .visible
                 ) {
-                    Button("Reverse", role: .destructive) {
-                        routeStore.reverseRoute(route)
-                    }
+                    Button("Reverse", role: .destructive) { routeStore.reverseRoute(route) }
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text("The start and end points will be swapped. This cannot be undone.")
                 }
-            }
 
-            // MARK: - POIs section
-            Section {
-                if routeStore.selectedPOIs.isEmpty {
-                    Text("No POIs added yet")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(routeStore.selectedPOIs) { poi in
-                    HStack(spacing: 10) {
-                        Image(systemName: poi.category.systemImage)
-                            .foregroundStyle(.orange)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(poi.name)
+                // MARK: POIs Card
+                VStack(spacing: 0) {
+                    DetailSectionHeader(
+                        title: "Points of Interest",
+                        systemImage: "mappin.and.ellipse",
+                        badge: routeStore.selectedPOIs.count > 0 ? "\(routeStore.selectedPOIs.count)" : nil
+                    )
+
+                    if routeStore.selectedPOIs.isEmpty {
+                        HStack(spacing: 12) {
+                            Image(systemName: "mappin.slash")
+                                .foregroundStyle(.tertiary)
+                            Text("No POIs added yet")
                                 .font(.subheadline)
-                            Text(poi.category.displayName)
-                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                }
-                .onDelete { offsets in
-                    offsets.forEach { routeStore.removePOI(routeStore.selectedPOIs[$0]) }
-                }
-
-                Button {
-                    showPOIDiscovery = true
-                } label: {
-                    Label("Discover POIs along route", systemImage: "sparkle.magnifyingglass")
-                        .foregroundStyle(.orange)
-                }
-            } header: {
-                HStack {
-                    Text("Points of Interest")
-                    Spacer()
-                    Text("\(routeStore.selectedPOIs.count)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section("Embedded Waypoints") {
-                if route.waypoints.isEmpty {
-                    Text("No embedded waypoints").foregroundStyle(.secondary)
-                } else {
-                    ForEach(route.waypoints) { waypoint in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(waypoint.name ?? "Waypoint")
-                            Text(String(format: "%.5f, %.5f",
-                                        waypoint.coordinate.latitude,
-                                        waypoint.coordinate.longitude))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        .padding(14)
+                    } else {
+                        ForEach(routeStore.selectedPOIs) { poi in
+                            POIRow(poi: poi)
+                            if poi.id != routeStore.selectedPOIs.last?.id {
+                                Divider().padding(.leading, 50)
+                            }
                         }
                     }
+
+                    Divider().padding(.leading, 14)
+                    Button {
+                        showPOIDiscovery = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkle.magnifyingglass")
+                                .frame(width: 20)
+                            Text("Discover POIs along route")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.blue)
+                        .padding(14)
+                    }
+                }
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+
+                // MARK: Waypoints Card
+                if !route.waypoints.isEmpty {
+                    VStack(spacing: 0) {
+                        DetailSectionHeader(
+                            title: "Embedded Waypoints",
+                            systemImage: "flag",
+                            badge: "\(route.waypoints.count)"
+                        )
+                        ForEach(route.waypoints) { wp in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(wp.name ?? "Waypoint")
+                                    .font(.subheadline.weight(.medium))
+                                Text(String(format: "%.5f, %.5f",
+                                            wp.coordinate.latitude,
+                                            wp.coordinate.longitude))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(14)
+                            if wp.id != route.waypoints.last?.id {
+                                Divider().padding(.leading, 14)
+                            }
+                        }
+                    }
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Route Details")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPOIDiscovery) {
@@ -191,5 +251,111 @@ struct RouteDetailView: View {
         guard !trimmed.isEmpty else { return }
         routeStore.renameRoute(route, to: trimmed)
         isRenaming = false
+    }
+}
+
+// MARK: - Shared Sub-components
+
+struct DetailSectionHeader: View {
+    let title: String
+    let systemImage: String
+    var badge: String? = nil
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.blue)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.blue, in: Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color(.systemGray6).opacity(0.6))
+    }
+}
+
+struct DetailRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+}
+
+struct MetricTile: View {
+    let label: String
+    let value: String
+    let unit: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(.primary)
+            Text(unit)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .tracking(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 1)
+    }
+}
+
+struct POIRow: View {
+    let poi: POIModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Image(systemName: poi.category.systemImage)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.orange)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(poi.name)
+                    .font(.subheadline.weight(.medium))
+                Text(poi.category.displayName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }
