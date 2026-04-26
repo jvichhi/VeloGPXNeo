@@ -18,6 +18,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var routeProgress: RouteProgress?
     @Published var progressPercent: Double = 0
     @Published var reroutePolyline: [CLLocationCoordinate2D] = []
+    /// Surfaced routing/rerouting error message. Shown as a dismissible HUD banner in RideView.
+    /// Cleared automatically after 6 seconds or when the user taps the banner.
+    @Published var lastError: String? = nil
 
     private var manager: CLLocationManager!
     private var route: RouteModel?
@@ -28,10 +31,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var nearestTrackIndex: Int = 0
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
+    private var errorClearTask: Task<Void, Never>?
 
-    // MARK: - Watch throttle (P3-1)
-    // sendWatchUpdate() was firing on every GPS ping (~1-3/sec at cycling speed).
-    // Gate to 1 Hz to avoid unnecessary encode/WCSession pressure.
+    // MARK: - Watch throttle
     private var lastWatchUpdateTime: Date = .distantPast
     private let watchUpdateInterval: TimeInterval = 1.0
 
@@ -73,6 +75,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.reroutePolyline = []
         self.breadcrumbs = []
         self.lastWatchUpdateTime = .distantPast
+        self.lastError = nil
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
     }
@@ -84,6 +87,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             lastAlertedPOIID = nil
         }
         sendWatchUpdate()
+    }
+
+    /// Dismiss the error banner manually (called when user taps it).
+    func clearError() {
+        errorClearTask?.cancel()
+        lastError = nil
     }
 
     @discardableResult
@@ -121,7 +130,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         reroutePolyline = []
         sendWatchUpdate()
     }
-    
+
     func setHistoryStore(_ store: RideHistoryStore) {
         historyStore = store
     }
@@ -197,9 +206,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    // MARK: - Reroute using CyclingRouteService (P1-1 fix)
-    // Previously used MKDirections with .walking directly. Now delegates to
-    // CyclingRouteService which uses .cycling on iOS 26+ with .walking fallback.
+    // MARK: - Reroute via CyclingRouteService (.cycling on iOS 26+)
 
     private func requestReroute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
         rideState.isRerouting = true
@@ -210,8 +217,23 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 rideState.rerouteSteps = result.route.steps.map {
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
                 }.filter { !$0.instructions.isEmpty }
-            } catch {}
+            } catch {
+                showError("Couldn't find a route back. Keep riding — retrying shortly.")
+            }
             rideState.isRerouting = false
+        }
+    }
+
+    // MARK: - Error helpers
+
+    private func showError(_ message: String) {
+        errorClearTask?.cancel()
+        lastError = message
+        // Auto-dismiss after 6 seconds
+        errorClearTask = Task {
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            lastError = nil
         }
     }
 
@@ -258,12 +280,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return minDistance
     }
 
-    // MARK: - POI tracking (P1-2 fix)
-    // Previously: nearest POI by raw straight-line distance.
-    // Now: projects each POI onto the GPX track to find its track index,
-    // filters to POIs whose track index >= nearestTrackIndex (i.e. still ahead),
-    // and sorts by track index ascending so the next on-route POI wins.
-    // nextPOIDistance is still straight-line for the display chip (accurate enough).
+    // MARK: - POI tracking
 
     private func updateNextPOI(from coordinate: CLLocationCoordinate2D) {
         guard !pois.isEmpty, let route else {
@@ -279,9 +296,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             return
         }
 
-        // For each POI, find its nearest track index within a reasonable search window.
-        // We search the full remaining track (from nearestTrackIndex onward) to avoid
-        // missing POIs that are geometrically close but track-index-far.
         let searchStart = nearestTrackIndex
         let searchRange = trackPoints.indices.filter { $0 >= searchStart }
 
@@ -299,17 +313,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 let d = poiCoord.distance(to: trackPoints[i].coordinate.clCoordinate)
                 if d < bestDist { bestDist = d; bestIdx = i }
             }
-            // Only include POIs that project ahead of current position.
-            // bestDist here is the POI's distance to its nearest track point.
-            // Exclude if the nearest track point is behind us.
             guard bestIdx >= searchStart else { return nil }
             let straightLine = coordinate.distance(to: poiCoord)
-            // Exclude POIs more than 5km away by straight line (same guard as before).
             guard straightLine < 5000 else { return nil }
             return POIWithIndex(poi: poi, trackIndex: bestIdx, straightLineDistance: straightLine)
         }
 
-        // Sort by track index ascending — earliest on remaining route wins.
         let sorted = candidatesAhead.sorted { $0.trackIndex < $1.trackIndex }
 
         if let first = sorted.first {
@@ -341,7 +350,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
 
-    // MARK: - Watch (P3-1 fix: throttled to 1 Hz)
+    // MARK: - Watch (throttled to 1 Hz)
 
     private func sendWatchUpdate() {
         let now = Date()

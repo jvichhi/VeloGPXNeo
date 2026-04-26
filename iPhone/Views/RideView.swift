@@ -26,6 +26,15 @@ private struct CandidateRoute {
     let distance: CLLocationDistance
 }
 
+// MARK: - HUD height PreferenceKey
+// Replaces the fragile DispatchQueue.asyncAfter timing hack.
+private struct HUDHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - RouteModel mapRect
 private extension RouteModel {
     var mapRect: MKMapRect {
@@ -96,7 +105,6 @@ struct RideView: View {
                 }
             }
             .onAppear {
-                // Merged from two .onAppear blocks (cleanup)
                 rideStore.prepare()
                 rideStore.setHistoryStore(historyStore)
                 if let route = routeStore.selectedRoute {
@@ -290,6 +298,10 @@ struct RideView: View {
             ridingHUDPanel(route: route)
         }
         .animation(.spring(duration: 0.3), value: isFollowing)
+        // Receive HUD height reported via PreferenceKey
+        .onPreferenceChange(HUDHeightKey.self) { value in
+            hudHeight = value
+        }
     }
 
     // MARK: - Riding HUD Panel
@@ -337,20 +349,10 @@ struct RideView: View {
                     .padding(.bottom, 8)
             }
         }
+        // Report height to parent via PreferenceKey — replaces asyncAfter hack
         .background(
             GeometryReader { geo in
-                Color.clear
-                    .onAppear { hudHeight = geo.size.height }
-                    .onChange(of: statsExpanded) { _, _ in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            hudHeight = geo.size.height
-                        }
-                    }
-                    .onChange(of: rideStore.rideState.rerouteSteps.count) { _, _ in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            hudHeight = geo.size.height
-                        }
-                    }
+                Color.clear.preference(key: HUDHeightKey.self, value: geo.size.height)
             }
         )
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -541,14 +543,10 @@ struct RideView: View {
                 }
             }
 
-            if let coord = rideStore.rideState.currentCoordinate {
-                Annotation("You", coordinate: coord.clCoordinate) {
-                    ZStack {
-                        Circle().fill(.white).frame(width: 24, height: 24).shadow(radius: 3)
-                        Circle().fill(.blue).frame(width: 14, height: 14)
-                    }
-                }
-            }
+            // WWDC25: UserAnnotation replaces the manual blue dot Annotation.
+            // Provides system pulsing blue dot, accuracy ring, and participates
+            // in the improved iOS 26 location rendering pipeline.
+            UserAnnotation()
         }
         .onMapCameraChange(frequency: .onEnd) { _ in
             if suppressNextCameraChange {
@@ -570,6 +568,11 @@ struct RideView: View {
     @ViewBuilder
     private var topBanners: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let error = rideStore.lastError {
+                errorBanner(message: error)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onTapGesture { rideStore.clearError() }
+            }
             if rideStore.rideState.isOffRoute {
                 offRouteChip
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -581,8 +584,32 @@ struct RideView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.spring(duration: 0.3), value: rideStore.lastError)
         .animation(.spring(duration: 0.3), value: rideStore.rideState.isOffRoute)
         .animation(.spring(duration: 0.3), value: rideStore.rideState.nextPOI?.id)
+    }
+
+    // MARK: - Error Banner
+
+    @ViewBuilder
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+            Spacer()
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Color.orange, in: Capsule())
+        .shadow(color: .orange.opacity(0.3), radius: 8, x: 0, y: 3)
     }
 
     // MARK: - Off Route Chip
@@ -607,6 +634,7 @@ struct RideView: View {
                rideStore.rideState.offRouteDistance <= 200 {
                 let relativeBearing = (bearing - rideStore.rideState.currentHeading + 360)
                     .truncatingRemainder(dividingBy: 360)
+                let _ = bearing // suppress unused warning
                 Image(systemName: "arrow.up")
                     .rotationEffect(.degrees(relativeBearing))
                     .font(.system(size: 15, weight: .black))
@@ -717,22 +745,25 @@ struct RideView: View {
     }
 
     // MARK: - Camera
+    // Uses MapCameraAnimation(.linear) for smooth heading transitions (WWDC25)
 
     private func updateRidingCamera(coord: CLLocationCoordinate2D) {
         let heading = rideStore.rideState.currentHeading
         suppressNextCameraChange = true
         isFollowing = true
-        position = .camera(MapCamera(
-            centerCoordinate: coord,
-            distance: 400,
-            heading: heading,
-            pitch: 45
-        ))
+        withAnimation(.linear(duration: 0.3)) {
+            position = .camera(MapCamera(
+                centerCoordinate: coord,
+                distance: 400,
+                heading: heading,
+                pitch: 45
+            ))
+        }
     }
 
-    // MARK: - POI Spur Computation (P1-1 fix: uses CyclingRouteService)
-    // All MKDirections calls now route through CyclingRouteService.shared
-    // which uses .cycling on iOS 26+ and .walking as fallback.
+    // MARK: - POI Spur Computation
+    // All MKDirections calls route through CyclingRouteService.shared
+    // (.cycling on iOS 26+, .walking fallback)
 
     private func computePOISpurs(route: RouteModel) async {
         let pois = routeStore.selectedPOIs
@@ -791,7 +822,6 @@ struct RideView: View {
         let results: [CandidateRoute] = await withTaskGroup(of: CandidateRoute?.self) { group in
             for candidate in candidates {
                 group.addTask {
-                    // P1-1 fix: use CyclingRouteService instead of raw MKDirections with .walking
                     do {
                         let result = try await CyclingRouteService.shared.calculateRoute(
                             from: poiCoord,
@@ -835,7 +865,6 @@ struct RideView: View {
         from: CLLocationCoordinate2D,
         to: CLLocationCoordinate2D
     ) async -> [CLLocationCoordinate2D] {
-        // P1-1 fix: delegate to CyclingRouteService (.cycling on iOS 26+, .walking fallback)
         do {
             let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
             return result.route.polyline.coordinates

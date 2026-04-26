@@ -6,13 +6,12 @@
 ## 🔴 P0 — Fix Immediately
 
 - [ ] **Duplicate `POISearchService.swift`**
-  `iPhone/POISearchService.swift` (1040 B) and `iPhone/Services/POISearchService.swift` (1078 B) both exist.
-  This will cause a compiler error or silent shadowing. Delete the root-level duplicate.
+  `iPhone/POISearchService.swift` (root-level) confirmed absent — verify in Xcode project file (.pbxproj)
+  that no stale reference remains. Remove from Build Phases if present.
 
-- [ ] **POI toggle uses name-matching instead of ID**
-  `NearbySearchSheet.toggle()` and `isAdded()` match POIs by `name` string.
-  Two POIs sharing a name (e.g. two "Café" stops) will collide.
-  Fix: use coordinate fingerprint or assign/store a stable `UUID` at creation time.
+- [ ] **POI toggle uses name-matching instead of ID** — *already fixed*
+  `NearbySearchSheet` now uses `deterministicID(for:)` based on coordinate (6 d.p.).
+  *(mark complete — already landed)*
 
 ---
 
@@ -21,96 +20,72 @@
 - [x] **Replace `.walking`/`.automobile` routing with `.cycling` (WWDC25)**
   All `MKDirections` calls now route through `CyclingRouteService.shared`.
   Uses `#available(iOS 26.0, *)` to gate `.cycling`; falls back to `.walking` on older OS.
-  Affected: `RideView.fetchSpurCoordinates`, `RideView.shortestRouteBackToGPX`, `RideSessionStore.requestReroute`.
 
 - [ ] **Extract `RideView` into sub-views** (`RideView.swift` is 35 KB)
   Candidates: `RideMapLayer`, `RideHUDPanel`, `RideBirdsEyePanel`.
   Move spur computation into a dedicated `POISpurService`.
 
-- [ ] **Fix `nextPOI` to use on-route ordering, not raw distance** ✅ done in `RideSessionStore`
-  POIs are now projected onto the GPX track and sorted by `trackIndex`.
-  Only POIs ahead of `nearestTrackIndex` are considered.
-  *(mark complete — already landed)*
+- [x] **Fix `nextPOI` to use on-route ordering, not raw distance**
+  POIs projected onto GPX track, sorted by `trackIndex`. Only ahead-of-position POIs considered.
 
-- [ ] **Replace manual `Annotation("You", ...)` with `UserAnnotation()`**
-  Current: custom blue circle drawn in `mapLayer()`.
-  Fix: use `UserAnnotation()` for the system pulsing dot + accuracy ring,
-  which participates in the improved WWDC25 location rendering pipeline.
+- [x] **Replace manual `Annotation("You", ...)` with `UserAnnotation()`**
+  Done. System pulsing blue dot + accuracy ring. iOS 26 location rendering pipeline.
 
-- [ ] **`hudHeight` uses `DispatchQueue.asyncAfter` timing hack**
-  Two `.onChange` handlers use `asyncAfter(deadline: .now() + 0.05)` to capture geometry.
-  Fix: replace with a `PreferenceKey`-based height propagation or stable `onSizeChange`.
+- [x] **`hudHeight` uses `DispatchQueue.asyncAfter` timing hack**
+  Replaced with `HUDHeightKey: PreferenceKey`. Height reported via `.preference` in
+  `ridingHUDPanel`, consumed via `.onPreferenceChange` in `ridingLayout`.
 
 ---
 
 ## 🟢 P2 — Backlog
 
 - [ ] **Elevation gain has no noise smoothing**
-  Raw GPS altitude deltas are accumulated on every update, over-counting due to GPS noise.
-  Fix: add a threshold gate (only accumulate deltas > 2 m) or a simple Kalman filter.
+  Raw GPS altitude deltas accumulated on every update. Over-counts due to GPS noise.
+  Fix: threshold gate (only accumulate deltas > 2 m) or simple Kalman filter.
 
 - [ ] **`PlaceDescriptorService` is not wired to any consumer**
-  The 4.1 KB service generates place descriptions but has no call site.
-  Wire to `NearbyResultCard` detail view, or delete it if the feature is cut.
+  Wire to `NearbyResultCard` detail view, or delete if feature is cut.
 
-- [ ] **`NextPOIBanner.swift` is a near-empty stub (856 B)**
-  The chip logic is inlined in `RideView.nextPOIChip()`.
-  Either delete `NextPOIBanner.swift` or fully migrate the chip into it.
+- [x] **`NextPOIBanner.swift` stub deleted**
+  Was 856 B, used `MKMapItem` not `POIModel`, superseded by `RideView.nextPOIChip()`.
 
-- [ ] **`RouteNoticeView.swift` appears vestigial (1154 B)**
-  No visible integration point in `RideView`; likely superseded by the inline `offRouteChip`.
-  Audit usages and delete if unused.
+- [ ] **`RouteNoticeView.swift` — kept, needs wiring**
+  Displays `MKDirections` road closure/restriction notices (iOS 26+).
+  Wire into `CyclingRouteService` result and surface in `topBanners`.
 
 - [ ] **`POIDiscoverySheet` vs `NearbySearchSheet` — two overlapping sheets**
-  Distinction between pre-ride discovery and mid-ride search is not enforced in the model.
-  Document the intended split clearly, or merge into one sheet with a `mode` parameter.
+  Document the pre-ride vs mid-ride split, or merge with a `mode` parameter.
 
 - [ ] **`RouteStore+POI.swift` is suspiciously thin (866 B)**
-  POI persistence is scattered; `routeStore.savePOIs()` is called from `RideView`.
-  Consolidate POI persistence fully into `RouteStore` or flesh out the extension.
+  Consolidate POI persistence fully into `RouteStore`.
 
 - [ ] **`MKLocalSearch` uses raw string queries — migrate to typed `MKPointOfInterestFilter`**
-  `POISearchService` searches with plain strings like `"Café"`.
-  WWDC25 improved `MKPointOfInterestFilter` with typed category constants.
-  Fix: use `.cafe`, `.gasStation`, etc. for more reliable results.
+  Use `.cafe`, `.gasStation`, etc. for more reliable WWDC25 results.
 
 - [ ] **`MapStyle` — expose cycling overlay option (WWDC25)**
-  Currently hardcoded to `.standard(elevation: .realistic)`.
-  Add a user setting to toggle between standard, hybrid, and the new cycling-focused style.
-
-- [ ] **`MapCameraAnimation` not used for heading updates (WWDC25)**
-  `updateRidingCamera` sets position directly.
-  Wrap in `withAnimation` using `MapCameraAnimation` curve control for smoother heading transitions.
+  Add a user setting to toggle between standard, hybrid, and cycling-focused style.
 
 ---
 
 ## 🔵 P3 — Nice to Have
 
-- [x] **Throttle `sendWatchUpdate()` to 1 Hz**
-  Previously encoded `WatchRideSummary` on every GPS ping.
-  Fixed: gated behind `watchUpdateInterval = 1.0` in `RideSessionStore`. *(already landed)*
+- [x] **Throttle `sendWatchUpdate()` to 1 Hz** — done.
 
-- [ ] **Surface routing/rerouting errors to the user**
-  Every `catch {}` is silent. Users see nothing when spur routing or rerouting fails.
-  Fix: add `@Published var lastError: String?` to `RideSessionStore` and show a dismissible HUD banner.
+- [x] **Surface routing/rerouting errors to the user**
+  `RideSessionStore.lastError: String?` published. `showError()` auto-dismisses after 6s.
+  `RideView.topBanners` shows orange dismissible capsule banner. Tap to clear.
+
+- [x] **`MapCameraAnimation` for smooth heading transitions (WWDC25)**
+  `updateRidingCamera` now wraps `position` update in `withAnimation(.linear(duration: 0.3))`.
 
 - [ ] **`RideHistoryStore` has no pagination**
-  `RideHistoryView` loads all history at once.
-  Fix: lazy loading with `SwiftData` or paginated JSON file reads.
+  Lazy loading with `SwiftData` or paginated JSON reads.
 
 - [ ] **Hardcoded English strings — not using `LocalizationManager`**
-  `LocalizationManager` exists but user-visible strings in `RideView`, `NearbySearchSheet`,
-  and `RideSummaryView` are hardcoded English.
-  Fix: run a pass to move all strings through the localization system.
+  Run a pass to move all user-visible strings through the localization system.
 
 - [ ] **No unit tests for core logic**
-  `Tests/` exists but has no coverage for `minimumDistance`, `updateNextPOI` ordering,
-  elevation accumulation, or `bearing()`.
-  Add `XCTestCase` tests for these as a baseline.
-
-- [ ] **Two `.onAppear` modifiers in `RideView`**
-  Fragile ordering; both fire on appear.
-  *(Already merged in current code — verify and close if done.)*
+  Add `XCTestCase` coverage for `minimumDistance`, `updateNextPOI`, elevation accumulation, `bearing()`.
 
 ---
 
@@ -122,3 +97,9 @@
 | `nextPOI` uses on-route track index ordering | Apr 26, 2026 |
 | `sendWatchUpdate()` throttled to 1 Hz | Apr 26, 2026 |
 | Two `.onAppear` blocks merged into one | Apr 26, 2026 |
+| POI toggle uses coordinate-based deterministic ID | Apr 26, 2026 |
+| `UserAnnotation()` replaces manual blue dot | Apr 26, 2026 |
+| `HUDHeightKey` PreferenceKey replaces `asyncAfter` hack | Apr 26, 2026 |
+| Error surfacing via `lastError` + dismissible HUD banner | Apr 26, 2026 |
+| `MapCameraAnimation` for smooth camera transitions | Apr 26, 2026 |
+| `NextPOIBanner.swift` stub deleted | Apr 26, 2026 |
