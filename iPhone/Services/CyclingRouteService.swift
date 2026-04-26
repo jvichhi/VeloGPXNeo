@@ -3,9 +3,9 @@
 //  VeloGPX
 //
 //  Computes cycling directions between two points using MKDirections.
-//  - iOS 26+: uses .cycling transport type (WWDC25 new API)
-//  - iOS 18 fallback: uses .walking
-//  Returns the first MKRoute plus rich metadata (name, notices, ETA).
+//  - iOS 26+: uses .cycling transport type
+//  - Fallback: uses .walking
+//  Returns the first MKRoute plus metadata (name, ETA).
 //
 
 import Foundation
@@ -18,16 +18,13 @@ struct CyclingRouteResult {
     /// The computed MKRoute (polyline, steps, distance, ETA).
     let route: MKRoute
 
-    /// Localized route name provided by MapKit (iOS 26+), nil on older OS.
+    /// Localized route name provided by MapKit, nil if empty.
     let routeName: String?
 
-    /// Road closure / restriction notices (iOS 26+), empty on older OS.
-    let notices: [String]
-
-    /// The matched source MapItem MapKit actually used (may differ from request).
+    /// The source MapItem used for the request.
     let matchedSource: MKMapItem?
 
-    /// The matched destination MapItem MapKit actually used.
+    /// The destination MapItem used for the request.
     let matchedDestination: MKMapItem?
 
     /// Whether the route was computed using .cycling (true) or .walking fallback (false).
@@ -42,15 +39,17 @@ actor CyclingRouteService {
     private init() {}
 
     /// Calculates a cycling route from `source` to `destination`.
-    /// Automatically selects .cycling on iOS 26+, falls back to .walking on iOS 18.
     func calculateRoute(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
 
+        let sourceItem = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        let destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.source = sourceItem
+        request.destination = destinationItem
         request.requestsAlternateRoutes = true
 
         var isCycling = false
@@ -68,25 +67,13 @@ actor CyclingRouteService {
             throw CyclingRouteError.noRoutesFound
         }
 
-        // iOS 26: response exposes richer metadata via matched items and notices.
-        var routeName: String? = nil
-        var notices: [String] = []
-        var matchedSource: MKMapItem? = nil
-        var matchedDestination: MKMapItem? = nil
-
-        if #available(iOS 26.0, *) {
-            routeName = firstRoute.name.isEmpty ? nil : firstRoute.name
-            notices = response.notices.map { $0.description }
-            matchedSource = response.source
-            matchedDestination = response.destination
-        }
+        let routeName = firstRoute.name.isEmpty ? nil : firstRoute.name
 
         return CyclingRouteResult(
             route: firstRoute,
             routeName: routeName,
-            notices: notices,
-            matchedSource: matchedSource,
-            matchedDestination: matchedDestination,
+            matchedSource: sourceItem,
+            matchedDestination: destinationItem,
             isCycling: isCycling
         )
     }
@@ -97,9 +84,12 @@ actor CyclingRouteService {
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
 
+        let sourceItem = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        let destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.source = sourceItem
+        request.destination = destinationItem
         request.requestsAlternateRoutes = true
 
         var isCycling = false
@@ -114,24 +104,11 @@ actor CyclingRouteService {
         let response = try await directions.calculate()
 
         return response.routes.prefix(3).map { route in
-            var routeName: String? = nil
-            var notices: [String] = []
-            var matchedSource: MKMapItem? = nil
-            var matchedDestination: MKMapItem? = nil
-
-            if #available(iOS 26.0, *) {
-                routeName = route.name.isEmpty ? nil : route.name
-                notices = response.notices.map { $0.description }
-                matchedSource = response.source
-                matchedDestination = response.destination
-            }
-
-            return CyclingRouteResult(
+            CyclingRouteResult(
                 route: route,
-                routeName: routeName,
-                notices: notices,
-                matchedSource: matchedSource,
-                matchedDestination: matchedDestination,
+                routeName: route.name.isEmpty ? nil : route.name,
+                matchedSource: sourceItem,
+                matchedDestination: destinationItem,
                 isCycling: isCycling
             )
         }
