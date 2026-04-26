@@ -53,6 +53,7 @@ private extension RouteModel {
 struct RideView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @StateObject private var rideStore = RideSessionStore()
+    @EnvironmentObject private var historyStore: RideHistoryStore
     @State private var position: MapCameraPosition = .automatic
     @State private var viewMode: RideViewMode = .birdseye
     @State private var showNearbySearch = false
@@ -63,6 +64,7 @@ struct RideView: View {
     @State private var rideSummary: RideSummary? = nil
     @State private var showRideSummary = false
     @State private var statsExpanded: Bool = false
+    @State private var hudHeight: CGFloat = 0
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -109,6 +111,9 @@ struct RideView: View {
                     position = .rect(route.mapRect)
                     Task { await computePOISpurs(route: route) }
                 }
+            }
+            .onAppear {
+                rideStore.setHistoryStore(historyStore)
             }
             .onChange(of: routeStore.selectedPOIs) { _, _ in
                 if let route = routeStore.selectedRoute {
@@ -217,79 +222,87 @@ struct RideView: View {
 
     @ViewBuilder
     private func ridingLayout(route: RouteModel) -> some View {
+        let controlsBottom = hudHeight + 12
+
         ZStack(alignment: .bottom) {
+
+            // Full-screen map
             mapLayer(route: route)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack(spacing: 8) {
+            // ── Top overlay: compact chips (off-route + next POI) ─────────
+            VStack(alignment: .leading, spacing: 8) {
                 topBanners
-                    .padding(.top, 56)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 58)
+            .padding(.leading, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .allowsHitTesting(false)
 
-            if !isFollowing {
-                HStack {
-                    Spacer()
-                    Button {
-                        if let coord = rideStore.rideState.currentCoordinate {
-                            updateRidingCamera(coord: coord.clCoordinate)
-                        }
-                    } label: {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.blue)
-                            .padding(13)
-                            .background(.ultraThickMaterial, in: Circle())
-                            .shadow(radius: 6)
+            // ── Right control rail — grouped pill ─────────────────────────
+            VStack(spacing: 0) {
+                Button {
+                    if let coord = rideStore.rideState.currentCoordinate {
+                        updateRidingCamera(coord: coord.clCoordinate)
                     }
+                } label: {
+                    Image(systemName: isFollowing ? "location.fill" : "location.north.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isFollowing ? Color.blue.opacity(0.5) : Color.primary)
+                        .frame(width: 44, height: 44)
                 }
-                .padding(.trailing, 16)
-                .padding(.bottom, statsExpanded ? 310 : 210)
-                .transition(.scale.combined(with: .opacity))
-                .animation(.spring(duration: 0.3), value: isFollowing)
-            }
+                .accessibilityLabel(isFollowing ? "Following location" : "Re-centre map")
 
-            HStack(spacing: 12) {
+                Divider()
+                    .frame(width: 28)
+                    .padding(.horizontal, 8)
+
                 Button {
                     showNearbySearch = true
                 } label: {
-                    Image(systemName: "magnifyingglass")
+                    Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                         .frame(width: 44, height: 44)
-                        .background(.ultraThickMaterial, in: Circle())
-                        .shadow(radius: 4)
                 }
                 .disabled(rideStore.rideState.currentCoordinate == nil)
-
-                Spacer()
-
-                Button {
-                    if let summary = rideStore.stopAndBuildSummary() {
-                        rideSummary = summary
-                        showRideSummary = true
-                    } else {
-                        rideStore.stop()
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "stop.fill")
-                        Text("Stop")
-                            .fontWeight(.semibold)
-                    }
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 13)
-                    .background(Color.red, in: Capsule())
-                    .shadow(radius: 4)
-                }
+                .accessibilityLabel("Search nearby POIs")
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, statsExpanded ? 302 : 202)
-            .animation(.spring(duration: 0.35), value: statsExpanded)
+            .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: .black.opacity(0.13), radius: 8, x: 0, y: 3)
+            .padding(.trailing, 14)
+            .padding(.bottom, controlsBottom + 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .animation(.spring(duration: 0.35), value: hudHeight)
+            .animation(.easeInOut(duration: 0.2), value: isFollowing)
 
+            // ── End Ride — bottom-left, above HUD ─────────────────────────
+            Button {
+                if let summary = rideStore.stopAndBuildSummary() {
+                    rideSummary = summary
+                    showRideSummary = true
+                } else {
+                    rideStore.stop()
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("End Ride")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 13)
+                .background(Color.red, in: Capsule())
+                .shadow(color: .red.opacity(0.3), radius: 10, x: 0, y: 4)
+            }
+            .padding(.leading, 14)
+            .padding(.bottom, controlsBottom + 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .animation(.spring(duration: 0.35), value: hudHeight)
+
+            // ── HUD panel ─────────────────────────────────────────────────
             ridingHUDPanel(route: route)
         }
         .animation(.spring(duration: 0.3), value: isFollowing)
@@ -340,6 +353,22 @@ struct RideView: View {
                     .padding(.bottom, 8)
             }
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { hudHeight = geo.size.height }
+                    .onChange(of: statsExpanded) { _, _ in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            hudHeight = geo.size.height
+                        }
+                    }
+                    .onChange(of: rideStore.rideState.rerouteSteps.count) { _, _ in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            hudHeight = geo.size.height
+                        }
+                    }
+            }
+        )
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
@@ -352,38 +381,39 @@ struct RideView: View {
     private var primaryMetricsRow: some View {
         let s = rideStore.rideState
         HStack(spacing: 0) {
-            VStack(spacing: 1) {
+
+            VStack(spacing: 2) {
                 Text("SPEED")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(1.2)
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(String(format: "%.1f", s.speedKmh))
-                        .font(.system(size: 40, weight: .black, design: .rounded))
+                        .font(.system(size: 38, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color.blue)
+                        .foregroundStyle(.blue)
                     Text("km/h")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 5)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
 
-            Divider().frame(height: 48)
+            Divider().frame(height: 44)
 
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("DISTANCE")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(1.2)
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
                     Text(String(format: "%.2f", s.distanceKm))
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit()
                     Text("km")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 2)
                 }
@@ -391,23 +421,23 @@ struct RideView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
 
-            Divider().frame(height: 48)
+            Divider().frame(height: 44)
 
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("TIME")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(1.2)
                 Text(s.elapsedTime.formattedDuration)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .monospacedDigit()
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
 
-            Divider().frame(height: 48)
+            Divider().frame(height: 44)
 
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("ROUTE")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -415,11 +445,11 @@ struct RideView: View {
                 ZStack {
                     Circle()
                         .stroke(Color.blue.opacity(0.18), lineWidth: 4)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 32, height: 32)
                     Circle()
                         .trim(from: 0, to: rideStore.progressPercent)
                         .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 32, height: 32)
                         .rotationEffect(.degrees(-90))
                     Text("\(Int(rideStore.progressPercent * 100))%")
                         .font(.system(size: 9, weight: .bold))
@@ -556,41 +586,39 @@ struct RideView: View {
 
     @ViewBuilder
     private var topBanners: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             if rideStore.rideState.isOffRoute {
-                offRouteBanner
+                offRouteChip
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
             if let poi = rideStore.rideState.nextPOI,
                let dist = rideStore.rideState.nextPOIDistance,
                dist <= 2000 {
-                nextPOIBanner(poi: poi, distance: dist)
+                nextPOIChip(poi: poi, distance: dist)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 16)
         .animation(.spring(duration: 0.3), value: rideStore.rideState.isOffRoute)
         .animation(.spring(duration: 0.3), value: rideStore.rideState.nextPOI?.id)
     }
 
-    // MARK: - Off Route Banner
+    // MARK: - Off Route Chip
 
     @ViewBuilder
-    private var offRouteBanner: some View {
-        HStack(spacing: 10) {
+    private var offRouteChip: some View {
+        HStack(spacing: 7) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Off Route")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                 Text("\(Int(rideStore.rideState.offRouteDistance))m from route")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.82))
             }
-
-            Spacer()
 
             if let bearing = rideStore.rideState.bearingToRoute,
                rideStore.rideState.offRouteDistance <= 200 {
@@ -598,82 +626,79 @@ struct RideView: View {
                     .truncatingRemainder(dividingBy: 360)
                 Image(systemName: "arrow.up")
                     .rotationEffect(.degrees(relativeBearing))
-                    .font(.system(size: 18, weight: .black))
+                    .font(.system(size: 15, weight: .black))
                     .foregroundStyle(.white)
+                    .padding(.leading, 2)
             }
 
             if rideStore.rideState.isRerouting {
-                ProgressView().tint(.white).scaleEffect(0.8)
+                ProgressView().tint(.white).scaleEffect(0.75)
+                    .padding(.leading, 2)
             }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .red.opacity(0.4), radius: 8, x: 0, y: 3)
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
-
-    // MARK: - Next POI Banner
-
-    @ViewBuilder
-    private func nextPOIBanner(poi: POIModel, distance: CLLocationDistance) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.18))
-                    .frame(width: 42, height: 42)
-                Image(systemName: poi.category.systemImage)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.green)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(poi.name)
-                    .font(.system(size: 15, weight: .bold))
-                    .lineLimit(1)
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.forward.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Text(distance < 1000
-                         ? "\(Int(distance))m ahead"
-                         : String(format: "%.1f km ahead", distance / 1000))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .padding(.vertical, 9)
+        .background(Color.red, in: Capsule())
+        .shadow(color: .red.opacity(0.35), radius: 8, x: 0, y: 3)
+    }
+
+    // MARK: - Next POI Chip
+
+    @ViewBuilder
+    private func nextPOIChip(poi: POIModel, distance: CLLocationDistance) -> some View {
+        HStack(spacing: 9) {
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(0.2))
+                    .frame(width: 30, height: 30)
+                Image(systemName: poi.category.systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(poi.name)
+                    .font(.system(size: 13, weight: .bold))
+                    .lineLimit(1)
+                Text(distance < 1000
+                     ? "\(Int(distance))m ahead"
+                     : String(format: "%.1f km ahead", distance / 1000))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 2)
     }
 
     // MARK: - Re-route Steps
 
     @ViewBuilder
     private var rerouteStepsList: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Label("Back to route", systemImage: "arrow.triangle.turn.up.right.circle.fill")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.orange)
-            ForEach(rideStore.rideState.rerouteSteps.prefix(3), id: \.instructions) { step in
+
+            ForEach(
+                Array(rideStore.rideState.rerouteSteps.prefix(3).enumerated()),
+                id: \.element.instructions
+            ) { index, step in
                 HStack {
-                    Text(step.instructions).font(.caption).foregroundStyle(.primary)
+                    Text(step.instructions)
+                        .font(.system(size: index == 0 ? 13 : 12, weight: index == 0 ? .semibold : .regular))
+                        .foregroundStyle(index == 0 ? Color.primary : Color.secondary)
                     Spacer()
-                    Text("\(Int(step.distanceMeters))m").font(.caption).foregroundStyle(.secondary)
+                    Text("\(Int(step.distanceMeters))m")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 10)
+        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Elevation Strip
@@ -784,7 +809,7 @@ struct RideView: View {
                     let request = MKDirections.Request()
                     request.source      = MKMapItem(placemark: MKPlacemark(coordinate: poiCoord))
                     request.destination = MKMapItem(placemark: MKPlacemark(coordinate: candidate))
-                    request.transportType = .walking
+                    request.transportType = .cycling  // Uses MapKit cycling routing (WWDC25)
                     request.requestsAlternateRoutes = false
                     do {
                         let response = try await MKDirections(request: request).calculate()
@@ -824,7 +849,7 @@ struct RideView: View {
         let request = MKDirections.Request()
         request.source      = MKMapItem(placemark: MKPlacemark(coordinate: from))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
-        request.transportType = .walking
+        request.transportType = .cycling  // Uses MapKit cycling routing (WWDC25)
         request.requestsAlternateRoutes = false
         do {
             let response = try await MKDirections(request: request).calculate()
