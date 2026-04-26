@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Japanese (ja) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "ルート";
 "Ride" = "ライド";
 "My Rides" = "マイライド";
 "Settings" = "設定";
+
+/* Settings */
+"settings.language.title" = "言語";
+"settings.language.subtitle" = "アプリの表示言語";
+"settings.import.title" = "ルートをインポート";
+"settings.import.subtitle" = "ファイルアプリからGPXファイルをインポート";
+"settings.map.title" = "マップエンジン";
+"settings.map.subtitle" = "リアルな標高表示のAppleマップ標準";
+"settings.birdseye.title" = "鳥瞳視点";
+"settings.birdseye.subtitle" = "ライド開始前の全体ビュー";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "ウォッチにメトリクスと操作を同期";
+"settings.poi.title" = "ポイント・オブ・インタレスト";
+"settings.poi.subtitle" = "POIのカテゴリと表示を管理";
+"settings.export.title" = "エクスポート";
+"settings.export.subtitle" = "ライドをGPXまたはFITファイルでエクスポート";
+
+/* Language Picker */
+"language.search.prompt" = "言語を検索";
+"language.picker.title" = "言語";
+"language.picker.done" = "完了";
+
+/* Route Library */
+"route.library.empty.title" = "ルートなし";
+"route.library.empty.subtitle" = "Safari、ファイル、またはメールから\nGPXまたはGeoJSONファイルをインポートしてください。";
+"route.library.import.button" = "ルートをインポート";
+"route.library.ride.button" = "このルートでライド";
+"route.library.import.cancelled" = "インポートをキャンセル";
+"route.library.delete" = "削除";
+
+/* Route Detail */
+"route.detail.title" = "ルート詳細";
+"route.detail.elevation.profile" = "標高プロフィール";
+"route.detail.stat.distance" = "距離";
+"route.detail.stat.gain" = "登り";
+"route.detail.stat.loss" = "下り";
+"route.detail.section.route" = "ルート";
+"route.detail.name.placeholder" = "ルート名";
+"route.detail.save" = "保存";
+"route.detail.cancel" = "キャンセル";
+"route.detail.row.name" = "名前";
+"route.detail.row.format" = "フォーマット";
+"route.detail.row.trackpoints" = "トラックポイント";
+"route.detail.row.file" = "ファイル";
+"route.detail.reverse.button" = "ルート方向を反転";
+"route.detail.reverse.confirm.title" = "このルートを反転しますか？";
+"route.detail.reverse.confirm.action" = "反転";
+"route.detail.reverse.confirm.message" = "スタートとゴールが入れ替わります。この操作は元に戻せません。";
+"route.detail.section.poi" = "ポイント・オブ・インタレスト";
+"route.detail.poi.empty" = "POIはまだ追加されていません";
+"route.detail.poi.discover" = "ルート沿いのPOIを発見";
+"route.detail.section.waypoints" = "埋め込みウェイポイント";
+"route.detail.waypoint.fallback" = "ウェイポイント";
+
+/* Ride View */
+"ride.no.route.title" = "ルートを選択";
+"ride.no.route.subtitle" = "ライブラリからGPXルートをインポートまたは選択してください。";
+"ride.start.button" = "ライド開始";
+"ride.center.map" = "マップを中心に";
+"ride.metric.speed" = "速度";
+"ride.metric.distance" = "距離";
+"ride.metric.time" = "時間";
+"ride.metric.route" = "ルート";
+"ride.metric.avg.speed" = "平均速度";
+"ride.metric.elev.gain" = "累計登負";
+"ride.metric.elev.loss" = "累計降下";
+"ride.offroute.title" = "ルート外";
+"ride.offroute.distance" = "ルートから%dm";
+"ride.reroute.back" = "ルートに戻る";
+"ride.end.button" = "ライド終了";
+"ride.location.following" = "位置追従中";
+"ride.location.recentre" = "マップを再中心化";
+"ride.poi.search.label" = "POIを検索";
+"ride.poi.ahead.meters" = "%dm先";
+"ride.poi.ahead.km" = "%.1f km先";
+
+/* Ride History */
+"history.title" = "マイライド";
+"history.empty.title" = "ライドなし";
+"history.empty.subtitle" = "完了したライドはここに表示されます。\nサドルに践ってペダルを番ろう！";
+"history.record.longest" = "最長距離";
+"history.record.fastest" = "最高平均速";
+"history.record.climb" = "最大累計登り";
+"history.delete" = "削除";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "ライドを名前変更";
+"history.detail.rename.placeholder" = "ライド名";
+"history.detail.rename.save" = "保存";
+"history.detail.rename.cancel" = "キャンセル";
+"history.detail.menu.rename" = "名前変更";
+"history.detail.menu.delete" = "ライドを削除";
+"history.detail.delete.confirm.title" = "このライドを削除しますか？";
+"history.detail.delete.confirm.message" = "この操作は元に戻せません。";
+"history.detail.delete.action" = "削除";
+"history.detail.planned.toggle.title" = "計画 vs 実際";
+"history.detail.planned.toggle.subtitle" = "元の計画ルートを重ねて表示";
+"history.detail.section.poi" = "ポイント・オブ・インタレスト";
+"history.detail.section.share" = "ライドを共有";
+"history.detail.share.card.button" = "画像カードとして共有";
+"history.detail.section.export" = "GPXをエクスポート";
+"history.detail.export.poi.title" = "POIを含める";
+"history.detail.export.poi.subtitle.one" = "%dか所の立寄りポイント";
+"history.detail.export.poi.subtitle.other" = "%dか所の立寄りポイント";
+"history.detail.export.gpx.button" = "GPXファイルを共有";
+
+/* Ride Summary */
+"summary.title" = "ライド完了";
+"summary.done" = "完了";
+"summary.section.save" = "ライドを保存";
+"summary.gps.track.title" = "GPSトラック";
+"summary.gps.track.subtitle" = "実際の走行ルート — %dポイント記録";
+"summary.export.no.track" = "このライドのGPSトラックは記録されていません。";
+"summary.export.poi.title" = "POIを含める";
+"summary.export.gpx.button" = "GPXファイルを共有";
+
+/* Metric Labels */
+"metric.time" = "時間";
+"metric.avg" = "平均";
+"metric.max" = "最大";
+"metric.gain" = "登り";
+"metric.loss" = "下り";
+"metric.pois" = "POI";
+"metric.visited" = "訪問";
+"metric.kmh" = "km/h";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "近くのポイント";
+"nearby.searching" = "検索中…";
+"nearby.empty" = "近くに結果なし";
+"nearby.category.cafe" = "カフェ";
+"nearby.category.water" = "水";
+"nearby.category.bikeshop" = "自転車屋";
+"nearby.category.restaurant" = "レストラン";
+"nearby.unknown" = "不明";
+"nearby.distance.meters" = "%.0f m";
+"nearby.distance.km" = "%.1f km";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "キャンセル";
+"common.save" = "保存";
+"common.delete" = "削除";
+"common.done" = "完了";
+"common.cancel.action" = "キャンセル";

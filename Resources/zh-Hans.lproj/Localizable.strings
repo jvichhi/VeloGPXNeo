@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Simplified Chinese (zh-Hans) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "路线";
 "Ride" = "骑行";
 "My Rides" = "我的骑行";
 "Settings" = "设置";
+
+/* Settings */
+"settings.language.title" = "语言";
+"settings.language.subtitle" = "应用显示语言";
+"settings.import.title" = "导入路线";
+"settings.import.subtitle" = "从文件应用导入GPX文件";
+"settings.map.title" = "地图引擎";
+"settings.map.subtitle" = "具有真实海拔高度的Apple地图标准模式";
+"settings.birdseye.title" = "鸟瞰视图";
+"settings.birdseye.subtitle" = "骑行开始前的总览模式";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "将指标和控制同步到Watch";
+"settings.poi.title" = "兴趣点";
+"settings.poi.subtitle" = "管理POI类别和显示";
+"settings.export.title" = "导出";
+"settings.export.subtitle" = "将骑行导出为GPX或FIT文件";
+
+/* Language Picker */
+"language.search.prompt" = "搜索语言";
+"language.picker.title" = "语言";
+"language.picker.done" = "完成";
+
+/* Route Library */
+"route.library.empty.title" = "暂无路线";
+"route.library.empty.subtitle" = "从 Safari、文件或邮件\n导入GPX或GeoJSON文件。";
+"route.library.import.button" = "导入路线";
+"route.library.ride.button" = "骑这条路线";
+"route.library.import.cancelled" = "导入已取消";
+"route.library.delete" = "删除";
+
+/* Route Detail */
+"route.detail.title" = "路线详情";
+"route.detail.elevation.profile" = "海拔剧面";
+"route.detail.stat.distance" = "距离";
+"route.detail.stat.gain" = "上升";
+"route.detail.stat.loss" = "下降";
+"route.detail.section.route" = "路线";
+"route.detail.name.placeholder" = "路线名称";
+"route.detail.save" = "保存";
+"route.detail.cancel" = "取消";
+"route.detail.row.name" = "名称";
+"route.detail.row.format" = "格式";
+"route.detail.row.trackpoints" = "轨迹点";
+"route.detail.row.file" = "文件";
+"route.detail.reverse.button" = "反转路线方向";
+"route.detail.reverse.confirm.title" = "反转此路线？";
+"route.detail.reverse.confirm.action" = "反转";
+"route.detail.reverse.confirm.message" = "起点和终点将交换，此操作无法撤销。";
+"route.detail.section.poi" = "兴趣点";
+"route.detail.poi.empty" = "暂无POI";
+"route.detail.poi.discover" = "发现路线沿途POI";
+"route.detail.section.waypoints" = "嵌入式路pkt点";
+"route.detail.waypoint.fallback" = "领航点";
+
+/* Ride View */
+"ride.no.route.title" = "选择路线";
+"ride.no.route.subtitle" = "从库中导入或选择GPX路线。";
+"ride.start.button" = "开始骑行";
+"ride.center.map" = "居中地图";
+"ride.metric.speed" = "速度";
+"ride.metric.distance" = "距离";
+"ride.metric.time" = "时间";
+"ride.metric.route" = "路线";
+"ride.metric.avg.speed" = "平均速度";
+"ride.metric.elev.gain" = "累计上升";
+"ride.metric.elev.loss" = "累计下降";
+"ride.offroute.title" = "偏离路线";
+"ride.offroute.distance" = "离路线%dm";
+"ride.reroute.back" = "返回路线";
+"ride.end.button" = "结束骑行";
+"ride.location.following" = "跟随位置";
+"ride.location.recentre" = "重新居中";
+"ride.poi.search.label" = "搜索附近POI";
+"ride.poi.ahead.meters" = "前方%dm";
+"ride.poi.ahead.km" = "前方%.1f km";
+
+/* Ride History */
+"history.title" = "我的骑行";
+"history.empty.title" = "暂无骑行记录";
+"history.empty.subtitle" = "已完成的骑行将显示在这里。\n出发，开始骑行！";
+"history.record.longest" = "最长";
+"history.record.fastest" = "最快平均";
+"history.record.climb" = "最大爬升";
+"history.delete" = "删除";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "重命名骑行";
+"history.detail.rename.placeholder" = "骑行名称";
+"history.detail.rename.save" = "保存";
+"history.detail.rename.cancel" = "取消";
+"history.detail.menu.rename" = "重命名";
+"history.detail.menu.delete" = "删除骑行";
+"history.detail.delete.confirm.title" = "删除此骑行？";
+"history.detail.delete.confirm.message" = "此操作无法撤销。";
+"history.detail.delete.action" = "删除";
+"history.detail.planned.toggle.title" = "计划 vs 实际";
+"history.detail.planned.toggle.subtitle" = "显示原始计划路线叠加层";
+"history.detail.section.poi" = "兴趣点";
+"history.detail.section.share" = "分享骑行";
+"history.detail.share.card.button" = "以图片卡分享";
+"history.detail.section.export" = "导出GPX";
+"history.detail.export.poi.title" = "包含POI";
+"history.detail.export.poi.subtitle.one" = "%d个停靠点作为路pkt点";
+"history.detail.export.poi.subtitle.other" = "%d个停靠点作为路pkt点";
+"history.detail.export.gpx.button" = "分享GPX文件";
+
+/* Ride Summary */
+"summary.title" = "骑行完成";
+"summary.done" = "完成";
+"summary.section.save" = "保存骑行";
+"summary.gps.track.title" = "GPS轨迹";
+"summary.gps.track.subtitle" = "实际骑行路径 — 已记录%d个点";
+"summary.export.no.track" = "此骑行未记录GPS轨迹。";
+"summary.export.poi.title" = "包含POI";
+"summary.export.gpx.button" = "分享GPX文件";
+
+/* Metric Labels */
+"metric.time" = "时间";
+"metric.avg" = "平均";
+"metric.max" = "最大";
+"metric.gain" = "上升";
+"metric.loss" = "下降";
+"metric.pois" = "POI";
+"metric.visited" = "已访";
+"metric.kmh" = "km/h";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "附近";
+"nearby.searching" = "搜索中…";
+"nearby.empty" = "附近没有结果";
+"nearby.category.cafe" = "咏啡馆";
+"nearby.category.water" = "飲用水";
+"nearby.category.bikeshop" = "设车店";
+"nearby.category.restaurant" = "餐厅";
+"nearby.unknown" = "未知";
+"nearby.distance.meters" = "%.0f米";
+"nearby.distance.km" = "%.1f公里";
+
+/* Common */
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.save" = "保存";
+"common.delete" = "删除";
+"common.done" = "完成";
+"common.cancel.action" = "取消";
