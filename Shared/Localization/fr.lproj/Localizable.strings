@@ -1,0 +1,65 @@
+// French
+"app.name" = "VeloGPX";
+
+"tab.ride" = "Parcours";
+"tab.library" = "Bibliothèque";
+"tab.history" = "Historique";
+"tab.settings" = "Réglages";
+
+"ride.start" = "Démarrer";
+"ride.end" = "Terminer";
+"ride.center_map" = "Centrer la carte";
+"ride.off_route" = "Hors itinéraire";
+"ride.off_route_distance" = "%dm de l'itinéraire";
+"ride.back_to_route" = "Retour à l'itinéraire";
+"ride.next_poi_ahead" = "%@ devant vous";
+"ride.select_route" = "Sélectionnez un itinéraire";
+"ride.select_route_desc" = "Importez ou choisissez un parcours GPX depuis votre bibliothèque.";
+
+"metric.speed" = "VITESSE";
+"metric.distance" = "DISTANCE";
+"metric.time" = "TEMPS";
+"metric.route" = "ROUTE";
+"metric.avg_speed" = "VIT. MOY.";
+"metric.elev_gain" = "DÉNIVELÉ +";
+"metric.elev_loss" = "DÉNIVELÉ −";
+
+"poi.search_nearby" = "Rechercher des POI";
+"poi.add" = "Ajouter un POI";
+"poi.visited" = "visité(s)";
+
+"settings.title" = "Réglages";
+"settings.language" = "Langue";
+"settings.language_subtitle" = "Choisissez votre langue préférée";
+"settings.import" = "Import GPX & GeoJSON";
+"settings.import_subtitle" = "Ouvrez des fichiers depuis Safari, Fichiers ou Mail.";
+"settings.map_engine" = "Moteur de carte";
+"settings.map_engine_subtitle" = "MapKit avec rendu d'élévation réaliste.";
+"settings.birdseye" = "Vue d'ensemble";
+"settings.birdseye_subtitle" = "Prévisualisez l'itinéraire complet avant de partir.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Vitesse, distance et fréquence cardiaque avec retours haptiques.";
+"settings.poi" = "Points d'intérêt";
+"settings.poi_subtitle" = "Découvrez cafés, points d'eau, vélocistes sur votre route.";
+"settings.export" = "Export GPX";
+"settings.export_subtitle" = "Exportez votre trace, l'itinéraire et les POI visités.";
+
+"summary.title" = "Résumé";
+"summary.distance" = "Distance";
+"summary.duration" = "Durée";
+"summary.avg_speed" = "Vitesse moy.";
+"summary.max_speed" = "Vitesse max";
+"summary.elev_gain" = "Dénivelé positif";
+"summary.elev_loss" = "Dénivelé négatif";
+"summary.pois_visited" = "POI visités";
+"summary.save" = "Enregistrer";
+"summary.discard" = "Abandonner";
+
+"history.title" = "Historique";
+"history.empty" = "Aucune sortie";
+"history.empty_desc" = "Vos sorties terminées apparaîtront ici.";
+
+"library.title" = "Bibliothèque";
+"library.empty" = "Aucun itinéraire";
+"library.empty_desc" = "Importez un fichier GPX ou GeoJSON pour commencer.";
+"library.import" = "Importer";

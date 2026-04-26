@@ -1,0 +1,65 @@
+// Norwegian Bokmål
+"app.name" = "VeloGPX";
+
+"tab.ride" = "Tur";
+"tab.library" = "Bibliotek";
+"tab.history" = "Historikk";
+"tab.settings" = "Innstillinger";
+
+"ride.start" = "Start";
+"ride.end" = "Avslutt";
+"ride.center_map" = "Sentrer kart";
+"ride.off_route" = "Utenfor ruten";
+"ride.off_route_distance" = "%dm fra ruten";
+"ride.back_to_route" = "Tilbake til ruten";
+"ride.next_poi_ahead" = "%@ fremover";
+"ride.select_route" = "Velg en rute";
+"ride.select_route_desc" = "Importer eller velg en GPX-rute fra biblioteket.";
+
+"metric.speed" = "FART";
+"metric.distance" = "DISTANSE";
+"metric.time" = "TID";
+"metric.route" = "RUTE";
+"metric.avg_speed" = "SNITTFART";
+"metric.elev_gain" = "STIGNING";
+"metric.elev_loss" = "NEDSTIGNING";
+
+"poi.search_nearby" = "Søk etter nærliggende POI-er";
+"poi.add" = "Legg til POI";
+"poi.visited" = "besøkt";
+
+"settings.title" = "Innstillinger";
+"settings.language" = "Språk";
+"settings.language_subtitle" = "Velg foretrukket språk";
+"settings.import" = "GPX & GeoJSON-import";
+"settings.import_subtitle" = "Åpne filer fra Safari, Filer eller Mail.";
+"settings.map_engine" = "Kartmotor";
+"settings.map_engine_subtitle" = "MapKit med realistisk høydegjengivelse.";
+"settings.birdseye" = "Fugleperspektiv";
+"settings.birdseye_subtitle" = "Forhåndsvis hele ruten før du starter.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Fart, distanse og puls med haptisk tilbakemelding.";
+"settings.poi" = "Interessepunkter";
+"settings.poi_subtitle" = "Oppdag kaféer, vannsteder og sykkelbutikker.";
+"settings.export" = "GPX-eksport";
+"settings.export_subtitle" = "Eksporter spor, rute og besøkte POI-er som GPX.";
+
+"summary.title" = "Oppsummering";
+"summary.distance" = "Distanse";
+"summary.duration" = "Varighet";
+"summary.avg_speed" = "Snittfart";
+"summary.max_speed" = "Maks fart";
+"summary.elev_gain" = "Høydegevinst";
+"summary.elev_loss" = "Høydetap";
+"summary.pois_visited" = "Besøkte POI-er";
+"summary.save" = "Lagre";
+"summary.discard" = "Forkast";
+
+"history.title" = "Historikk";
+"history.empty" = "Ingen turer ennå";
+"history.empty_desc" = "Dine fullførte turer vises her.";
+
+"library.title" = "Bibliotek";
+"library.empty" = "Ingen ruter";
+"library.empty_desc" = "Importer en GPX- eller GeoJSON-fil for å starte.";
+"library.import" = "Importer rute";

@@ -1,0 +1,65 @@
+// Italian
+"app.name" = "VeloGPX";
+
+"tab.ride" = "Percorso";
+"tab.library" = "Libreria";
+"tab.history" = "Cronologia";
+"tab.settings" = "Impostazioni";
+
+"ride.start" = "Inizia";
+"ride.end" = "Termina";
+"ride.center_map" = "Centra mappa";
+"ride.off_route" = "Fuori percorso";
+"ride.off_route_distance" = "%dm dal percorso";
+"ride.back_to_route" = "Torna al percorso";
+"ride.next_poi_ahead" = "%@ davanti";
+"ride.select_route" = "Seleziona un percorso";
+"ride.select_route_desc" = "Importa o scegli un percorso GPX dalla tua libreria.";
+
+"metric.speed" = "VELOCITÀ";
+"metric.distance" = "DISTANZA";
+"metric.time" = "TEMPO";
+"metric.route" = "PERCORSO";
+"metric.avg_speed" = "VEL. MEDIA";
+"metric.elev_gain" = "DISLIVELLO +";
+"metric.elev_loss" = "DISLIVELLO −";
+
+"poi.search_nearby" = "Cerca POI vicini";
+"poi.add" = "Aggiungi POI";
+"poi.visited" = "visitato/i";
+
+"settings.title" = "Impostazioni";
+"settings.language" = "Lingua";
+"settings.language_subtitle" = "Scegli la tua lingua preferita";
+"settings.import" = "Import GPX & GeoJSON";
+"settings.import_subtitle" = "Apri file da Safari, File o Mail.";
+"settings.map_engine" = "Motore mappa";
+"settings.map_engine_subtitle" = "MapKit con elevazione realistica.";
+"settings.birdseye" = "Vista dall'alto";
+"settings.birdseye_subtitle" = "Anteprima del percorso completo prima di partire.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Velocità, distanza e frequenza cardiaca con feedback aptici.";
+"settings.poi" = "Punti di interesse";
+"settings.poi_subtitle" = "Scopri caffè, fonti d'acqua e negozi di bici.";
+"settings.export" = "Esporta GPX";
+"settings.export_subtitle" = "Esporta traccia, percorso e POI visitati in un file GPX.";
+
+"summary.title" = "Riepilogo";
+"summary.distance" = "Distanza";
+"summary.duration" = "Durata";
+"summary.avg_speed" = "Vel. media";
+"summary.max_speed" = "Vel. massima";
+"summary.elev_gain" = "Dislivello pos.";
+"summary.elev_loss" = "Dislivello neg.";
+"summary.pois_visited" = "POI visitati";
+"summary.save" = "Salva";
+"summary.discard" = "Scarta";
+
+"history.title" = "Cronologia";
+"history.empty" = "Nessun percorso";
+"history.empty_desc" = "I tuoi percorsi completati appariranno qui.";
+
+"library.title" = "Libreria";
+"library.empty" = "Nessuna rotta";
+"library.empty_desc" = "Importa un file GPX o GeoJSON per iniziare.";
+"library.import" = "Importa percorso";

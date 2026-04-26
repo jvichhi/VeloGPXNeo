@@ -1,0 +1,65 @@
+// Portuguese (Brazil)
+"app.name" = "VeloGPX";
+
+"tab.ride" = "Pedal";
+"tab.library" = "Biblioteca";
+"tab.history" = "Histórico";
+"tab.settings" = "Configurações";
+
+"ride.start" = "Iniciar";
+"ride.end" = "Encerrar";
+"ride.center_map" = "Centralizar mapa";
+"ride.off_route" = "Fora do percurso";
+"ride.off_route_distance" = "%dm do percurso";
+"ride.back_to_route" = "Voltar ao percurso";
+"ride.next_poi_ahead" = "%@ à frente";
+"ride.select_route" = "Selecione um percurso";
+"ride.select_route_desc" = "Importe ou escolha um percurso GPX da sua biblioteca.";
+
+"metric.speed" = "VELOCIDADE";
+"metric.distance" = "DISTÂNCIA";
+"metric.time" = "TEMPO";
+"metric.route" = "PERCURSO";
+"metric.avg_speed" = "VEL. MÉDIA";
+"metric.elev_gain" = "GANHO ALT.";
+"metric.elev_loss" = "PERDA ALT.";
+
+"poi.search_nearby" = "Buscar POIs próximos";
+"poi.add" = "Adicionar POI";
+"poi.visited" = "visitado(s)";
+
+"settings.title" = "Configurações";
+"settings.language" = "Idioma";
+"settings.language_subtitle" = "Escolha seu idioma preferido";
+"settings.import" = "Importar GPX & GeoJSON";
+"settings.import_subtitle" = "Abra arquivos do Safari, Arquivos ou Mail.";
+"settings.map_engine" = "Motor de mapa";
+"settings.map_engine_subtitle" = "MapKit com elevação realista.";
+"settings.birdseye" = "Visão aérea";
+"settings.birdseye_subtitle" = "Pré-visualize o percurso completo antes de pedalar.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Velocidade, distância e frequência cardíaca com haptics.";
+"settings.poi" = "Pontos de interesse";
+"settings.poi_subtitle" = "Descubra cafés, fontes e lojas de bicicleta.";
+"settings.export" = "Exportar GPX";
+"settings.export_subtitle" = "Exporte sua trilha, percurso e POIs visitados.";
+
+"summary.title" = "Resumo";
+"summary.distance" = "Distância";
+"summary.duration" = "Duração";
+"summary.avg_speed" = "Vel. média";
+"summary.max_speed" = "Vel. máxima";
+"summary.elev_gain" = "Ganho altitude";
+"summary.elev_loss" = "Perda altitude";
+"summary.pois_visited" = "POIs visitados";
+"summary.save" = "Salvar";
+"summary.discard" = "Descartar";
+
+"history.title" = "Histórico";
+"history.empty" = "Nenhum pedal ainda";
+"history.empty_desc" = "Seus pedais concluídos aparecerão aqui.";
+
+"library.title" = "Biblioteca";
+"library.empty" = "Nenhum percurso";
+"library.empty_desc" = "Importe um arquivo GPX ou GeoJSON para começar.";
+"library.import" = "Importar percurso";

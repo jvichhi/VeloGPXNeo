@@ -1,0 +1,65 @@
+// Arabic
+"app.name" = "VeloGPX";
+
+"tab.ride" = "ركوب";
+"tab.library" = "المكتبة";
+"tab.history" = "السجل";
+"tab.settings" = "الإعدادات";
+
+"ride.start" = "ابدأ";
+"ride.end" = "إنهاء";
+"ride.center_map" = "توسيط الخريطة";
+"ride.off_route" = "خارج المسار";
+"ride.off_route_distance" = "%dm من المسار";
+"ride.back_to_route" = "العودة إلى المسار";
+"ride.next_poi_ahead" = "%@ أمامك";
+"ride.select_route" = "اختر مساراً";
+"ride.select_route_desc" = "استورد أو اختر مسار GPX من مكتبتك.";
+
+"metric.speed" = "السرعة";
+"metric.distance" = "المسافة";
+"metric.time" = "الوقت";
+"metric.route" = "المسار";
+"metric.avg_speed" = "متوسط السرعة";
+"metric.elev_gain" = "الارتفاع";
+"metric.elev_loss" = "الانحدار";
+
+"poi.search_nearby" = "البحث عن نقاط قريبة";
+"poi.add" = "إضافة نقطة";
+"poi.visited" = "تمت الزيارة";
+
+"settings.title" = "الإعدادات";
+"settings.language" = "اللغة";
+"settings.language_subtitle" = "اختر لغتك المفضلة";
+"settings.import" = "استيراد GPX & GeoJSON";
+"settings.import_subtitle" = "افتح الملفات من Safari أو الملفات أو البريد.";
+"settings.map_engine" = "محرك الخريطة";
+"settings.map_engine_subtitle" = "MapKit مع عرض واقعي للتضاريس.";
+"settings.birdseye" = "منظور الطائر";
+"settings.birdseye_subtitle" = "معاينة المسار الكامل قبل الانطلاق.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "السرعة والمسافة ومعدل ضربات القلب مع ردود فعل لمسية.";
+"settings.poi" = "نقاط الاهتمام";
+"settings.poi_subtitle" = "اكتشف المقاهي ونقاط المياه ومحلات الدراجات.";
+"settings.export" = "تصدير GPX";
+"settings.export_subtitle" = "تصدير المسار والمواقع المزارة كملف GPX.";
+
+"summary.title" = "ملخص الرحلة";
+"summary.distance" = "المسافة";
+"summary.duration" = "المدة";
+"summary.avg_speed" = "متوسط السرعة";
+"summary.max_speed" = "أقصى سرعة";
+"summary.elev_gain" = "الارتفاع المكتسب";
+"summary.elev_loss" = "الانحدار";
+"summary.pois_visited" = "النقاط المزارة";
+"summary.save" = "حفظ";
+"summary.discard" = "تجاهل";
+
+"history.title" = "سجل الرحلات";
+"history.empty" = "لا توجد رحلات بعد";
+"history.empty_desc" = "ستظهر رحلاتك المكتملة هنا.";
+
+"library.title" = "المكتبة";
+"library.empty" = "لا توجد مسارات";
+"library.empty_desc" = "استورد ملف GPX أو GeoJSON للبدء.";
+"library.import" = "استيراد مسار";

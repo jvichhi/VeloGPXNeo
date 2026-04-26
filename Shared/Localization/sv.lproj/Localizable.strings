@@ -1,0 +1,65 @@
+// Swedish
+"app.name" = "VeloGPX";
+
+"tab.ride" = "Tur";
+"tab.library" = "Bibliotek";
+"tab.history" = "Historik";
+"tab.settings" = "Inställningar";
+
+"ride.start" = "Starta";
+"ride.end" = "Avsluta";
+"ride.center_map" = "Centrera karta";
+"ride.off_route" = "Utanför rutten";
+"ride.off_route_distance" = "%dm från rutten";
+"ride.back_to_route" = "Tillbaka till rutten";
+"ride.next_poi_ahead" = "%@ framför";
+"ride.select_route" = "Välj en rutt";
+"ride.select_route_desc" = "Importera eller välj en GPX-rutt från ditt bibliotek.";
+
+"metric.speed" = "HASTIGHET";
+"metric.distance" = "STRÄCKA";
+"metric.time" = "TID";
+"metric.route" = "RUTT";
+"metric.avg_speed" = "MEDEL";
+"metric.elev_gain" = "UPPSTIGNING";
+"metric.elev_loss" = "NEDSTIGNING";
+
+"poi.search_nearby" = "Sök POI i närheten";
+"poi.add" = "Lägg till POI";
+"poi.visited" = "besökt";
+
+"settings.title" = "Inställningar";
+"settings.language" = "Språk";
+"settings.language_subtitle" = "Välj ditt föredragna språk";
+"settings.import" = "GPX & GeoJSON import";
+"settings.import_subtitle" = "Öppna filer från Safari, Filer eller Mail.";
+"settings.map_engine" = "Kartmotor";
+"settings.map_engine_subtitle" = "MapKit med realistisk höjdrendering.";
+"settings.birdseye" = "Fågelperspektiv";
+"settings.birdseye_subtitle" = "Förhandsgranska rutten innan du startar.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Hastighet, sträcka och puls med haptisk feedback.";
+"settings.poi" = "Intressepunkter";
+"settings.poi_subtitle" = "Upptäck kaféer, vattenpunkter och cykelaffärer.";
+"settings.export" = "GPX-export";
+"settings.export_subtitle" = "Exportera spår, rutt och besökta POI:er som GPX.";
+
+"summary.title" = "Sammanfattning";
+"summary.distance" = "Sträcka";
+"summary.duration" = "Varaktighet";
+"summary.avg_speed" = "Medelhastighet";
+"summary.max_speed" = "Maxhastighet";
+"summary.elev_gain" = "Höjdvinst";
+"summary.elev_loss" = "Höjdförlust";
+"summary.pois_visited" = "Besökta POI:er";
+"summary.save" = "Spara";
+"summary.discard" = "Kassera";
+
+"history.title" = "Historik";
+"history.empty" = "Inga turer ännu";
+"history.empty_desc" = "Dina avslutade turer visas här.";
+
+"library.title" = "Bibliotek";
+"library.empty" = "Inga rutter";
+"library.empty_desc" = "Importera en GPX- eller GeoJSON-fil för att börja.";
+"library.import" = "Importera rutt";

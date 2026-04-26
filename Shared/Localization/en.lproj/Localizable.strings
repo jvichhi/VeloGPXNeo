@@ -1,0 +1,73 @@
+// English
+"app.name" = "VeloGPX";
+
+// Tab Bar
+"tab.ride" = "Ride";
+"tab.library" = "Library";
+"tab.history" = "History";
+"tab.settings" = "Settings";
+
+// Ride View
+"ride.start" = "Start Ride";
+"ride.end" = "End Ride";
+"ride.center_map" = "Center Map";
+"ride.off_route" = "Off Route";
+"ride.off_route_distance" = "%dm from route";
+"ride.back_to_route" = "Back to route";
+"ride.next_poi_ahead" = "%@ ahead";
+"ride.select_route" = "Select a route";
+"ride.select_route_desc" = "Import or choose a GPX route from your library.";
+
+// Metrics
+"metric.speed" = "SPEED";
+"metric.distance" = "DISTANCE";
+"metric.time" = "TIME";
+"metric.route" = "ROUTE";
+"metric.avg_speed" = "AVG SPEED";
+"metric.elev_gain" = "ELEV GAIN";
+"metric.elev_loss" = "ELEV LOSS";
+
+// POI
+"poi.search_nearby" = "Search Nearby POIs";
+"poi.add" = "Add POI";
+"poi.visited" = "visited";
+
+// Settings
+"settings.title" = "Settings";
+"settings.language" = "Language";
+"settings.language_subtitle" = "Choose your preferred language";
+"settings.import" = "GPX & GeoJSON Import";
+"settings.import_subtitle" = "Open files from Safari, Files, or Mail.";
+"settings.map_engine" = "Map Engine";
+"settings.map_engine_subtitle" = "MapKit with realistic elevation rendering.";
+"settings.birdseye" = "Bird's Eye Mode";
+"settings.birdseye_subtitle" = "Preview the full route and elevation before riding.";
+"settings.apple_watch" = "Apple Watch";
+"settings.apple_watch_subtitle" = "Speed, distance, and heart rate with haptic cues.";
+"settings.poi" = "Points of Interest";
+"settings.poi_subtitle" = "Discover cafés, water sources, bike shops along your route.";
+"settings.export" = "GPX Export";
+"settings.export_subtitle" = "Export track, route, and visited POIs as a single GPX file.";
+
+// Ride Summary
+"summary.title" = "Ride Summary";
+"summary.distance" = "Distance";
+"summary.duration" = "Duration";
+"summary.avg_speed" = "Avg Speed";
+"summary.max_speed" = "Max Speed";
+"summary.elev_gain" = "Elevation Gain";
+"summary.elev_loss" = "Elevation Loss";
+"summary.pois_visited" = "POIs Visited";
+"summary.save" = "Save Ride";
+"summary.discard" = "Discard";
+
+// History
+"history.title" = "Ride History";
+"history.empty" = "No rides yet";
+"history.empty_desc" = "Your completed rides will appear here.";
+
+// Library
+"library.title" = "Route Library";
+"library.empty" = "No routes yet";
+"library.empty_desc" = "Import a GPX or GeoJSON file to get started.";
+"library.import" = "Import Route";
