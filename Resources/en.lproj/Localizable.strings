@@ -3,3 +3,150 @@
 "Ride" = "Ride";
 "My Rides" = "My Rides";
 "Settings" = "Settings";
+
+/* Settings */
+"settings.language.title" = "Language";
+"settings.language.subtitle" = "App display language";
+"settings.import.title" = "Import Routes";
+"settings.import.subtitle" = "Import GPX files from Files app";
+"settings.map.title" = "Map Engine";
+"settings.map.subtitle" = "Apple Maps standard with realistic elevation";
+"settings.birdseye.title" = "Bird's Eye View";
+"settings.birdseye.subtitle" = "Overview mode before starting a ride";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "Sync metrics and controls to your Watch";
+"settings.poi.title" = "Points of Interest";
+"settings.poi.subtitle" = "Manage POI categories and display";
+"settings.export.title" = "Export";
+"settings.export.subtitle" = "Export rides as GPX or FIT files";
+
+/* Language Picker */
+"language.search.prompt" = "Search languages";
+"language.picker.title" = "Language";
+"language.picker.done" = "Done";
+
+/* Route Library */
+"route.library.empty.title" = "No routes yet";
+"route.library.empty.subtitle" = "Import a GPX or GeoJSON file from\nSafari, Files, or Mail.";
+"route.library.import.button" = "Import a Route";
+"route.library.ride.button" = "Ride This Route";
+"route.library.import.cancelled" = "Import cancelled";
+"route.library.delete" = "Delete";
+
+/* Route Detail */
+"route.detail.title" = "Route Details";
+"route.detail.elevation.profile" = "Elevation Profile";
+"route.detail.stat.distance" = "DISTANCE";
+"route.detail.stat.gain" = "GAIN";
+"route.detail.stat.loss" = "LOSS";
+"route.detail.section.route" = "Route";
+"route.detail.name.placeholder" = "Route name";
+"route.detail.save" = "Save";
+"route.detail.cancel" = "Cancel";
+"route.detail.row.name" = "Name";
+"route.detail.row.format" = "Format";
+"route.detail.row.trackpoints" = "Track Points";
+"route.detail.row.file" = "File";
+"route.detail.reverse.button" = "Reverse Route Direction";
+"route.detail.reverse.confirm.title" = "Reverse this route?";
+"route.detail.reverse.confirm.action" = "Reverse";
+"route.detail.reverse.confirm.message" = "The start and end points will be swapped. This cannot be undone.";
+"route.detail.section.poi" = "Points of Interest";
+"route.detail.poi.empty" = "No POIs added yet";
+"route.detail.poi.discover" = "Discover POIs along route";
+"route.detail.section.waypoints" = "Embedded Waypoints";
+"route.detail.waypoint.fallback" = "Waypoint";
+
+/* Ride View */
+"ride.no.route.title" = "Select a route";
+"ride.no.route.subtitle" = "Import or choose a GPX route from your library.";
+"ride.start.button" = "Start Ride";
+"ride.center.map" = "Center Map";
+"ride.metric.speed" = "SPEED";
+"ride.metric.distance" = "DISTANCE";
+"ride.metric.time" = "TIME";
+"ride.metric.route" = "ROUTE";
+"ride.metric.avg.speed" = "AVG SPEED";
+"ride.metric.elev.gain" = "ELEV GAIN";
+"ride.metric.elev.loss" = "ELEV LOSS";
+"ride.offroute.title" = "Off Route";
+"ride.offroute.distance" = "%dm from route";
+"ride.reroute.back" = "Back to route";
+"ride.end.button" = "End Ride";
+"ride.location.following" = "Following location";
+"ride.location.recentre" = "Re-centre map";
+"ride.poi.search.label" = "Search nearby POIs";
+"ride.poi.ahead.meters" = "%dm ahead";
+"ride.poi.ahead.km" = "%.1f km ahead";
+
+/* Ride History */
+"history.title" = "My Rides";
+"history.empty.title" = "No rides yet";
+"history.empty.subtitle" = "Your completed rides will appear here.\nHop on and start pedalling!";
+"history.record.longest" = "Longest";
+"history.record.fastest" = "Fastest avg";
+"history.record.climb" = "Most climb";
+"history.delete" = "Delete";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "Rename Ride";
+"history.detail.rename.placeholder" = "Ride name";
+"history.detail.rename.save" = "Save";
+"history.detail.rename.cancel" = "Cancel";
+"history.detail.menu.rename" = "Rename";
+"history.detail.menu.delete" = "Delete Ride";
+"history.detail.delete.confirm.title" = "Delete this ride?";
+"history.detail.delete.confirm.message" = "This cannot be undone.";
+"history.detail.delete.action" = "Delete";
+"history.detail.planned.toggle.title" = "Planned vs Actual";
+"history.detail.planned.toggle.subtitle" = "Show the original planned route overlay";
+"history.detail.section.poi" = "Points of Interest";
+"history.detail.section.share" = "Share Ride";
+"history.detail.share.card.button" = "Share as Image Card";
+"history.detail.section.export" = "Export GPX";
+"history.detail.export.poi.title" = "Include POIs";
+"history.detail.export.poi.subtitle.one" = "%d stop as waypoints";
+"history.detail.export.poi.subtitle.other" = "%d stops as waypoints";
+"history.detail.export.gpx.button" = "Share GPX File";
+
+/* Ride Summary */
+"summary.title" = "Ride Complete";
+"summary.done" = "Done";
+"summary.section.save" = "Save Ride";
+"summary.gps.track.title" = "GPS Track";
+"summary.gps.track.subtitle" = "Your actual ride path — %d points recorded";
+"summary.export.no.track" = "No GPS track recorded for this ride.";
+"summary.export.poi.title" = "Include POIs";
+"summary.export.gpx.button" = "Share GPX File";
+
+/* Metric Labels (shared across Ride, Summary, History) */
+"metric.time" = "TIME";
+"metric.avg" = "AVG";
+"metric.max" = "MAX";
+"metric.gain" = "GAIN";
+"metric.loss" = "LOSS";
+"metric.pois" = "POIs";
+"metric.visited" = "visited";
+"metric.kmh" = "km/h";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "Near This Point";
+"nearby.searching" = "Searching…";
+"nearby.empty" = "No results nearby";
+"nearby.category.cafe" = "Café";
+"nearby.category.water" = "Water";
+"nearby.category.bikeshop" = "Bike Shop";
+"nearby.category.restaurant" = "Restaurant";
+"nearby.unknown" = "Unknown";
+"nearby.distance.meters" = "%.0f m away";
+"nearby.distance.km" = "%.1f km away";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.save" = "Save";
+"common.delete" = "Delete";
+"common.done" = "Done";
+"common.cancel.action" = "Cancel";
