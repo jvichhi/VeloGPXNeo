@@ -19,8 +19,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var progressPercent: Double = 0
     @Published var reroutePolyline: [CLLocationCoordinate2D] = []
 
-    // Declared as implicitly-unwrapped so it can be assigned in init()
-    // AFTER super.init() — this keeps CLLocationManager on the main thread.
     private var manager: CLLocationManager!
     private var route: RouteModel?
     private var pois: [POIModel] = []
@@ -31,13 +29,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastRerouteTime: Date?
 
     // MARK: - Breadcrumb trail
-    /// Every accepted GPS fix recorded during the active ride.
-    /// Persisted here so buildSummary() can hand it to RideSummary.
     private var breadcrumbs: [CLLocationCoordinate2D] = []
 
     override init() {
         super.init()
-        // CLLocationManager MUST be created after super.init() and on the main thread.
         manager = CLLocationManager()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
@@ -69,17 +64,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.routeProgress = nil
         self.progressPercent = 0
         self.reroutePolyline = []
-        self.breadcrumbs = []          // ← reset trail on new ride
+        self.breadcrumbs = []
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
     }
 
-    /// Hot-swap the POI list mid-ride (called after NearbySearchSheet adds a POI).
-    /// Resets lastAlertedPOIID so newly added POIs can trigger approach alerts immediately.
     func updatePOIs(_ newPOIs: [POIModel]) {
         pois = newPOIs
-        // Only clear the alert lock if new POIs were added — preserves
-        // suppress state for POIs the rider has already passed.
         let currentIDs = Set(pois.map { $0.id })
         if let alerted = lastAlertedPOIID, !currentIDs.contains(alerted) {
             lastAlertedPOIID = nil
@@ -87,8 +78,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         sendWatchUpdate()
     }
 
-    /// Stops tracking and returns a RideSummary ready for the summary sheet.
-    /// Caller is responsible for showing RideSummaryView.
     @discardableResult
     func stopAndBuildSummary() -> RideSummary? {
         UIApplication.shared.isIdleTimerDisabled = false
@@ -113,7 +102,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         )
     }
 
-    /// Legacy stop — used when no summary is needed.
     func stop() {
         UIApplication.shared.isIdleTimerDisabled = false
         manager.stopUpdatingLocation()
@@ -137,14 +125,15 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             let delta = location.distance(from: lastLocation)
             if delta < 200 {
                 rideState.totalDistance += delta
-                // Only record breadcrumb if we moved more than 5 m (distanceFilter)
-                // and the fix is plausible (< 200 m jump, which we already gate above).
                 breadcrumbs.append(location.coordinate)
             }
             let elevationDelta = location.altitude - lastLocation.altitude
-            if elevationDelta > 0 { rideState.elevationGain += elevationDelta }
+            if elevationDelta > 0 {
+                rideState.elevationGain += elevationDelta
+            } else {
+                rideState.elevationLoss += abs(elevationDelta)
+            }
         } else {
-            // First fix of the ride — record it.
             breadcrumbs.append(location.coordinate)
         }
         self.lastLocation = location
@@ -210,9 +199,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 rideState.rerouteSteps = mkRoute.steps.map {
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
                 }.filter { !$0.instructions.isEmpty }
-            } catch {
-                // silently fail — arrow still shows
-            }
+            } catch {}
             rideState.isRerouting = false
         }
     }

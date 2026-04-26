@@ -41,6 +41,7 @@ public struct RideState: Codable, Sendable {
     public var offRouteDistance: Double
     public var heartRate: Double?
     public var elevationGain: Double
+    public var elevationLoss: Double
     public var bearingToRoute: Double?       // degrees, when off-route < 200m
     public var rerouteSteps: [RerouteStep]   // when off-route > 200m
     public var isRerouting: Bool
@@ -59,6 +60,7 @@ public struct RideState: Codable, Sendable {
         offRouteDistance: Double = 0,
         heartRate: Double? = nil,
         elevationGain: Double = 0,
+        elevationLoss: Double = 0,
         bearingToRoute: Double? = nil,
         rerouteSteps: [RerouteStep] = [],
         isRerouting: Bool = false
@@ -76,6 +78,7 @@ public struct RideState: Codable, Sendable {
         self.offRouteDistance = offRouteDistance
         self.heartRate = heartRate
         self.elevationGain = elevationGain
+        self.elevationLoss = elevationLoss
         self.bearingToRoute = bearingToRoute
         self.rerouteSteps = rerouteSteps
         self.isRerouting = isRerouting
