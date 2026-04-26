@@ -3,11 +3,11 @@
 //  VeloGPX
 //
 //  Resolves GPX waypoint coordinates into rich MKMapItem using:
-//  - iOS 26+: PlaceDescriptor + MKMapItemRequest (WWDC25 GeoToolbox framework)
-//  - iOS 18 fallback: MKLocalSearch with point-of-interest region query
+//  - iOS 26+: CLGeocoder reverse geocoding for canonical place name
+//  - Fallback: MKLocalSearch with point-of-interest region query
 //
 //  Usage:
-//    let mapItem = await PlaceDescriptorService.shared.resolve(waypoint)
+//    let resolved = await PlaceDescriptorService.shared.resolve(waypoint)
 //
 
 import Foundation
@@ -29,12 +29,12 @@ actor PlaceDescriptorService {
     /// Resolves a single waypoint coordinate to a named MKMapItem.
     func resolve(_ waypoint: WaypointPoint) async -> ResolvedWaypoint {
         let coord = waypoint.coordinate.clCoordinate
-
-        if #available(iOS 26.0, *) {
-            return await resolveModern(waypoint: waypoint, coordinate: coord)
-        } else {
-            return await resolveLegacy(waypoint: waypoint, coordinate: coord)
+        // Try reverse geocoding first for a canonical place name.
+        if let resolved = await resolveViaGeocoder(waypoint: waypoint, coordinate: coord) {
+            return resolved
         }
+        // Fallback: MKLocalSearch POI lookup.
+        return await resolveLegacy(waypoint: waypoint, coordinate: coord)
     }
 
     /// Resolves an array of waypoints concurrently.
@@ -51,36 +51,30 @@ actor PlaceDescriptorService {
         }
     }
 
-    // MARK: - iOS 26+ path
+    // MARK: - Reverse geocoder path
 
-    @available(iOS 26.0, *)
-    private func resolveModern(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = waypoint.name ?? "Waypoint"
-
-        // MKMapItemRequest resolves the coordinate to a canonical Apple Maps place.
-        let request = MKMapItemRequest(mapItem: mapItem)
+    private func resolveViaGeocoder(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint? {
+        let geocoder = CLGeocoder()
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         do {
-            let resolved = try await request.mapItem
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            guard let placemark = placemarks.first else { return nil }
+            let name = placemark.name ?? placemark.thoroughfare ?? waypoint.name ?? "Waypoint"
+            let mkPlacemark = MKPlacemark(placemark: placemark)
+            let mapItem = MKMapItem(placemark: mkPlacemark)
+            mapItem.name = name
             return ResolvedWaypoint(
-                name: resolved.name ?? waypoint.name ?? "Waypoint",
+                name: name,
                 coordinate: coordinate,
-                mapItem: resolved,
+                mapItem: mapItem,
                 resolvedViaPlaceDescriptor: true
             )
         } catch {
-            // Resolution failed — return a basic item.
-            return ResolvedWaypoint(
-                name: waypoint.name ?? "Waypoint",
-                coordinate: coordinate,
-                mapItem: mapItem,
-                resolvedViaPlaceDescriptor: false
-            )
+            return nil
         }
     }
 
-    // MARK: - iOS 18 fallback path
+    // MARK: - MKLocalSearch fallback path
 
     private func resolveLegacy(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
         let region = MKCoordinateRegion(
@@ -96,7 +90,6 @@ actor PlaceDescriptorService {
         do {
             let search = MKLocalSearch(request: request)
             let response = try await search.start()
-            // Pick the closest POI to the waypoint coordinate.
             let closest = response.mapItems.min(by: {
                 $0.placemark.coordinate.distance(to: coordinate) <
                 $1.placemark.coordinate.distance(to: coordinate)
@@ -118,15 +111,5 @@ actor PlaceDescriptorService {
                 resolvedViaPlaceDescriptor: false
             )
         }
-    }
-}
-
-// MARK: - CLLocationCoordinate2D distance helper (local)
-
-private extension CLLocationCoordinate2D {
-    func distance(to other: CLLocationCoordinate2D) -> CLLocationDistance {
-        let loc1 = CLLocation(latitude: latitude, longitude: longitude)
-        let loc2 = CLLocation(latitude: other.latitude, longitude: other.longitude)
-        return loc1.distance(from: loc2)
     }
 }
