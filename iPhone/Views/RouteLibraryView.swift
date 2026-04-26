@@ -4,20 +4,68 @@ import UniformTypeIdentifiers
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
+    @State private var pendingSelectRoute: RouteModel? = nil
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(routeStore.routes) { route in
-                        NavigationLink {
-                            RouteDetailView(route: route)
-                        } label: {
-                            RouteCard(route: route)
+                        let isSelected = routeStore.selectedRoute?.id == route.id
+                        let isPending  = pendingSelectRoute?.id == route.id
+
+                        VStack(spacing: 0) {
+                            NavigationLink {
+                                RouteDetailView(route: route)
+                            } label: {
+                                RouteCard(route: route, isActive: isSelected)
+                            }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                // Tapping an already-active card just navigates — no re-select needed
+                                if !isSelected {
+                                    withAnimation(.spring(duration: 0.25)) {
+                                        pendingSelectRoute = route
+                                    }
+                                }
+                            })
+
+                            // Inline "Ride This Route" CTA — slides in when card is tapped
+                            if isPending && !isSelected {
+                                HStack(spacing: 10) {
+                                    Button {
+                                        withAnimation(.spring(duration: 0.3)) {
+                                            routeStore.selectedRoute = route
+                                            pendingSelectRoute = nil
+                                        }
+                                    } label: {
+                                        Label("Ride This Route", systemImage: "bicycle")
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 12)
+                                            .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                                            .foregroundStyle(.white)
+                                    }
+
+                                    Button {
+                                        withAnimation(.spring(duration: 0.2)) {
+                                            pendingSelectRoute = nil
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 40, height: 40)
+                                            .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 12)
+                                .padding(.top, -4)
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            }
                         }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            routeStore.selectedRoute = route
-                        })
+                        .shadow(color: .black.opacity(isSelected ? 0.10 : 0.06), radius: isSelected ? 8 : 6, y: isSelected ? 3 : 2)
                         .contextMenu {
                             Button(role: .destructive) {
                                 routeStore.deleteRoute(route)
@@ -109,17 +157,19 @@ struct RouteLibraryView: View {
 
 private struct RouteCard: View {
     let route: RouteModel
+    let isActive: Bool
 
     var body: some View {
         HStack(spacing: 14) {
-            // Left accent icon
+
+            // Left icon — blue tint when active
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.12))
+                    .fill(isActive ? Color.blue.opacity(0.18) : Color.blue.opacity(0.10))
                     .frame(width: 52, height: 52)
                 Image(systemName: "figure.outdoor.cycle")
                     .font(.system(size: 22))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(isActive ? .blue : .blue.opacity(0.7))
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -129,30 +179,44 @@ private struct RouteCard: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    StatBadge(
-                        icon: "arrow.left.and.right",
-                        value: String(format: "%.1f km", route.totalDistance / 1000)
-                    )
-                    StatBadge(
-                        icon: "mountain.2",
-                        value: String(format: "%.0f m ↑", route.elevationGain)
-                    )
-                    StatBadge(
-                        icon: "doc",
-                        value: route.sourceFormat.rawValue.uppercased()
-                    )
+                    StatBadge(icon: "arrow.left.and.right", value: String(format: "%.1f km", route.totalDistance / 1000))
+                    StatBadge(icon: "mountain.2",           value: String(format: "%.0f m ↑", route.elevationGain))
+                    StatBadge(icon: "doc",                  value: route.sourceFormat.rawValue.uppercased())
                 }
             }
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            // Active checkmark badge OR chevron
+            if isActive {
+                ZStack {
+                    Circle()
+                        .fill(.blue)
+                        .frame(width: 26, height: 26)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .background(
+            isActive
+                ? AnyShapeStyle(.regularMaterial)
+                : AnyShapeStyle(.regularMaterial),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay(
+            // Blue left edge accent on active card
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(isActive ? Color.blue.opacity(0.45) : Color.clear, lineWidth: 1.5)
+        )
+        .animation(.spring(duration: 0.25), value: isActive)
     }
 }
 
