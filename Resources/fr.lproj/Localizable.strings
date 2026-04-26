@@ -1,5 +1,120 @@
-/* Tab Bar */
+/* ============================================================
+   VeloGPX — French (fr) Localizable.strings
+   ============================================================ */
+
+// MARK: - Tab Bar
 "Routes" = "Parcours";
 "Ride" = "Vélo";
 "My Rides" = "Mes sorties";
 "Settings" = "Réglages";
+
+// MARK: - Route Library
+"No routes yet" = "Aucun parcours";
+"Import a GPX or GeoJSON file from\nSafari, Files, or Mail." = "Importez un fichier GPX ou GeoJSON\ndepuis Safari, Fichiers ou Mail.";
+"Import a Route" = "Importer un parcours";
+"Import cancelled" = "Importation annulée";
+"Ride This Route" = "Démarrer ce parcours";
+"Delete" = "Supprimer";
+
+// MARK: - Route Detail
+"Select a route" = "Choisissez un parcours";
+"Import or choose a GPX route from your library." = "Importez ou choisissez un parcours GPX depuis votre bibliothèque.";
+"Start Ride" = "Démarrer";
+"Center Map" = "Centrer la carte";
+
+// MARK: - Ride View — Map overlay labels
+"You" = "Vous";
+"Waypoint" = "Point de passage";
+"Following location" = "Suivi activé";
+"Re-centre map" = "Recentrer la carte";
+"Search nearby POIs" = "Rechercher des POI à proximité";
+"End Ride" = "Terminer";
+
+// MARK: - Ride View — Metric labels (HUD)
+"SPEED" = "VITESSE";
+"DISTANCE" = "DISTANCE";
+"TIME" = "TEMPS";
+"ROUTE" = "ROUTE";
+"AVG SPEED" = "VIT. MOY.";
+"ELEV GAIN" = "DÉNIVELÉ +";
+"ELEV LOSS" = "DÉNIVELÉ −";
+
+// MARK: - Ride View — Off-route chip
+"Off Route" = "Hors parcours";
+
+// MARK: - Ride View — Re-route
+"Back to route" = "Retour au parcours";
+
+// MARK: - Ride Summary
+"Ride Complete" = "Sortie terminée";
+"Done" = "Terminer";
+"GPS Track" = "Trace GPS";
+"Your actual ride path — %lld points recorded" = "Votre trajet réel — %lld points enregistrés";
+"Include POIs" = "Inclure les POI";
+"%lld stop as waypoints" = "%lld arrêt comme point de passage";
+"%lld stops as waypoints" = "%lld arrêts comme points de passage";
+"No GPS track recorded for this ride." = "Aucune trace GPS enregistrée pour cette sortie.";
+"Share GPX File" = "Partager le fichier GPX";
+"Save Ride" = "Enregistrer la sortie";
+"Points of Interest" = "Points d'intérêt";
+
+// MARK: - Ride Summary — Metric tile labels
+"AVG" = "MOY";
+"MAX" = "MAX";
+"GAIN" = "MONTÉE";
+"LOSS" = "DESCENTE";
+"POIs" = "POI";
+"visited" = "visité(s)";
+
+// MARK: - Ride History
+"No rides yet" = "Aucune sortie";
+"Your completed rides will appear here.\nHop on and start pedalling!" = "Vos sorties terminées apparaîtront ici.\nEnfourchez votre vélo !";
+"My Rides" = "Mes sorties";
+"%lld ride" = "%lld sortie";
+"%lld rides" = "%lld sorties";
+"km gain" = "m dénivelé";
+
+// MARK: - Ride History — Records banner
+"Longest" = "Plus long";
+"Fastest avg" = "Plus rapide";
+"Most climb" = "Plus de dénivelé";
+
+// MARK: - Ride History Detail
+"Rename Ride" = "Renommer la sortie";
+"Ride name" = "Nom de la sortie";
+"Save" = "Enregistrer";
+"Cancel" = "Annuler";
+"Delete this ride?" = "Supprimer cette sortie ?";
+"This cannot be undone." = "Cette action est irréversible.";
+"Delete Ride" = "Supprimer la sortie";
+"Rename" = "Renommer";
+"Planned vs Actual" = "Planifié vs réel";
+"Show the original planned route overlay" = "Afficher le tracé du parcours planifié";
+"Share Ride" = "Partager la sortie";
+"Share as Image Card" = "Partager comme carte image";
+"Export GPX" = "Exporter en GPX";
+
+// MARK: - Settings
+"Language" = "Langue";
+"App display language" = "Langue d'affichage de l'application";
+"Import Routes" = "Importer des parcours";
+"Import GPX files from Files app" = "Importez des fichiers GPX depuis l'application Fichiers";
+"Map Engine" = "Moteur cartographique";
+"Apple Maps standard with realistic elevation" = "Apple Plans standard avec relief réaliste";
+"Bird's Eye View" = "Vue aérienne";
+"Overview mode before starting a ride" = "Vue d'ensemble avant de démarrer une sortie";
+"Apple Watch" = "Apple Watch";
+"Sync metrics and controls to your Watch" = "Synchronisez les métriques et commandes sur votre Apple Watch";
+"Points of Interest" = "Points d'intérêt";
+"Manage POI categories and display" = "Gérez les catégories et l'affichage des POI";
+"Export" = "Exporter";
+"Export rides as GPX or FIT files" = "Exportez vos sorties en fichiers GPX ou FIT";
+
+// MARK: - Language Picker
+"Search languages" = "Rechercher une langue";
+
+// MARK: - Nearby Search / POI
+"Search nearby POIs" = "Rechercher des POI à proximité";
+
+// MARK: - Alert buttons
+"OK" = "OK";
