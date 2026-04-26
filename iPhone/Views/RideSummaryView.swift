@@ -104,11 +104,12 @@ struct RideSummaryView: View {
             columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
             spacing: 10
         ) {
-            MetricTile(label: "TIME",  value: summary.elapsedTime.hhmm,                    unit: summary.elapsedTime.unit, icon: "clock.fill",                        color: .purple)
-            MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh), unit: "km/h",                   icon: "speedometer",                       color: .blue)
-            MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh), unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
-            MetricTile(label: "GAIN",  value: String(format: "%.0f", summary.elevationGain), unit: "m",                   icon: "mountain.2.fill",                    color: .green)
-            MetricTile(label: "POIs",  value: "\(summary.pois.count)",                     unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
+            MetricTile(label: "TIME",  value: summary.elapsedTime.hhmm,                      unit: summary.elapsedTime.unit, icon: "clock.fill",                        color: .purple)
+            MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh),   unit: "km/h",                   icon: "speedometer",                       color: .blue)
+            MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh),   unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
+            MetricTile(label: "GAIN",  value: String(format: "%.0f", summary.elevationGain), unit: "m",                      icon: "mountain.2.fill",                    color: .green)
+            MetricTile(label: "LOSS",  value: String(format: "%.0f", summary.elevationLoss), unit: "m",                      icon: "arrow.down.to.line",                 color: .cyan)
+            MetricTile(label: "POIs",  value: "\(summary.pois.count)",                       unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
         }
     }
 
@@ -140,7 +141,6 @@ struct RideSummaryView: View {
         VStack(spacing: 0) {
             DetailSectionHeader(title: "Save Ride", systemImage: "square.and.arrow.up")
 
-            // What's always included
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.blue)
@@ -157,7 +157,6 @@ struct RideSummaryView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
 
-            // Optional POI toggle
             if !summary.pois.isEmpty {
                 Divider().padding(.leading, 14)
                 HStack {
@@ -177,7 +176,6 @@ struct RideSummaryView: View {
 
             Divider()
 
-            // Empty track warning
             if summary.actualTrack.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -285,7 +283,7 @@ struct RideSummaryView: View {
 
 // MARK: - Duration formatting
 
-private extension TimeInterval {
+extension TimeInterval {
     var formattedDuration: String {
         let h = Int(self) / 3600
         let m = (Int(self) % 3600) / 60
