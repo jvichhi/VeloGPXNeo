@@ -137,7 +137,7 @@ struct RideHistoryDetailView: View {
         ) {
             MetricTile(label: "TIME",  value: ride.elapsedTime.hhmm,                       unit: ride.elapsedTime.unit, icon: "clock.fill",                      color: .purple)
             MetricTile(label: "AVG",   value: String(format: "%.1f", ride.avgSpeedKmh),    unit: "km/h",                icon: "speedometer",                     color: .blue)
-            MetricTile(label: "MAX",   value: String(format: "%.1f", ride.maxSpeedKmh),    unit: "km/h",                icon: "gauge.with.dots.needle.67percent",color: .red)
+            MetricTile(label: "MAX",   value: String(format: "%.1f", ride.maxSpeedKmh),    unit: "km/h",                icon: "gauge.with.dots.needle.67percent", color: .red)
             MetricTile(label: "GAIN",  value: String(format: "%.0f", ride.elevationGain),  unit: "m",                   icon: "mountain.2.fill",                  color: .green)
             MetricTile(label: "LOSS",  value: String(format: "%.0f", ride.elevationLoss),  unit: "m",                   icon: "arrow.down.to.line",               color: .cyan)
             MetricTile(label: "POIs",  value: "\(ride.pois.count)",                        unit: "visited",             icon: "mappin.circle.fill",               color: .orange)
@@ -345,15 +345,4 @@ struct RideHistoryDetailView: View {
             mapSnapshot = img
         } catch {}
     }
-}
-
-// MARK: - TimeInterval helpers (scoped here to avoid redeclaration if already in RideSummaryView)
-
-fileprivate extension TimeInterval {
-    var hhmm: String {
-        let h = Int(self) / 3600
-        let m = (Int(self) % 3600) / 60
-        return h > 0 ? String(format: "%d:%02d", h, m) : String(format: "%02d", m)
-    }
-    var unit: String { Int(self) >= 3600 ? "hr" : "min" }
 }
