@@ -7,55 +7,88 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var query = "Café"
+    @State private var selectedCategory = "Café"
 
-    private let categories = ["Café", "Water", "Bike Shop", "Restaurant"]
+    private let categories: [(label: String, icon: String, query: String)] = [
+        ("Café",       "cup.and.saucer.fill",      "Café"),
+        ("Water",      "drop.fill",                "Water"),
+        ("Bike Shop",  "wrench.and.screwdriver",   "Bike Shop"),
+        ("Restaurant", "fork.knife",               "Restaurant")
+    ]
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView("Searching…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if results.isEmpty {
-                    ContentUnavailableView(
-                        "No results",
-                        systemImage: "magnifyingglass",
-                        description: Text("Try a different category.")
-                    )
-                } else {
-                    List(results, id: \.self) { item in
-                        ResultRow(
-                            item: item,
-                            searchCoordinate: coordinate,   // ← pass your position
-                            isAdded: isAdded(item),
-                            onToggle: { toggle(item) }
-                        )
-                    }
-                    .listStyle(.plain)
-                }
-            }
-            .navigationTitle("Near This Point")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu("Category") {
-                        ForEach(categories, id: \.self) { cat in
+            VStack(spacing: 0) {
+
+                // Category chip bar
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(categories, id: \.query) { cat in
                             Button {
-                                query = cat
+                                selectedCategory = cat.query
                                 Task { await load() }
                             } label: {
-                                Label(cat, systemImage: category(for: cat).systemImage)
+                                HStack(spacing: 5) {
+                                    Image(systemName: cat.icon)
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text(cat.label)
+                                        .font(.system(size: 13, weight: .medium))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    selectedCategory == cat.query ? Color.blue : Color(.systemGray5),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(selectedCategory == cat.query ? .white : .primary)
                             }
+                            .animation(.spring(duration: 0.2), value: selectedCategory)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+
+                Divider()
+
+                // Content
+                Group {
+                    if isLoading {
+                        ProgressView("Searching…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if results.isEmpty {
+                        VStack(spacing: 14) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.tertiary)
+                            Text("No results nearby")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 10) {
+                                ForEach(results, id: \.self) { item in
+                                    NearbyResultCard(
+                                        item: item,
+                                        searchCoordinate: coordinate,
+                                        categoryIcon: categories.first(where: { $0.query == selectedCategory })?.icon ?? "mappin",
+                                        isAdded: isAdded(item),
+                                        onToggle: { toggle(item) }
+                                    )
+                                }
+                            }
+                            .padding(16)
                         }
                     }
                 }
             }
+            .navigationTitle("Near This Point")
+            .navigationBarTitleDisplayMode(.inline)
         }
         .task { await load() }
     }
-
-    // MARK: - Add / Remove
 
     private func isAdded(_ item: MKMapItem) -> Bool {
         guard let name = item.name else { return false }
@@ -69,7 +102,7 @@ struct NearbySearchSheet: View {
         } else {
             let poi = POIModel(
                 name: name,
-                category: category(for: query),
+                category: category(for: selectedCategory),
                 coordinate: item.placemark.coordinate,
                 distanceFromRoute: 0,
                 address: item.placemark.thoroughfare,
@@ -80,15 +113,11 @@ struct NearbySearchSheet: View {
         }
     }
 
-    // MARK: - Search
-
     func load() async {
         isLoading = true
-        results = (try? await POISearchService.shared.search(query: query, near: coordinate)) ?? []
+        results = (try? await POISearchService.shared.search(query: selectedCategory, near: coordinate)) ?? []
         isLoading = false
     }
-
-    // MARK: - Category mapping
 
     private func category(for query: String) -> POICategory {
         switch query {
@@ -101,21 +130,19 @@ struct NearbySearchSheet: View {
     }
 }
 
-// MARK: - Result Row
+// MARK: - Result Card
 
-private struct ResultRow: View {
+private struct NearbyResultCard: View {
     let item: MKMapItem
-    let searchCoordinate: CLLocationCoordinate2D   // ← your current position
+    let searchCoordinate: CLLocationCoordinate2D
+    let categoryIcon: String
     let isAdded: Bool
     let onToggle: () -> Void
 
-    // Distance from your position to this result
     private var distanceMeters: CLLocationDistance {
-        let from = CLLocation(latitude: searchCoordinate.latitude,
-                              longitude: searchCoordinate.longitude)
-        let to   = CLLocation(latitude: item.placemark.coordinate.latitude,
-                              longitude: item.placemark.coordinate.longitude)
-        return from.distance(from: to)
+        CLLocation(latitude: searchCoordinate.latitude, longitude: searchCoordinate.longitude)
+            .distance(from: CLLocation(latitude: item.placemark.coordinate.latitude,
+                                       longitude: item.placemark.coordinate.longitude))
     }
 
     private var distanceLabel: String {
@@ -125,40 +152,47 @@ private struct ResultRow: View {
     }
 
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 12) {
+        HStack(spacing: 12) {
+            // Category icon circle
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: categoryIcon)
+                    .font(.system(size: 17))
+                    .foregroundStyle(.blue)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.name ?? "Unknown")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                if let address = item.placemark.thoroughfare {
+                    Text(address)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(distanceLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            Button(action: onToggle) {
                 ZStack {
                     Circle()
                         .fill(isAdded ? Color.blue : Color(.systemGray5))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 34, height: 34)
                     Image(systemName: isAdded ? "checkmark" : "plus")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(isAdded ? .white : .secondary)
                 }
-                .animation(.spring(duration: 0.25), value: isAdded)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name ?? "Unknown")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    if let address = item.placemark.thoroughfare {
-                        Text(address)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(distanceLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-
-                Text(isAdded ? "Added" : "Add")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isAdded ? .blue : .secondary)
             }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+            .animation(.spring(duration: 0.25), value: isAdded)
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 1)
     }
 }

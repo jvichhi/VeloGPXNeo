@@ -18,14 +18,17 @@ struct RideSummaryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     mapSnapshotSection
-                    statsSection
+                    heroStatsSection
+                    statsGridSection
                     if !summary.pois.isEmpty { poisSection }
                     exportSection
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Ride Complete")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -54,9 +57,9 @@ struct RideSummaryView: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
             } else {
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 18)
                     .fill(Color(.systemGray5))
                     .frame(maxWidth: .infinity)
                     .frame(height: 220)
@@ -65,125 +68,112 @@ struct RideSummaryView: View {
                     }
             }
         }
-        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
     }
 
-    // MARK: - Stats
+    // MARK: - Hero Distance
 
     @ViewBuilder
-    private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var heroStatsSection: some View {
+        VStack(spacing: 4) {
             Text(summary.routeName)
-                .font(.title2.bold())
-
+                .font(.headline)
+                .foregroundStyle(.primary)
             Text(summary.startDate.formatted(date: .abbreviated, time: .shortened))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 12
-            ) {
-                summaryTile("Distance", String(format: "%.2f km", summary.distanceKm),  icon: "arrow.triangle.swap")
-                summaryTile("Time",     summary.elapsedTime.formattedDuration,           icon: "clock.fill")
-                summaryTile("Avg Speed", String(format: "%.1f km/h", summary.avgSpeedKmh), icon: "speedometer")
-                summaryTile("Max Speed", String(format: "%.1f km/h", summary.maxSpeedKmh), icon: "gauge.with.dots.needle.67percent")
-                summaryTile("Elev Gain", String(format: "%.0f m", summary.elevationGain),  icon: "mountain.2.fill")
-                summaryTile("Stops",     "\(summary.pois.count) POI\(summary.pois.count == 1 ? "" : "s")", icon: "mappin.circle.fill")
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(String(format: "%.2f", summary.distanceKm))
+                    .font(.system(size: 52, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.blue)
+                Text("km")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding()
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
+    // MARK: - Stats Grid
+
     @ViewBuilder
-    private func summaryTile(_ label: String, _ value: String, icon: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundStyle(.blue)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
-            }
-            Spacer()
+    private var statsGridSection: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+            spacing: 10
+        ) {
+            MetricTile(label: "TIME",      value: summary.elapsedTime.hhmm,              unit: summary.elapsedTime.unit,     icon: "clock.fill",                           color: .purple)
+            MetricTile(label: "AVG",       value: String(format: "%.1f", summary.avgSpeedKmh), unit: "km/h",                 icon: "speedometer",                          color: .blue)
+            MetricTile(label: "MAX",       value: String(format: "%.1f", summary.maxSpeedKmh), unit: "km/h",                 icon: "gauge.with.dots.needle.67percent",      color: .red)
+            MetricTile(label: "GAIN",      value: String(format: "%.0f", summary.elevationGain), unit: "m",                 icon: "mountain.2.fill",                      color: .green)
+            MetricTile(label: "POIs",      value: "\(summary.pois.count)",               unit: "visited",                    icon: "mappin.circle.fill",                   color: .orange)
         }
-        .padding(10)
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - POIs
 
     @ViewBuilder
     private var poisSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Points of Interest", systemImage: "mappin.and.ellipse")
-                .font(.headline)
-
+        VStack(spacing: 0) {
+            DetailSectionHeader(
+                title: "Points of Interest",
+                systemImage: "mappin.and.ellipse",
+                badge: "\(summary.pois.count)"
+            )
             ForEach(summary.pois) { poi in
-                HStack(spacing: 12) {
-                    Image(systemName: poi.category.systemImage)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.orange)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(poi.name).font(.subheadline.weight(.medium))
-                        Text(poi.category.displayName).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 4)
+                POIRow(poi: poi)
                 if poi.id != summary.pois.last?.id {
-                    Divider()
+                    Divider().padding(.leading, 50)
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
     // MARK: - Export
 
     @ViewBuilder
     private var exportSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Export as GPX", systemImage: "square.and.arrow.up")
-                .font(.headline)
+        VStack(spacing: 0) {
+            DetailSectionHeader(title: "Export as GPX", systemImage: "square.and.arrow.up")
 
-            VStack(spacing: 0) {
-                exportToggle("Actual Track", isOn: $exportActualTrack, alwaysOn: true)
-                Divider().padding(.leading, 36)
-                exportToggle("Original Planned Route", isOn: $exportPlannedRoute)
-                if !summary.pois.isEmpty {
-                    Divider().padding(.leading, 36)
-                    exportToggle("Points of Interest (\(summary.pois.count))", isOn: $exportPOIs)
-                }
+            exportToggle("Actual Track", isOn: $exportActualTrack, alwaysOn: true)
+            Divider().padding(.leading, 14)
+            exportToggle("Original Planned Route", isOn: $exportPlannedRoute)
+            if !summary.pois.isEmpty {
+                Divider().padding(.leading, 14)
+                exportToggle("Points of Interest (\(summary.pois.count))", isOn: $exportPOIs)
             }
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
+
+            Divider()
 
             Button {
                 exportGPX()
             } label: {
                 Label("Share GPX File", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.white)
             }
-            .buttonStyle(.borderedProminent)
+            .padding(14)
             .disabled(!exportActualTrack && !exportPlannedRoute)
         }
-        .padding()
-        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
     @ViewBuilder
     private func exportToggle(_ label: String, isOn: Binding<Bool>, alwaysOn: Bool = false) -> some View {
         HStack {
-            Text(label).font(.subheadline)
+            Text(label)
+                .font(.subheadline)
             Spacer()
             if alwaysOn {
                 Image(systemName: "checkmark.circle.fill")
@@ -206,13 +196,11 @@ struct RideSummaryView: View {
             includePOIs: exportPOIs && !summary.pois.isEmpty
         )
         let gpxString = GPXExporter.export(summary, options: options)
-
         let filename = summary.routeName
             .replacingOccurrences(of: " ", with: "_")
             .replacingOccurrences(of: "/", with: "-")
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(filename)_ride.gpx")
-
         do {
             try gpxString.write(to: url, atomically: true, encoding: .utf8)
             gpxFileURL = url
@@ -222,56 +210,40 @@ struct RideSummaryView: View {
         }
     }
 
-    // MARK: - Map Snapshot Generator
+    // MARK: - Map Snapshot
 
     private func generateMapSnapshot() async {
         guard !summary.actualTrack.isEmpty else { return }
-
-        // Compute bounding rect over the actual track
         let coords = summary.actualTrack
         let minLat = coords.map(\.latitude).min()!
         let maxLat = coords.map(\.latitude).max()!
         let minLon = coords.map(\.longitude).min()!
         let maxLon = coords.map(\.longitude).max()!
-
-        let center = CLLocationCoordinate2D(
-            latitude: (minLat + maxLat) / 2,
-            longitude: (minLon + maxLon) / 2
-        )
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2)
         let latDelta = max((maxLat - minLat) * 1.4, 0.005)
         let lonDelta = max((maxLon - minLon) * 1.4, 0.005)
-        let region = MKCoordinateRegion(
-            center: center,
-            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
-        )
-
+        let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta))
         let options = MKMapSnapshotter.Options()
         options.region = region
         options.size = CGSize(width: UIScreen.main.bounds.width - 32, height: 220)
         options.scale = UIScreen.main.scale
         options.mapType = .standard
         options.showsBuildings = false
-
         do {
             let snapshotter = MKMapSnapshotter(options: options)
             let snapshot = try await snapshotter.start()
-
-            // Draw actual track overlay on snapshot
             let image = UIGraphicsImageRenderer(size: options.size).image { _ in
                 snapshot.image.draw(at: .zero)
-
                 let path = UIBezierPath()
                 for (i, coord) in coords.enumerated() {
                     let point = snapshot.point(for: coord)
                     if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
                 }
                 UIColor.systemBlue.withAlphaComponent(0.85).setStroke()
-                path.lineWidth = 3
+                path.lineWidth = 3.5
                 path.lineCapStyle = .round
                 path.lineJoinStyle = .round
                 path.stroke()
-
-                // Draw planned track in lighter blue if present
                 if !summary.plannedTrack.isEmpty {
                     let planned = UIBezierPath()
                     for (i, coord) in summary.plannedTrack.enumerated() {
@@ -283,8 +255,6 @@ struct RideSummaryView: View {
                     planned.setLineDash([6, 4], count: 2, phase: 0)
                     planned.stroke()
                 }
-
-                // Draw POI dots
                 for poi in summary.pois {
                     let pt = snapshot.point(for: poi.coordinate.clCoordinate)
                     let dot = UIBezierPath(ovalIn: CGRect(x: pt.x - 5, y: pt.y - 5, width: 10, height: 10))
@@ -296,9 +266,7 @@ struct RideSummaryView: View {
                 }
             }
             mapSnapshot = image
-        } catch {
-            // Snapshot failed silently — map section stays as a placeholder
-        }
+        } catch {}
     }
 }
 
@@ -312,6 +280,14 @@ private extension TimeInterval {
         return h > 0
             ? String(format: "%d:%02d:%02d", h, m, s)
             : String(format: "%02d:%02d", m, s)
+    }
+    var hhmm: String {
+        let h = Int(self) / 3600
+        let m = (Int(self) % 3600) / 60
+        return h > 0 ? String(format: "%d:%02d", h, m) : String(format: "%02d", m)
+    }
+    var unit: String {
+        Int(self) >= 3600 ? "hr" : "min"
     }
 }
 
