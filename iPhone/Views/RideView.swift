@@ -96,14 +96,13 @@ struct RideView: View {
                 }
             }
             .onAppear {
+                // Merged from two .onAppear blocks (cleanup)
                 rideStore.prepare()
+                rideStore.setHistoryStore(historyStore)
                 if let route = routeStore.selectedRoute {
                     position = .rect(route.mapRect)
                     Task { await computePOISpurs(route: route) }
                 }
-            }
-            .onAppear {
-                rideStore.setHistoryStore(historyStore)
             }
             .onChange(of: routeStore.selectedPOIs) { _, _ in
                 if let route = routeStore.selectedRoute {
@@ -216,11 +215,9 @@ struct RideView: View {
 
         ZStack(alignment: .bottom) {
 
-            // Full-screen map
             mapLayer(route: route)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // ── Top overlay: compact chips (off-route + next POI) ─────────
             VStack(alignment: .leading, spacing: 8) {
                 topBanners
             }
@@ -229,9 +226,7 @@ struct RideView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .allowsHitTesting(false)
 
-            // ── Right control rail — grouped pill ─────────────────────────
             VStack(spacing: 0) {
-                // Re-centre
                 Button {
                     if let coord = rideStore.rideState.currentCoordinate {
                         updateRidingCamera(coord: coord.clCoordinate)
@@ -248,7 +243,6 @@ struct RideView: View {
                     .frame(width: 28)
                     .padding(.horizontal, 8)
 
-                // POI search
                 Button {
                     showNearbySearch = true
                 } label: {
@@ -268,7 +262,6 @@ struct RideView: View {
             .animation(.spring(duration: 0.35), value: hudHeight)
             .animation(.easeInOut(duration: 0.2), value: isFollowing)
 
-            // ── End Ride — bottom-left, above HUD ─────────────────────────
             Button {
                 if let summary = rideStore.stopAndBuildSummary() {
                     rideSummary = summary
@@ -294,7 +287,6 @@ struct RideView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .animation(.spring(duration: 0.35), value: hudHeight)
 
-            // ── HUD panel ─────────────────────────────────────────────────
             ridingHUDPanel(route: route)
         }
         .animation(.spring(duration: 0.3), value: isFollowing)
@@ -305,7 +297,6 @@ struct RideView: View {
     @ViewBuilder
     private func ridingHUDPanel(route: RouteModel) -> some View {
         VStack(spacing: 0) {
-            // Drag handle + expand toggle
             Button {
                 withAnimation(.spring(duration: 0.35)) {
                     statsExpanded.toggle()
@@ -374,8 +365,6 @@ struct RideView: View {
     private var primaryMetricsRow: some View {
         let s = rideStore.rideState
         HStack(spacing: 0) {
-
-            // Speed — hero metric
             VStack(spacing: 2) {
                 Text("SPEED")
                     .font(.system(size: 10, weight: .semibold))
@@ -397,7 +386,6 @@ struct RideView: View {
 
             Divider().frame(height: 44)
 
-            // Distance
             VStack(spacing: 2) {
                 Text("DISTANCE")
                     .font(.system(size: 10, weight: .semibold))
@@ -418,7 +406,6 @@ struct RideView: View {
 
             Divider().frame(height: 44)
 
-            // Time
             VStack(spacing: 2) {
                 Text("TIME")
                     .font(.system(size: 10, weight: .semibold))
@@ -433,7 +420,6 @@ struct RideView: View {
 
             Divider().frame(height: 44)
 
-            // Route progress ring
             VStack(spacing: 2) {
                 Text("ROUTE")
                     .font(.system(size: 10, weight: .semibold))
@@ -744,7 +730,9 @@ struct RideView: View {
         ))
     }
 
-    // MARK: - POI Spur Computation
+    // MARK: - POI Spur Computation (P1-1 fix: uses CyclingRouteService)
+    // All MKDirections calls now route through CyclingRouteService.shared
+    // which uses .cycling on iOS 26+ and .walking as fallback.
 
     private func computePOISpurs(route: RouteModel) async {
         let pois = routeStore.selectedPOIs
@@ -772,7 +760,7 @@ struct RideView: View {
                 let origin   = inboundOrigin(poi)
                 let poiCoord = poi.coordinate.clCoordinate
                 group.addTask {
-                    async let inCoords  = fetchSpurCoordinates(from: origin,   to: poiCoord)
+                    async let inCoords  = fetchSpurCoordinates(from: origin, to: poiCoord)
                     async let outResult = shortestRouteBackToGPX(from: poiCoord, routeCoords: routeCoords)
                     return POISpur(
                         id: poi.id,
@@ -803,18 +791,22 @@ struct RideView: View {
         let results: [CandidateRoute] = await withTaskGroup(of: CandidateRoute?.self) { group in
             for candidate in candidates {
                 group.addTask {
-                    let request = MKDirections.Request()
-                    request.source      = MKMapItem(placemark: MKPlacemark(coordinate: poiCoord))
-                    request.destination = MKMapItem(placemark: MKPlacemark(coordinate: candidate))
-                    request.transportType = .walking
-                    request.requestsAlternateRoutes = false
+                    // P1-1 fix: use CyclingRouteService instead of raw MKDirections with .walking
                     do {
-                        let response = try await MKDirections(request: request).calculate()
-                        if let route = response.routes.first {
-                            return CandidateRoute(coordinates: route.polyline.coordinates, distance: route.distance)
-                        }
-                    } catch { }
-                    return CandidateRoute(coordinates: [poiCoord, candidate], distance: poiCoord.distance(to: candidate))
+                        let result = try await CyclingRouteService.shared.calculateRoute(
+                            from: poiCoord,
+                            to: candidate
+                        )
+                        return CandidateRoute(
+                            coordinates: result.route.polyline.coordinates,
+                            distance: result.route.distance
+                        )
+                    } catch {
+                        return CandidateRoute(
+                            coordinates: [poiCoord, candidate],
+                            distance: poiCoord.distance(to: candidate)
+                        )
+                    }
                 }
             }
             var collected: [CandidateRoute] = []
@@ -843,14 +835,10 @@ struct RideView: View {
         from: CLLocationCoordinate2D,
         to: CLLocationCoordinate2D
     ) async -> [CLLocationCoordinate2D] {
-        let request = MKDirections.Request()
-        request.source      = MKMapItem(placemark: MKPlacemark(coordinate: from))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
-        request.transportType = .walking
-        request.requestsAlternateRoutes = false
+        // P1-1 fix: delegate to CyclingRouteService (.cycling on iOS 26+, .walking fallback)
         do {
-            let response = try await MKDirections(request: request).calculate()
-            return response.routes.first?.polyline.coordinates ?? [from, to]
+            let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
+            return result.route.polyline.coordinates
         } catch {
             return [from, to]
         }

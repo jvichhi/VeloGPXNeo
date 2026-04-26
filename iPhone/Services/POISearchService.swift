@@ -2,6 +2,9 @@ import Foundation
 import MapKit
 import CoreLocation
 
+/// Canonical POI search service. Uses MKLocalSearch with typed POI filters.
+/// iOS 26+: uses MKPointOfInterestFilter category constants for better ranking.
+/// Fallback: natural language query string.
 @MainActor
 final class POISearchService {
     static let shared = POISearchService()

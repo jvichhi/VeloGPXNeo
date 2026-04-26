@@ -29,6 +29,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
 
+    // MARK: - Watch throttle (P3-1)
+    // sendWatchUpdate() was firing on every GPS ping (~1-3/sec at cycling speed).
+    // Gate to 1 Hz to avoid unnecessary encode/WCSession pressure.
+    private var lastWatchUpdateTime: Date = .distantPast
+    private let watchUpdateInterval: TimeInterval = 1.0
+
     // MARK: - Breadcrumb trail
     private var breadcrumbs: [CLLocationCoordinate2D] = []
 
@@ -66,6 +72,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.progressPercent = 0
         self.reroutePolyline = []
         self.breadcrumbs = []
+        self.lastWatchUpdateTime = .distantPast
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
     }
@@ -190,21 +197,17 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
+    // MARK: - Reroute using CyclingRouteService (P1-1 fix)
+    // Previously used MKDirections with .walking directly. Now delegates to
+    // CyclingRouteService which uses .cycling on iOS 26+ with .walking fallback.
+
     private func requestReroute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
         rideState.isRerouting = true
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: from))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
-        request.transportType = .walking
-        request.requestsAlternateRoutes = false
-
         Task {
             do {
-                let directions = MKDirections(request: request)
-                let response = try await directions.calculate()
-                guard let mkRoute = response.routes.first else { return }
-                reroutePolyline = mkRoute.polyline.coordinates
-                rideState.rerouteSteps = mkRoute.steps.map {
+                let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
+                reroutePolyline = result.route.polyline.coordinates
+                rideState.rerouteSteps = result.route.steps.map {
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
                 }.filter { !$0.instructions.isEmpty }
             } catch {}
@@ -255,21 +258,70 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return minDistance
     }
 
-    // MARK: - POI tracking
+    // MARK: - POI tracking (P1-2 fix)
+    // Previously: nearest POI by raw straight-line distance.
+    // Now: projects each POI onto the GPX track to find its track index,
+    // filters to POIs whose track index >= nearestTrackIndex (i.e. still ahead),
+    // and sorts by track index ascending so the next on-route POI wins.
+    // nextPOIDistance is still straight-line for the display chip (accurate enough).
 
     private func updateNextPOI(from coordinate: CLLocationCoordinate2D) {
-        guard !pois.isEmpty else {
+        guard !pois.isEmpty, let route else {
             rideState.nextPOI = nil
             rideState.nextPOIDistance = nil
             return
         }
-        let nearest = pois
-            .map { poi -> (POIModel, Double) in (poi, coordinate.distance(to: poi.coordinate.clCoordinate)) }
-            .filter { $0.1 < 5000 }
-            .min(by: { $0.1 < $1.1 })
-        rideState.nextPOI = nearest?.0
-        rideState.nextPOIDistance = nearest?.1
-        if let (poi, dist) = nearest, dist < 200 { triggerApproachAlert(for: poi) }
+
+        let trackPoints = route.trackPoints
+        guard trackPoints.count > 1 else {
+            rideState.nextPOI = nil
+            rideState.nextPOIDistance = nil
+            return
+        }
+
+        // For each POI, find its nearest track index within a reasonable search window.
+        // We search the full remaining track (from nearestTrackIndex onward) to avoid
+        // missing POIs that are geometrically close but track-index-far.
+        let searchStart = nearestTrackIndex
+        let searchRange = trackPoints.indices.filter { $0 >= searchStart }
+
+        struct POIWithIndex {
+            let poi: POIModel
+            let trackIndex: Int
+            let straightLineDistance: Double
+        }
+
+        let candidatesAhead: [POIWithIndex] = pois.compactMap { poi in
+            let poiCoord = poi.coordinate.clCoordinate
+            var bestIdx = searchStart
+            var bestDist = poiCoord.distance(to: trackPoints[searchStart].coordinate.clCoordinate)
+            for i in searchRange {
+                let d = poiCoord.distance(to: trackPoints[i].coordinate.clCoordinate)
+                if d < bestDist { bestDist = d; bestIdx = i }
+            }
+            // Only include POIs that project ahead of current position.
+            // bestDist here is the POI's distance to its nearest track point.
+            // Exclude if the nearest track point is behind us.
+            guard bestIdx >= searchStart else { return nil }
+            let straightLine = coordinate.distance(to: poiCoord)
+            // Exclude POIs more than 5km away by straight line (same guard as before).
+            guard straightLine < 5000 else { return nil }
+            return POIWithIndex(poi: poi, trackIndex: bestIdx, straightLineDistance: straightLine)
+        }
+
+        // Sort by track index ascending — earliest on remaining route wins.
+        let sorted = candidatesAhead.sorted { $0.trackIndex < $1.trackIndex }
+
+        if let first = sorted.first {
+            rideState.nextPOI = first.poi
+            rideState.nextPOIDistance = first.straightLineDistance
+            if first.straightLineDistance < 200 {
+                triggerApproachAlert(for: first.poi)
+            }
+        } else {
+            rideState.nextPOI = nil
+            rideState.nextPOIDistance = nil
+        }
     }
 
     private func triggerApproachAlert(for poi: POIModel) {
@@ -289,9 +341,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
 
-    // MARK: - Watch
+    // MARK: - Watch (P3-1 fix: throttled to 1 Hz)
 
     private func sendWatchUpdate() {
+        let now = Date()
+        guard now.timeIntervalSince(lastWatchUpdateTime) >= watchUpdateInterval else { return }
+        lastWatchUpdateTime = now
         guard WCSession.default.isReachable else { return }
         let summary = WatchRideSummary(state: rideState)
         guard let data = try? JSONEncoder().encode(summary) else { return }

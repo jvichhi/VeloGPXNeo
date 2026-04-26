@@ -90,18 +90,54 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
+    // MARK: - ID-based POI matching (P0-2 fix)
+    // MKMapItem has no stable ID, so we derive a deterministic UUID from
+    // the coordinate rounded to 6 decimal places. The same real-world
+    // location always produces the same UUID, making isAdded/toggle safe
+    // even when two cafés share a name.
+
+    private func deterministicID(for item: MKMapItem) -> UUID {
+        let lat = (item.placemark.coordinate.latitude * 1_000_000).rounded() / 1_000_000
+        let lon = (item.placemark.coordinate.longitude * 1_000_000).rounded() / 1_000_000
+        let seed = "\(lat),\(lon)"
+        // Use UUID v5-style: hash the seed string into a UUID-shaped value.
+        var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 1099511628211
+        }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        for i in 0..<8 {
+            bytes[i] = UInt8(hash & 0xFF)
+            hash >>= 8
+        }
+        // Second half from reversed seed
+        var hash2 = seed.reversed().description.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 1099511628211
+        }
+        for i in 8..<16 {
+            bytes[i] = UInt8(hash2 & 0xFF)
+            hash2 >>= 8
+        }
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+
     private func isAdded(_ item: MKMapItem) -> Bool {
-        guard let name = item.name else { return false }
-        return routeStore.selectedPOIs.contains { $0.name == name }
+        let itemID = deterministicID(for: item)
+        return routeStore.selectedPOIs.contains { $0.id == itemID }
     }
 
     private func toggle(_ item: MKMapItem) {
-        let name = item.name ?? "POI"
-        if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.name == name }) {
+        let itemID = deterministicID(for: item)
+        if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.id == itemID }) {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
             let poi = POIModel(
-                name: name,
+                id: itemID,
+                name: item.name ?? "POI",
                 category: category(for: selectedCategory),
                 coordinate: item.placemark.coordinate,
                 distanceFromRoute: 0,
