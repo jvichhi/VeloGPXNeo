@@ -53,6 +53,7 @@ private extension RouteModel {
 struct RideView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @StateObject private var rideStore = RideSessionStore()
+    @EnvironmentObject private var historyStore: RideHistoryStore
     @State private var position: MapCameraPosition = .automatic
     @State private var viewMode: RideViewMode = .birdseye
     @State private var showNearbySearch = false
@@ -109,6 +110,9 @@ struct RideView: View {
                     position = .rect(route.mapRect)
                     Task { await computePOISpurs(route: route) }
                 }
+            }
+            .onAppear {
+                rideStore.setHistoryStore(historyStore)
             }
             .onChange(of: routeStore.selectedPOIs) { _, _ in
                 if let route = routeStore.selectedRoute {

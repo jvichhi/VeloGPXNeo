@@ -27,6 +27,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastAlertedPOIID: UUID?
     private var nearestTrackIndex: Int = 0
     private var lastRerouteTime: Date?
+    private var historyStore: RideHistoryStore?
 
     // MARK: - Breadcrumb trail
     private var breadcrumbs: [CLLocationCoordinate2D] = []
@@ -88,18 +89,21 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         sendWatchUpdate()
 
         guard let route, let startTime else { return nil }
-        return RideSummary(
+        let summary = RideSummary(
             routeName: route.name,
             startDate: startTime,
             endDate: Date(),
             totalDistance: rideState.totalDistance,
             elevationGain: rideState.elevationGain,
+            elevationLoss: rideState.elevationLoss,
             maxSpeed: rideState.maxSpeed,
             elapsedTime: rideState.elapsedTime,
             actualTrack: breadcrumbs,
             plannedTrack: route.trackPoints.map { $0.coordinate.clCoordinate },
             pois: pois
         )
+        historyStore?.save(summary)
+        return summary
     }
 
     func stop() {
@@ -109,6 +113,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         rideState.isActive = false
         reroutePolyline = []
         sendWatchUpdate()
+    }
+    
+    func setHistoryStore(_ store: RideHistoryStore) {
+        historyStore = store
     }
 
     // MARK: - Location
