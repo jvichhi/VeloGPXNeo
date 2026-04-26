@@ -157,7 +157,7 @@ struct RideView: View {
     @ViewBuilder
     private func birdsEyeLayout(route: RouteModel) -> some View {
         ZStack(alignment: .bottom) {
-            mapLayer(route: route)
+            mapLayer(route: route, topControlInset: 0)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(spacing: 0) {
@@ -223,7 +223,11 @@ struct RideView: View {
 
         ZStack(alignment: .bottom) {
 
-            mapLayer(route: route)
+            // Pass topControlInset so MapCompass/MapPitchToggle/MapUserLocationButton
+            // are nudged below the status bar. Without this they sit at y≈0 and the
+            // top icon (compass/north indicator) is obstructed by the notch/Dynamic Island.
+            // 54 pt clears the status bar; the extra 8 pt gives a comfortable gap.
+            mapLayer(route: route, topControlInset: 62)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -490,9 +494,13 @@ struct RideView: View {
     }
 
     // MARK: - Map
+    // topControlInset: pushes the MapKit system controls (MapCompass, MapPitchToggle,
+    // MapUserLocationButton) below the status bar when the map is edge-to-edge.
+    // riding layout passes 62 pt (status bar ~54 pt + 8 pt gap).
+    // birdseye layout passes 0 (map is not full-bleed in that context).
 
     @ViewBuilder
-    private func mapLayer(route: RouteModel) -> some View {
+    private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
         Map(position: $position) {
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
@@ -556,6 +564,11 @@ struct RideView: View {
             }
         }
         .mapStyle(.standard(elevation: .realistic))
+        // Inset the safe area for MapKit's own controls so they sit below
+        // the status bar when the map bleeds under it (.ignoresSafeArea).
+        // This moves MapCompass, MapPitchToggle, and MapUserLocationButton
+        // down as a group without touching their internal layout.
+        .safeAreaPadding(.top, topControlInset)
         .mapControls {
             MapCompass()
             MapPitchToggle()
