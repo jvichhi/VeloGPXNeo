@@ -221,7 +221,6 @@ struct RideView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // ── Top overlay: compact chips (off-route + next POI) ─────────
-            // Left-aligned, narrow, never full-width
             VStack(alignment: .leading, spacing: 8) {
                 topBanners
             }
@@ -231,7 +230,6 @@ struct RideView: View {
             .allowsHitTesting(false)
 
             // ── Right control rail — grouped pill ─────────────────────────
-            // Sits vertically centred on the map area (above HUD)
             VStack(spacing: 0) {
                 // Re-centre
                 Button {
@@ -271,7 +269,6 @@ struct RideView: View {
             .animation(.easeInOut(duration: 0.2), value: isFollowing)
 
             // ── End Ride — bottom-left, above HUD ─────────────────────────
-            // Red is kept for the action itself, but placed away from top banners
             Button {
                 if let summary = rideStore.stopAndBuildSummary() {
                     rideSummary = summary
@@ -372,8 +369,6 @@ struct RideView: View {
     }
 
     // MARK: - Primary Metrics Row
-    // Speed: single line, large rounded numeral + inline unit label.
-    // Matches Bikemap / Komoot pattern — no awkward two-line split.
 
     @ViewBuilder
     private var primaryMetricsRow: some View {
@@ -582,10 +577,13 @@ struct RideView: View {
             MapPitchToggle()
             MapUserLocationButton()
         }
+        // Push native map controls below the Dynamic Island / status bar.
+        // 60pt clears the status bar on all current iPhone models;
+        // adjust if you add a custom top bar later.
+        .mapControlsOffset(y: 60)
     }
 
     // MARK: - Top Banners
-    // Compact chips — left-aligned, never full-width, slide in from top
 
     @ViewBuilder
     private var topBanners: some View {
@@ -606,8 +604,6 @@ struct RideView: View {
     }
 
     // MARK: - Off Route Chip
-    // Compact pill — just wide enough for its content, not edge-to-edge.
-    // Keeps precious map real estate visible.
 
     @ViewBuilder
     private var offRouteChip: some View {
@@ -625,7 +621,6 @@ struct RideView: View {
                     .foregroundStyle(.white.opacity(0.82))
             }
 
-            // Directional arrow — only when close enough to be useful
             if let bearing = rideStore.rideState.bearingToRoute,
                rideStore.rideState.offRouteDistance <= 200 {
                 let relativeBearing = (bearing - rideStore.rideState.currentHeading + 360)
@@ -679,7 +674,6 @@ struct RideView: View {
     }
 
     // MARK: - Re-route Steps
-    // Next turn bold/white, subsequent turns muted — clear hierarchy at a glance.
 
     @ViewBuilder
     private var rerouteStepsList: some View {
