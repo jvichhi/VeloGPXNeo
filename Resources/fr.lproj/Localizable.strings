@@ -2,119 +2,155 @@
    VeloGPX — French (fr) Localizable.strings
    ============================================================ */
 
-// MARK: - Tab Bar
+/* Tab Bar */
 "Routes" = "Parcours";
-"Ride" = "Vélo";
+"Ride" = "Sortie";
 "My Rides" = "Mes sorties";
 "Settings" = "Réglages";
 
-// MARK: - Route Library
-"No routes yet" = "Aucun parcours";
-"Import a GPX or GeoJSON file from\nSafari, Files, or Mail." = "Importez un fichier GPX ou GeoJSON\ndepuis Safari, Fichiers ou Mail.";
-"Import a Route" = "Importer un parcours";
-"Import cancelled" = "Importation annulée";
-"Ride This Route" = "Démarrer ce parcours";
-"Delete" = "Supprimer";
+/* Settings */
+"settings.language.title" = "Langue";
+"settings.language.subtitle" = "Langue d'affichage de l'application";
+"settings.import.title" = "Importer des parcours";
+"settings.import.subtitle" = "Importer des fichiers GPX depuis l'application Fichiers";
+"settings.map.title" = "Moteur cartographique";
+"settings.map.subtitle" = "Apple Plans standard avec relief réaliste";
+"settings.birdseye.title" = "Vue aérienne";
+"settings.birdseye.subtitle" = "Vue d'ensemble avant de démarrer une sortie";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "Synchronisez les métriques et commandes sur votre Apple Watch";
+"settings.poi.title" = "Points d'intérêt";
+"settings.poi.subtitle" = "Gérez les catégories et l'affichage des POI";
+"settings.export.title" = "Exporter";
+"settings.export.subtitle" = "Exportez vos sorties en fichiers GPX ou FIT";
 
-// MARK: - Route Detail
-"Select a route" = "Choisissez un parcours";
-"Import or choose a GPX route from your library." = "Importez ou choisissez un parcours GPX depuis votre bibliothèque.";
-"Start Ride" = "Démarrer";
-"Center Map" = "Centrer la carte";
+/* Language Picker */
+"language.search.prompt" = "Rechercher une langue";
+"language.picker.title" = "Langue";
+"language.picker.done" = "Terminé";
 
-// MARK: - Ride View — Map overlay labels
-"You" = "Vous";
-"Waypoint" = "Point de passage";
-"Following location" = "Suivi activé";
-"Re-centre map" = "Recentrer la carte";
-"Search nearby POIs" = "Rechercher des POI à proximité";
-"End Ride" = "Terminer";
+/* Route Library */
+"route.library.empty.title" = "Aucun parcours";
+"route.library.empty.subtitle" = "Importez un fichier GPX ou GeoJSON depuis\nSafari, Fichiers ou Mail.";
+"route.library.import.button" = "Importer un parcours";
+"route.library.ride.button" = "Démarrer ce parcours";
+"route.library.import.cancelled" = "Importation annulée";
+"route.library.delete" = "Supprimer";
 
-// MARK: - Ride View — Metric labels (HUD)
-"SPEED" = "VITESSE";
-"DISTANCE" = "DISTANCE";
-"TIME" = "TEMPS";
-"ROUTE" = "ROUTE";
-"AVG SPEED" = "VIT. MOY.";
-"ELEV GAIN" = "DÉNIVELÉ +";
-"ELEV LOSS" = "DÉNIVELÉ −";
+/* Route Detail */
+"route.detail.title" = "Détails du parcours";
+"route.detail.elevation.profile" = "Profil altimétrique";
+"route.detail.stat.distance" = "DISTANCE";
+"route.detail.stat.gain" = "MONTÉE";
+"route.detail.stat.loss" = "DESCENTE";
+"route.detail.section.route" = "Parcours";
+"route.detail.name.placeholder" = "Nom du parcours";
+"route.detail.save" = "Enregistrer";
+"route.detail.cancel" = "Annuler";
+"route.detail.row.name" = "Nom";
+"route.detail.row.format" = "Format";
+"route.detail.row.trackpoints" = "Points de trace";
+"route.detail.row.file" = "Fichier";
+"route.detail.reverse.button" = "Inverser le sens du parcours";
+"route.detail.reverse.confirm.title" = "Inverser ce parcours ?";
+"route.detail.reverse.confirm.action" = "Inverser";
+"route.detail.reverse.confirm.message" = "Les points de départ et d'arrivée seront échangés. Cette action est irréversible.";
+"route.detail.section.poi" = "Points d'intérêt";
+"route.detail.poi.empty" = "Aucun POI ajouté";
+"route.detail.poi.discover" = "Découvrir les POI le long du parcours";
+"route.detail.section.waypoints" = "Points de passage intégrés";
+"route.detail.waypoint.fallback" = "Point de passage";
 
-// MARK: - Ride View — Off-route chip
-"Off Route" = "Hors parcours";
+/* Ride View */
+"ride.no.route.title" = "Choisissez un parcours";
+"ride.no.route.subtitle" = "Importez ou choisissez un parcours GPX depuis votre bibliothèque.";
+"ride.start.button" = "Démarrer";
+"ride.center.map" = "Centrer la carte";
+"ride.metric.speed" = "VITESSE";
+"ride.metric.distance" = "DISTANCE";
+"ride.metric.time" = "TEMPS";
+"ride.metric.route" = "ROUTE";
+"ride.metric.avg.speed" = "VIT. MOY.";
+"ride.metric.elev.gain" = "DÉNIVELÉ +";
+"ride.metric.elev.loss" = "DÉNIVELÉ −";
+"ride.offroute.title" = "Hors parcours";
+"ride.offroute.distance" = "%dm du parcours";
+"ride.reroute.back" = "Retour au parcours";
+"ride.end.button" = "Terminer";
+"ride.location.following" = "Suivi activé";
+"ride.location.recentre" = "Recentrer la carte";
+"ride.poi.search.label" = "Rechercher des POI à proximité";
+"ride.poi.ahead.meters" = "%dm devant";
+"ride.poi.ahead.km" = "%.1f km devant";
 
-// MARK: - Ride View — Re-route
-"Back to route" = "Retour au parcours";
+/* Ride History */
+"history.title" = "Mes sorties";
+"history.empty.title" = "Aucune sortie";
+"history.empty.subtitle" = "Vos sorties terminées apparaîtront ici.\nEnfourchez votre vélo et pédalez !";
+"history.record.longest" = "Plus long";
+"history.record.fastest" = "Plus rapide";
+"history.record.climb" = "Plus de dénivelé";
+"history.delete" = "Supprimer";
 
-// MARK: - Ride Summary
-"Ride Complete" = "Sortie terminée";
-"Done" = "Terminer";
-"GPS Track" = "Trace GPS";
-"Your actual ride path — %lld points recorded" = "Votre trajet réel — %lld points enregistrés";
-"Include POIs" = "Inclure les POI";
-"%lld stop as waypoints" = "%lld arrêt comme point de passage";
-"%lld stops as waypoints" = "%lld arrêts comme points de passage";
-"No GPS track recorded for this ride." = "Aucune trace GPS enregistrée pour cette sortie.";
-"Share GPX File" = "Partager le fichier GPX";
-"Save Ride" = "Enregistrer la sortie";
-"Points of Interest" = "Points d'intérêt";
+/* Ride History Detail */
+"history.detail.rename.title" = "Renommer la sortie";
+"history.detail.rename.placeholder" = "Nom de la sortie";
+"history.detail.rename.save" = "Enregistrer";
+"history.detail.rename.cancel" = "Annuler";
+"history.detail.menu.rename" = "Renommer";
+"history.detail.menu.delete" = "Supprimer la sortie";
+"history.detail.delete.confirm.title" = "Supprimer cette sortie ?";
+"history.detail.delete.confirm.message" = "Cette action est irréversible.";
+"history.detail.delete.action" = "Supprimer";
+"history.detail.planned.toggle.title" = "Planifié vs réel";
+"history.detail.planned.toggle.subtitle" = "Afficher le tracé du parcours planifié";
+"history.detail.section.poi" = "Points d'intérêt";
+"history.detail.section.share" = "Partager la sortie";
+"history.detail.share.card.button" = "Partager comme carte image";
+"history.detail.section.export" = "Exporter en GPX";
+"history.detail.export.poi.title" = "Inclure les POI";
+"history.detail.export.poi.subtitle.one" = "%d arrêt comme point de passage";
+"history.detail.export.poi.subtitle.other" = "%d arrêts comme points de passage";
+"history.detail.export.gpx.button" = "Partager le fichier GPX";
 
-// MARK: - Ride Summary — Metric tile labels
-"AVG" = "MOY";
-"MAX" = "MAX";
-"GAIN" = "MONTÉE";
-"LOSS" = "DESCENTE";
-"POIs" = "POI";
-"visited" = "visité(s)";
+/* Ride Summary */
+"summary.title" = "Sortie terminée";
+"summary.done" = "Terminé";
+"summary.section.save" = "Enregistrer la sortie";
+"summary.gps.track.title" = "Trace GPS";
+"summary.gps.track.subtitle" = "Votre trajet réel — %d points enregistrés";
+"summary.export.no.track" = "Aucune trace GPS enregistrée pour cette sortie.";
+"summary.export.poi.title" = "Inclure les POI";
+"summary.export.gpx.button" = "Partager le fichier GPX";
 
-// MARK: - Ride History
-"No rides yet" = "Aucune sortie";
-"Your completed rides will appear here.\nHop on and start pedalling!" = "Vos sorties terminées apparaîtront ici.\nEnfourchez votre vélo !";
-"My Rides" = "Mes sorties";
-"%lld ride" = "%lld sortie";
-"%lld rides" = "%lld sorties";
-"km gain" = "m dénivelé";
+/* Metric Labels */
+"metric.time" = "TEMPS";
+"metric.avg" = "MOY";
+"metric.max" = "MAX";
+"metric.gain" = "MONTÉE";
+"metric.loss" = "DESCENTE";
+"metric.pois" = "POI";
+"metric.visited" = "visité(s)";
+"metric.kmh" = "km/h";
+"metric.km" = "km";
+"metric.meters" = "m";
 
-// MARK: - Ride History — Records banner
-"Longest" = "Plus long";
-"Fastest avg" = "Plus rapide";
-"Most climb" = "Plus de dénivelé";
+/* Nearby Search */
+"nearby.title" = "À proximité";
+"nearby.searching" = "Recherche…";
+"nearby.empty" = "Aucun résultat à proximité";
+"nearby.category.cafe" = "Café";
+"nearby.category.water" = "Point d'eau";
+"nearby.category.bikeshop" = "Véloiste";
+"nearby.category.restaurant" = "Restaurant";
+"nearby.unknown" = "Inconnu";
+"nearby.distance.meters" = "%.0f m";
+"nearby.distance.km" = "%.1f km";
 
-// MARK: - Ride History Detail
-"Rename Ride" = "Renommer la sortie";
-"Ride name" = "Nom de la sortie";
-"Save" = "Enregistrer";
-"Cancel" = "Annuler";
-"Delete this ride?" = "Supprimer cette sortie ?";
-"This cannot be undone." = "Cette action est irréversible.";
-"Delete Ride" = "Supprimer la sortie";
-"Rename" = "Renommer";
-"Planned vs Actual" = "Planifié vs réel";
-"Show the original planned route overlay" = "Afficher le tracé du parcours planifié";
-"Share Ride" = "Partager la sortie";
-"Share as Image Card" = "Partager comme carte image";
-"Export GPX" = "Exporter en GPX";
-
-// MARK: - Settings
-"Language" = "Langue";
-"App display language" = "Langue d'affichage de l'application";
-"Import Routes" = "Importer des parcours";
-"Import GPX files from Files app" = "Importez des fichiers GPX depuis l'application Fichiers";
-"Map Engine" = "Moteur cartographique";
-"Apple Maps standard with realistic elevation" = "Apple Plans standard avec relief réaliste";
-"Bird's Eye View" = "Vue aérienne";
-"Overview mode before starting a ride" = "Vue d'ensemble avant de démarrer une sortie";
-"Apple Watch" = "Apple Watch";
-"Sync metrics and controls to your Watch" = "Synchronisez les métriques et commandes sur votre Apple Watch";
-"Points of Interest" = "Points d'intérêt";
-"Manage POI categories and display" = "Gérez les catégories et l'affichage des POI";
-"Export" = "Exporter";
-"Export rides as GPX or FIT files" = "Exportez vos sorties en fichiers GPX ou FIT";
-
-// MARK: - Language Picker
-"Search languages" = "Rechercher une langue";
-
-// MARK: - Nearby Search / POI
-"Search nearby POIs" = "Rechercher des POI à proximité";
-
-// MARK: - Alert buttons
-"OK" = "OK";
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Annuler";
+"common.save" = "Enregistrer";
+"common.delete" = "Supprimer";
+"common.done" = "Terminé";
+"common.cancel.action" = "Annuler";

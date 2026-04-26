@@ -1,5 +1,156 @@
+/* ============================================================
+   VeloGPX — Spanish (es) Localizable.strings
+   ============================================================ */
+
 /* Tab Bar */
 "Routes" = "Rutas";
 "Ride" = "Pedalear";
-"My Rides" = "Mis rutas";
+"My Rides" = "Mis salidas";
 "Settings" = "Ajustes";
+
+/* Settings */
+"settings.language.title" = "Idioma";
+"settings.language.subtitle" = "Idioma de visualización de la app";
+"settings.import.title" = "Importar rutas";
+"settings.import.subtitle" = "Importar archivos GPX desde la app Archivos";
+"settings.map.title" = "Motor de mapas";
+"settings.map.subtitle" = "Apple Maps estándar con altimetría realista";
+"settings.birdseye.title" = "Vista de pájaro";
+"settings.birdseye.subtitle" = "Vista general antes de iniciar una salida";
+"settings.watch.title" = "Apple Watch";
+"settings.watch.subtitle" = "Sincroniza métricas y controles con tu Watch";
+"settings.poi.title" = "Puntos de interés";
+"settings.poi.subtitle" = "Gestionar categorías y visualización de PDI";
+"settings.export.title" = "Exportar";
+"settings.export.subtitle" = "Exportar salidas como archivos GPX o FIT";
+
+/* Language Picker */
+"language.search.prompt" = "Buscar idiomas";
+"language.picker.title" = "Idioma";
+"language.picker.done" = "Listo";
+
+/* Route Library */
+"route.library.empty.title" = "Sin rutas aún";
+"route.library.empty.subtitle" = "Importa un archivo GPX o GeoJSON desde\nSafari, Archivos o Mail.";
+"route.library.import.button" = "Importar ruta";
+"route.library.ride.button" = "Pedalear esta ruta";
+"route.library.import.cancelled" = "Importación cancelada";
+"route.library.delete" = "Eliminar";
+
+/* Route Detail */
+"route.detail.title" = "Detalles de ruta";
+"route.detail.elevation.profile" = "Perfil de elevación";
+"route.detail.stat.distance" = "DISTANCIA";
+"route.detail.stat.gain" = "ASCENSO";
+"route.detail.stat.loss" = "DESCENSO";
+"route.detail.section.route" = "Ruta";
+"route.detail.name.placeholder" = "Nombre de la ruta";
+"route.detail.save" = "Guardar";
+"route.detail.cancel" = "Cancelar";
+"route.detail.row.name" = "Nombre";
+"route.detail.row.format" = "Formato";
+"route.detail.row.trackpoints" = "Puntos de ruta";
+"route.detail.row.file" = "Archivo";
+"route.detail.reverse.button" = "Invertir dirección de ruta";
+"route.detail.reverse.confirm.title" = "¿Invertir esta ruta?";
+"route.detail.reverse.confirm.action" = "Invertir";
+"route.detail.reverse.confirm.message" = "Los puntos de inicio y fin se intercambiarán. Esta acción no se puede deshacer.";
+"route.detail.section.poi" = "Puntos de interés";
+"route.detail.poi.empty" = "Sin PDI añadidos aún";
+"route.detail.poi.discover" = "Descubrir PDI a lo largo de la ruta";
+"route.detail.section.waypoints" = "Waypoints integrados";
+"route.detail.waypoint.fallback" = "Waypoint";
+
+/* Ride View */
+"ride.no.route.title" = "Selecciona una ruta";
+"ride.no.route.subtitle" = "Importa o elige una ruta GPX de tu biblioteca.";
+"ride.start.button" = "Iniciar salida";
+"ride.center.map" = "Centrar mapa";
+"ride.metric.speed" = "VELOCIDAD";
+"ride.metric.distance" = "DISTANCIA";
+"ride.metric.time" = "TIEMPO";
+"ride.metric.route" = "RUTA";
+"ride.metric.avg.speed" = "VEL. MEDIA";
+"ride.metric.elev.gain" = "ASCENSO";
+"ride.metric.elev.loss" = "DESCENSO";
+"ride.offroute.title" = "Fuera de ruta";
+"ride.offroute.distance" = "%dm de la ruta";
+"ride.reroute.back" = "Volver a la ruta";
+"ride.end.button" = "Finalizar salida";
+"ride.location.following" = "Siguiendo ubicación";
+"ride.location.recentre" = "Recentrar mapa";
+"ride.poi.search.label" = "Buscar PDI cercanos";
+"ride.poi.ahead.meters" = "%dm adelante";
+"ride.poi.ahead.km" = "%.1f km adelante";
+
+/* Ride History */
+"history.title" = "Mis salidas";
+"history.empty.title" = "Sin salidas aún";
+"history.empty.subtitle" = "Tus salidas completadas aparecerán aquí.\n¡Súbete y empieza a pedalear!";
+"history.record.longest" = "Más larga";
+"history.record.fastest" = "Media más rápida";
+"history.record.climb" = "Más desnivel";
+"history.delete" = "Eliminar";
+
+/* Ride History Detail */
+"history.detail.rename.title" = "Renombrar salida";
+"history.detail.rename.placeholder" = "Nombre de la salida";
+"history.detail.rename.save" = "Guardar";
+"history.detail.rename.cancel" = "Cancelar";
+"history.detail.menu.rename" = "Renombrar";
+"history.detail.menu.delete" = "Eliminar salida";
+"history.detail.delete.confirm.title" = "¿Eliminar esta salida?";
+"history.detail.delete.confirm.message" = "Esta acción no se puede deshacer.";
+"history.detail.delete.action" = "Eliminar";
+"history.detail.planned.toggle.title" = "Planificado vs Real";
+"history.detail.planned.toggle.subtitle" = "Mostrar la superposición de ruta planificada original";
+"history.detail.section.poi" = "Puntos de interés";
+"history.detail.section.share" = "Compartir salida";
+"history.detail.share.card.button" = "Compartir como tarjeta de imagen";
+"history.detail.section.export" = "Exportar GPX";
+"history.detail.export.poi.title" = "Incluir PDI";
+"history.detail.export.poi.subtitle.one" = "%d parada como waypoint";
+"history.detail.export.poi.subtitle.other" = "%d paradas como waypoints";
+"history.detail.export.gpx.button" = "Compartir archivo GPX";
+
+/* Ride Summary */
+"summary.title" = "Salida completada";
+"summary.done" = "Listo";
+"summary.section.save" = "Guardar salida";
+"summary.gps.track.title" = "Pista GPS";
+"summary.gps.track.subtitle" = "Tu recorrido real — %d puntos registrados";
+"summary.export.no.track" = "No se registró pista GPS para esta salida.";
+"summary.export.poi.title" = "Incluir PDI";
+"summary.export.gpx.button" = "Compartir archivo GPX";
+
+/* Metric Labels */
+"metric.time" = "TIEMPO";
+"metric.avg" = "MEDIA";
+"metric.max" = "MÁX";
+"metric.gain" = "ASCENSO";
+"metric.loss" = "DESCENSO";
+"metric.pois" = "PDI";
+"metric.visited" = "visitado";
+"metric.kmh" = "km/h";
+"metric.km" = "km";
+"metric.meters" = "m";
+
+/* Nearby Search */
+"nearby.title" = "Cerca de aquí";
+"nearby.searching" = "Buscando…";
+"nearby.empty" = "Sin resultados cercanos";
+"nearby.category.cafe" = "Café";
+"nearby.category.water" = "Agua";
+"nearby.category.bikeshop" = "Tienda de bicicletas";
+"nearby.category.restaurant" = "Restaurante";
+"nearby.unknown" = "Desconocido";
+"nearby.distance.meters" = "%.0f m";
+"nearby.distance.km" = "%.1f km";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Cancelar";
+"common.save" = "Guardar";
+"common.delete" = "Eliminar";
+"common.done" = "Listo";
+"common.cancel.action" = "Cancelar";
