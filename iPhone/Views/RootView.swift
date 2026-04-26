@@ -9,6 +9,9 @@ struct RootView: View {
             RideView()
                 .tabItem { Label("Ride", systemImage: "bicycle") }
 
+            RideHistoryView()
+                .tabItem { Label("My Rides", systemImage: "clock.arrow.circlepath") }
+
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }

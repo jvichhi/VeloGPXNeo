@@ -15,6 +15,7 @@ public struct RideSummary: Sendable {
     // Stats
     public let totalDistance: Double       // metres
     public let elevationGain: Double       // metres
+    public let elevationLoss: Double       // metres
     public let maxSpeed: Double            // m/s
     public let elapsedTime: TimeInterval
 
@@ -35,6 +36,7 @@ public struct RideSummary: Sendable {
         endDate: Date,
         totalDistance: Double,
         elevationGain: Double,
+        elevationLoss: Double = 0,
         maxSpeed: Double,
         elapsedTime: TimeInterval,
         actualTrack: [CLLocationCoordinate2D],
@@ -47,6 +49,7 @@ public struct RideSummary: Sendable {
         self.endDate = endDate
         self.totalDistance = totalDistance
         self.elevationGain = elevationGain
+        self.elevationLoss = elevationLoss
         self.maxSpeed = maxSpeed
         self.elapsedTime = elapsedTime
         self.actualTrack = actualTrack
