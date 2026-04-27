@@ -7,9 +7,8 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-// Drawer snap heights (excludes tab bar — drawer lives inside tab content area)
 private let kDrawerCollapsed: CGFloat = 120
-private let kDrawerMedium:    CGFloat = 340
+private let kDrawerMedium: CGFloat = 340
 
 struct PlanView: View {
 
@@ -27,27 +26,27 @@ struct PlanView: View {
 
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                // ── Map fills entire tab content area ──
-                mapLayer
-                    .ignoresSafeArea(edges: .top)
-                    .frame(width: geo.size.width, height: geo.size.height)
+            VStack(spacing: 0) {
 
-                // ── Error banner ──
-                if showErrorBanner, let err = plan.routingError {
-                    errorBanner(message: err)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .zIndex(10)
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .padding(.top, 52)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                // Map takes all space above the drawer — shrinks as drawer grows
+                ZStack(alignment: .top) {
+                    mapLayer
+                    if showErrorBanner, let err = plan.routingError {
+                        errorBanner(message: err)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .padding(.top, 8)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: max(100, geo.size.height - drawerHeight))
+                .clipped()
 
-                // ── Bottom drawer (never taller than tab content area) ──
-                drawerCard(maxHeight: geo.size.height - 60)
+                // Drawer sits directly below map in normal flow
+                // Tab bar is rendered by TabView outside this entire view
+                drawerCard(maxDrawer: geo.size.height * 0.72)
             }
+            .ignoresSafeArea(edges: .top)
         }
-        .ignoresSafeArea(edges: .bottom)
         .onChange(of: plan.routingError) { _, newVal in
             if newVal != nil {
                 withAnimation { showErrorBanner = true }
@@ -58,76 +57,80 @@ struct PlanView: View {
                 }
             }
         }
-        .onAppear {
-            drawerHeight = kDrawerCollapsed
-        }
     }
 
-    // MARK: - Drawer Card
+    // MARK: - Drawer
 
-    private func drawerCard(maxHeight: CGFloat) -> some View {
+    private func drawerCard(maxDrawer: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Drag handle
             Capsule()
-                .fill(Color.secondary.opacity(0.4))
+                .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
 
             WaypointListSheet(
                 plan: plan,
                 engine: engine,
                 onRideNow: {
-                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                        drawerHeight = kDrawerCollapsed
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRide() }
                 },
                 onGoToRoutes: {
-                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                        drawerHeight = kDrawerCollapsed
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRoutes() }
                 },
                 onPlanAnother: {
                     plan.clearAll()
-                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                        drawerHeight = kDrawerCollapsed
+                    }
                 }
             )
         }
         .frame(maxWidth: .infinity)
-        .frame(height: min(drawerHeight, maxHeight))
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: -2)
-        // Drag gesture snaps between collapsed / medium / full
+        .frame(height: drawerHeight)
+        .clipped()
+        .background(.regularMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(height: 0.5)
+        }
         .gesture(
             DragGesture()
                 .onChanged { val in
                     let proposed = drawerHeight - val.translation.height
-                    drawerHeight = min(max(proposed, kDrawerCollapsed), maxHeight)
+                    drawerHeight = min(max(proposed, kDrawerCollapsed), maxDrawer)
                 }
                 .onEnded { val in
                     let velocity = val.predictedEndTranslation.height
-                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
-                        if velocity > 200 {
+                    let snaps: [CGFloat] = [kDrawerCollapsed, kDrawerMedium, maxDrawer]
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                        if velocity > 180 {
                             drawerHeight = kDrawerCollapsed
-                        } else if velocity < -200 {
-                            drawerHeight = min(maxHeight, kDrawerMedium)
+                        } else if velocity < -180 {
+                            drawerHeight = drawerHeight < kDrawerMedium ? kDrawerMedium : maxDrawer
                         } else {
-                            // Snap to nearest
-                            let snaps: [CGFloat] = [kDrawerCollapsed, kDrawerMedium, maxHeight]
                             drawerHeight = snaps.min(by: { abs($0 - drawerHeight) < abs($1 - drawerHeight) }) ?? kDrawerCollapsed
                         }
                     }
                 }
         )
         .onTapGesture {
-            // Tap collapsed drawer to expand to medium
             if drawerHeight <= kDrawerCollapsed {
-                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
                 }
             }
         }
     }
 
-    // MARK: - Map Layer
+    // MARK: - Map
 
     private var mapLayer: some View {
         MapReader { proxy in
@@ -171,9 +174,8 @@ struct PlanView: View {
                         )
                     }
                 }
-                // Auto-expand drawer on first waypoint
                 if plan.waypoints.count == 1 {
-                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                         drawerHeight = kDrawerMedium
                     }
                 }
@@ -203,6 +205,7 @@ struct PlanView: View {
         .padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
+        .padding(.top, 52)
     }
 }
 
