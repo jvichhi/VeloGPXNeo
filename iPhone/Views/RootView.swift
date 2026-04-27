@@ -15,9 +15,12 @@ struct RootView: View {
                 .tabItem { Label("Routes".localized, systemImage: "map") }
                 .tag(AppTab.routes)
 
-            PlanView(switchToRide: { selectedTab = .ride })
-                .tabItem { Label("Plan".localized, systemImage: "map.fill") }
-                .tag(AppTab.plan)
+            PlanView(
+                switchToRide: { selectedTab = .ride },
+                switchToRoutes: { selectedTab = .routes }
+            )
+            .tabItem { Label("Plan".localized, systemImage: "map.fill") }
+            .tag(AppTab.plan)
 
             RideView()
                 .tabItem { Label("Ride".localized, systemImage: "bicycle") }

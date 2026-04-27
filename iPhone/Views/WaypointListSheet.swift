@@ -2,6 +2,9 @@
 //  WaypointListSheet.swift
 //  VeloGPX
 //
+//  Embedded in PlanView's bottom drawer — NOT presented as a .sheet.
+//  No NavigationStack here; PlanView owns the chrome.
+//
 
 import SwiftUI
 import CoreLocation
@@ -16,36 +19,16 @@ struct WaypointListSheet: View {
 
     @EnvironmentObject private var routeStore: RouteStore
 
-    // Save alert
     @State private var showSaveAlert = false
     @State private var routeName = ""
-
-    // Post-save confirmation
     @State private var savedRouteName: String? = nil
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let name = savedRouteName {
-                    savedConfirmation(name: name)
-                } else {
-                    planningContent
-                }
-            }
-            .navigationTitle(savedRouteName == nil ? "Plan Route" : "Saved!")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if savedRouteName == nil {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            plan.clearAll()
-                        } label: {
-                            Text("Clear")
-                                .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.red)
-                        }
-                        .disabled(plan.waypoints.isEmpty)
-                    }
-                }
+        Group {
+            if let name = savedRouteName {
+                savedConfirmation(name: name)
+            } else {
+                planningContent
             }
         }
         .alert("Save Route", isPresented: $showSaveAlert) {
@@ -61,9 +44,25 @@ struct WaypointListSheet: View {
 
     private var planningContent: some View {
         VStack(spacing: 0) {
+            // Title row
+            HStack {
+                Text("Plan Route")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    plan.clearAll()
+                } label: {
+                    Text("Clear")
+                        .font(.subheadline)
+                        .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.red)
+                }
+                .disabled(plan.waypoints.isEmpty)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 6)
+
             summaryBar
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
                 .padding(.bottom, 8)
 
             Divider()
@@ -85,7 +84,7 @@ struct WaypointListSheet: View {
             actionRow
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .padding(.bottom, 16)
+                .padding(.bottom, 8)
         }
     }
 
@@ -95,12 +94,14 @@ struct WaypointListSheet: View {
         VStack(spacing: 20) {
             Spacer()
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 52))
+                .font(.system(size: 48))
                 .foregroundStyle(Color.green)
-            Text("\"\(name)\" saved to your library.")
+            Text("\"\(name)\"")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+            Text("Saved to your library")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
             VStack(spacing: 10) {
                 Button {
                     onGoToRoutes()
@@ -108,7 +109,7 @@ struct WaypointListSheet: View {
                     Label("View in Routes", systemImage: "list.bullet")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 13)
                         .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(Color.white)
                 }
@@ -116,10 +117,10 @@ struct WaypointListSheet: View {
                     savedRouteName = nil
                     onPlanAnother()
                 } label: {
-                    Label("Plan Another Route", systemImage: "plus.circle")
+                    Label("Plan Another", systemImage: "plus.circle")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 13)
                         .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(Color.primary)
                 }
@@ -132,7 +133,7 @@ struct WaypointListSheet: View {
     // MARK: - Summary Bar
 
     private var summaryBar: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             Label(distanceString, systemImage: "arrow.left.and.right")
                 .font(.subheadline.weight(.semibold))
             Label(elevationString, systemImage: "mountain.2")
@@ -186,17 +187,16 @@ struct WaypointListSheet: View {
     // MARK: - Empty Prompt
 
     private var emptyPrompt: some View {
-        VStack(spacing: 8) {
+        HStack {
             Image(systemName: "mappin.and.ellipse")
-                .font(.system(size: 32))
                 .foregroundStyle(.secondary)
-            Text("Tap the map to place waypoints")
+            Text("Tap the map to drop waypoints")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Close Loop Row
@@ -212,11 +212,11 @@ struct WaypointListSheet: View {
                 Text("Close Loop")
                     .font(.subheadline.weight(.medium))
                 if plan.isLoopClosed, let loopSeg = plan.segments.first(where: { $0.isLoop }) {
-                    Text("Return leg: " + formatDistance(loopSeg.distance))
+                    Text("Return: " + formatDistance(loopSeg.distance))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Add a return leg back to the start")
+                    Text("Add a return leg to the start")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -277,7 +277,6 @@ struct WaypointListSheet: View {
         let finalName = name.isEmpty ? PlanState.autoName() : name
         let route = plan.buildRouteModel(name: finalName)
         routeStore.addPlannedRoute(route, select: false)
-        // Show in-sheet confirmation — no external banner needed
         withAnimation { savedRouteName = finalName }
     }
 

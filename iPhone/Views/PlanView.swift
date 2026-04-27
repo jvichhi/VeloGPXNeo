@@ -7,6 +7,10 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
+// Drawer snap heights (excludes tab bar — drawer lives inside tab content area)
+private let kDrawerCollapsed: CGFloat = 120
+private let kDrawerMedium:    CGFloat = 340
+
 struct PlanView: View {
 
     @StateObject private var plan = PlanState()
@@ -18,64 +22,106 @@ struct PlanView: View {
     var switchToRoutes: () -> Void = {}
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var sheetDetent: PresentationDetent = .height(160)
-    @State private var isSheetPresented = true
+    @State private var drawerHeight: CGFloat = kDrawerCollapsed
     @State private var showErrorBanner = false
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                // ── Map fills entire tab content area ──
                 mapLayer
                     .ignoresSafeArea(edges: .top)
+                    .frame(width: geo.size.width, height: geo.size.height)
 
+                // ── Error banner ──
                 if showErrorBanner, let err = plan.routingError {
                     errorBanner(message: err)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .zIndex(10)
-                        .padding(.top, 8)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .padding(.top, 52)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+
+                // ── Bottom drawer (never taller than tab content area) ──
+                drawerCard(maxHeight: geo.size.height - 60)
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .onChange(of: plan.routingError) { _, newVal in
+            if newVal != nil {
+                withAnimation { showErrorBanner = true }
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    withAnimation { showErrorBanner = false }
+                    plan.routingError = nil
                 }
             }
-            .navigationBarHidden(true)
-            .onAppear {
-                if !isSheetPresented { isSheetPresented = true }
-            }
-            .sheet(isPresented: $isSheetPresented) {
-                WaypointListSheet(
-                    plan: plan,
-                    engine: engine,
-                    onRideNow: {
-                        isSheetPresented = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            switchToRide()
+        }
+        .onAppear {
+            drawerHeight = kDrawerCollapsed
+        }
+    }
+
+    // MARK: - Drawer Card
+
+    private func drawerCard(maxHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            // Drag handle
+            Capsule()
+                .fill(Color.secondary.opacity(0.4))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            WaypointListSheet(
+                plan: plan,
+                engine: engine,
+                onRideNow: {
+                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRide() }
+                },
+                onGoToRoutes: {
+                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRoutes() }
+                },
+                onPlanAnother: {
+                    plan.clearAll()
+                    withAnimation(.spring(response: 0.35)) { drawerHeight = kDrawerCollapsed }
+                }
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: min(drawerHeight, maxHeight))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: -2)
+        // Drag gesture snaps between collapsed / medium / full
+        .gesture(
+            DragGesture()
+                .onChanged { val in
+                    let proposed = drawerHeight - val.translation.height
+                    drawerHeight = min(max(proposed, kDrawerCollapsed), maxHeight)
+                }
+                .onEnded { val in
+                    let velocity = val.predictedEndTranslation.height
+                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                        if velocity > 200 {
+                            drawerHeight = kDrawerCollapsed
+                        } else if velocity < -200 {
+                            drawerHeight = min(maxHeight, kDrawerMedium)
+                        } else {
+                            // Snap to nearest
+                            let snaps: [CGFloat] = [kDrawerCollapsed, kDrawerMedium, maxHeight]
+                            drawerHeight = snaps.min(by: { abs($0 - drawerHeight) < abs($1 - drawerHeight) }) ?? kDrawerCollapsed
                         }
-                    },
-                    onGoToRoutes: {
-                        isSheetPresented = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            switchToRoutes()
-                        }
-                    },
-                    onPlanAnother: {
-                        plan.clearAll()
-                        sheetDetent = .height(160)
                     }
-                )
-                .presentationDetents([.height(160), .medium, .large], selection: $sheetDetent)
-                .presentationDragIndicator(.visible)
-                // Allow tapping map in compact detent; tab bar sits above sheet naturally
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(160)))
-                .interactiveDismissDisabled()
-                // Sheet content manages its own bottom safe area
-                .presentationContentInteraction(.scrolls)
-            }
-            .onChange(of: plan.routingError) { _, newVal in
-                if newVal != nil {
-                    withAnimation { showErrorBanner = true }
-                    Task {
-                        try? await Task.sleep(for: .seconds(3))
-                        withAnimation { showErrorBanner = false }
-                        plan.routingError = nil
-                    }
+                }
+        )
+        .onTapGesture {
+            // Tap collapsed drawer to expand to medium
+            if drawerHeight <= kDrawerCollapsed {
+                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                    drawerHeight = kDrawerMedium
                 }
             }
         }
@@ -125,8 +171,11 @@ struct PlanView: View {
                         )
                     }
                 }
+                // Auto-expand drawer on first waypoint
                 if plan.waypoints.count == 1 {
-                    withAnimation { sheetDetent = .medium }
+                    withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                        drawerHeight = kDrawerMedium
+                    }
                 }
             }
         }
@@ -154,7 +203,6 @@ struct PlanView: View {
         .padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
-        .padding(.top, 52)
     }
 }
 
