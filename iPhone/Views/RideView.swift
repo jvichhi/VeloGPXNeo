@@ -1,3 +1,8 @@
+//
+//  RideView.swift
+//  VeloGPX
+//
+
 import SwiftUI
 import MapKit
 import Charts
@@ -19,9 +24,8 @@ struct RideView: View {
     @State private var poiSpurs: [POISpur] = []
     @State private var suppressNextCameraChange = false
     @State private var hudHeight: CGFloat = 0
-    @State private var showNearbySheet   = false
+    @State private var showNearbySheet    = false
     @State private var showDiscoverySheet = false
-    @State private var scenePhase = ScenePhase.active
 
     @Environment(\.scenePhase) private var envScenePhase
 
@@ -44,7 +48,7 @@ struct RideView: View {
         .onChange(of: rideStore.rideState.isActive) { _, newValue in
             if newValue {
                 withAnimation(.easeInOut(duration: 0.4)) {
-                    if let coord = rideStore.rideState.currentCoordinate {
+                    if let coord = rideStore.rideState.currentCoordinate?.clCoordinate {
                         position = .camera(MapCamera(
                             centerCoordinate: coord,
                             distance: 400,
@@ -61,7 +65,7 @@ struct RideView: View {
             }
         }
         .onChange(of: rideStore.rideState.currentCoordinate) { _, newValue in
-            guard rideStore.rideState.isActive, let coord = newValue else { return }
+            guard rideStore.rideState.isActive, let coord = newValue?.clCoordinate else { return }
             updateRidingCamera(to: coord)
             Task { poiSpurs = await rideStore.computeSpurs() }
         }
@@ -98,7 +102,6 @@ struct RideView: View {
             mapLayer(route: route, topControlInset: 0)
                 .ignoresSafeArea()
 
-            // Pre-ride bottom card
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
                     HStack {
@@ -127,7 +130,7 @@ struct RideView: View {
                     }
 
                     Button {
-                        rideStore.startRide(route: route)
+                        rideStore.start(route: route, pois: routeStore.selectedPOIs)
                     } label: {
                         Text("Start Ride")
                             .font(.subheadline.weight(.semibold))
@@ -162,21 +165,17 @@ struct RideView: View {
             mapLayer(route: route, topControlInset: 62)
                 .ignoresSafeArea()
 
-            // HUD
             VStack(spacing: 0) {
-                // Chips
                 chipsRow
                     .padding(.horizontal, 12)
                     .padding(.top, 6)
 
-                // Reroute steps
                 if !rideStore.rideState.rerouteSteps.isEmpty {
                     rerouteStepsList
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
                 }
 
-                // Metrics
                 metricsHUD(route: route)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
@@ -279,7 +278,7 @@ struct RideView: View {
 
     private var endRideButton: some View {
         Button {
-            rideStore.endRide()
+            rideStore.stop()
         } label: {
             Text("End")
                 .font(.system(size: 12, weight: .bold))
@@ -301,7 +300,7 @@ struct RideView: View {
                     Image(systemName: idx == 0 ? "arrow.turn.up.right" : "arrow.right")
                         .font(.system(size: 11))
                         .foregroundStyle(idx == 0 ? .primary : .secondary)
-                    Text(step)
+                    Text(step.instructions)
                         .font(.system(size: 11))
                         .foregroundStyle(idx == 0 ? .primary : .secondary)
                         .lineLimit(1)
@@ -317,11 +316,11 @@ struct RideView: View {
     private func metricsHUD(route: RouteModel) -> some View {
         let s = rideStore.rideState
         return HStack(spacing: 0) {
-            metricCell(value: formatDistance(s.distanceTravelled),  label: "Distance")
+            metricCell(value: formatDistance(s.totalDistance),          label: "Distance")
             Divider().frame(height: 32)
-            metricCell(value: formatSpeed(s.currentSpeed),          label: "Speed")
+            metricCell(value: formatSpeed(s.speed),                     label: "Speed")
             Divider().frame(height: 32)
-            metricCell(value: formatDuration(s.elapsedTime),        label: "Time")
+            metricCell(value: formatDuration(s.elapsedTime),            label: "Time")
             Divider().frame(height: 32)
             metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
         }
@@ -340,10 +339,6 @@ struct RideView: View {
     }
 
     // MARK: - Map
-    // topControlInset: pushes the MapKit system controls (MapCompass, MapPitchToggle,
-    // MapUserLocationButton) below the status bar when the map is edge-to-edge.
-    // riding layout passes 62 pt (status bar ~54 pt + 8 pt gap).
-    // birdseye layout passes 0 (map is not full-bleed in that context).
 
     @ViewBuilder
     private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
@@ -376,12 +371,10 @@ struct RideView: View {
                     )
             }
 
-            // Waypoint pins: only show on the pre-ride route preview screen,
-            // never during an active ride or in Birds Eye mode.
-            // The route polyline is the rider's guide — pin clutter adds nothing.
             if !rideStore.rideState.isActive {
                 ForEach(route.waypoints) { waypoint in
-                    Annotation(waypoint.name ?? "Waypoint", coordinate: waypoint.coordinate.clCoordinate) {
+                    Annotation(waypoint.name ?? "Waypoint",
+                               coordinate: waypoint.coordinate.clCoordinate) {
                         Image(systemName: "mappin.circle.fill").foregroundStyle(.red)
                     }
                 }
@@ -402,9 +395,6 @@ struct RideView: View {
                 }
             }
 
-            // WWDC25: UserAnnotation replaces the manual blue dot Annotation.
-            // Provides system pulsing blue dot, accuracy ring, and participates
-            // in the improved iOS 26 location rendering pipeline.
             UserAnnotation()
         }
         .onMapCameraChange(frequency: .onEnd) { _ in
@@ -427,21 +417,19 @@ struct RideView: View {
     private func fitCameraToRoute(_ route: RouteModel) {
         let coords = route.trackPoints.map { $0.coordinate.clCoordinate }
         guard !coords.isEmpty else { return }
-        let region = MKCoordinateRegion(
-            center: coords.reduce(CLLocationCoordinate2D(latitude: 0, longitude: 0)) {
-                CLLocationCoordinate2D(
-                    latitude: $0.latitude + $1.latitude / Double(coords.count),
-                    longitude: $0.longitude + $1.longitude / Double(coords.count)
-                )
-            },
-            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-        )
+        var latSum = 0.0; var lonSum = 0.0
+        for c in coords { latSum += c.latitude; lonSum += c.longitude }
+        let center = CLLocationCoordinate2D(latitude: latSum / Double(coords.count),
+                                            longitude: lonSum / Double(coords.count))
+        let region = MKCoordinateRegion(center: center,
+                                        span: MKCoordinateSpan(latitudeDelta: 0.05,
+                                                               longitudeDelta: 0.05))
         suppressNextCameraChange = true
         position = .region(region)
     }
 
     private func updateRidingCamera(to coord: CLLocationCoordinate2D? = nil) {
-        let target = coord ?? rideStore.rideState.currentCoordinate
+        let target = coord ?? rideStore.rideState.currentCoordinate?.clCoordinate
         guard let c = target else { return }
         suppressNextCameraChange = true
         withAnimation(.linear(duration: 1.0)) {
@@ -470,8 +458,7 @@ struct RideView: View {
     }
 
     private func formatSpeed(_ mps: CLLocationSpeed) -> String {
-        let kmh = max(mps * 3.6, 0)
-        return String(format: "%.1f", kmh)
+        String(format: "%.1f", max(mps * 3.6, 0))
     }
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
