@@ -33,6 +33,10 @@
 		978915832F9DF8A70047D8F7 /* CyclingRouteOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915812F9DF8A70047D8F7 /* CyclingRouteOverlay.swift */; };
 		978915842F9DF8A70047D8F7 /* RouteNoticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915822F9DF8A70047D8F7 /* RouteNoticeView.swift */; };
 		9789159E2F9E794B0047D8F7 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9789159C2F9E794B0047D8F7 /* Localizable.strings */; };
+		978915A42F9EF23E0047D8F7 /* PlanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915A32F9EF23E0047D8F7 /* PlanState.swift */; };
+		978915A62F9EF24F0047D8F7 /* PlanRouteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915A52F9EF24F0047D8F7 /* PlanRouteEngine.swift */; };
+		978915A82F9EF2610047D8F7 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915A72F9EF2610047D8F7 /* PlanView.swift */; };
+		978915AA2F9EF2730047D8F7 /* WaypointListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915A92F9EF2730047D8F7 /* WaypointListSheet.swift */; };
 		97F812862F9468CE0068A42A /* GeoJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127D2F9468CE0068A42A /* GeoJSONParser.swift */; };
 		97F812872F9468CE0068A42A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8126F2F9468CE0068A42A /* RootView.swift */; };
 		97F812882F9468CE0068A42A /* RouteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127A2F9468CE0068A42A /* RouteModel.swift */; };
@@ -123,6 +127,10 @@
 		978915992F9E794B0047D8F7 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Localizable.strings; sourceTree = "<group>"; };
 		9789159A2F9E794B0047D8F7 /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Localizable.strings; sourceTree = "<group>"; };
 		9789159B2F9E794B0047D8F7 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		978915A32F9EF23E0047D8F7 /* PlanState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanState.swift; sourceTree = "<group>"; };
+		978915A52F9EF24F0047D8F7 /* PlanRouteEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanRouteEngine.swift; sourceTree = "<group>"; };
+		978915A72F9EF2610047D8F7 /* PlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
+		978915A92F9EF2730047D8F7 /* WaypointListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointListSheet.swift; sourceTree = "<group>"; };
 		97F8125B2F9468570068A42A /* VeloGPX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VeloGPX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97F8126B2F9468CE0068A42A /* RideSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionStore.swift; sourceTree = "<group>"; };
 		97F8126C2F9468CE0068A42A /* RouteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteStore.swift; sourceTree = "<group>"; };
@@ -184,6 +192,7 @@
 		9789157C2F9DF86B0047D8F7 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				978915A52F9EF24F0047D8F7 /* PlanRouteEngine.swift */,
 				978915782F9DF86B0047D8F7 /* CyclingRouteService.swift */,
 				978915792F9DF86B0047D8F7 /* PlaceDescriptorService.swift */,
 				9789157A2F9DF86B0047D8F7 /* POISearchService.swift */,
@@ -235,6 +244,8 @@
 		97F812732F9468CE0068A42A /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				978915A92F9EF2730047D8F7 /* WaypointListSheet.swift */,
+				978915A72F9EF2610047D8F7 /* PlanView.swift */,
 				978915812F9DF8A70047D8F7 /* CyclingRouteOverlay.swift */,
 				978915822F9DF8A70047D8F7 /* RouteNoticeView.swift */,
 				978915572F9DC8710047D8F7 /* RideHistoryDetailView.swift */,
@@ -256,6 +267,7 @@
 		97F812752F9468CE0068A42A /* iPhone */ = {
 			isa = PBXGroup;
 			children = (
+				978915A32F9EF23E0047D8F7 /* PlanState.swift */,
 				9789159D2F9E794B0047D8F7 /* Resources */,
 				9789157C2F9DF86B0047D8F7 /* Services */,
 				97F8126D2F9468CE0068A42A /* Stores */,
@@ -461,6 +473,7 @@
 				978915662F9DDB8C0047D8F7 /* LocalizationManager.swift in Sources */,
 				978915522F9D64D00047D8F7 /* RideSummaryView.swift in Sources */,
 				97F8128C2F9468CE0068A42A /* VeloGPXApp.swift in Sources */,
+				978915A42F9EF23E0047D8F7 /* PlanState.swift in Sources */,
 				9789154D2F9D64890047D8F7 /* RideSummary.swift in Sources */,
 				97F8128D2F9468CE0068A42A /* POIModel.swift in Sources */,
 				97F8128F2F9468CE0068A42A /* RouteLibraryView.swift in Sources */,
@@ -473,7 +486,9 @@
 				9789155B2F9DC8710047D8F7 /* ShareableRideCard.swift in Sources */,
 				9789155C2F9DC8710047D8F7 /* RideHistoryDetailView.swift in Sources */,
 				9789152A2F9C9B090047D8F7 /* RouteStore+POI.swift in Sources */,
+				978915A82F9EF2610047D8F7 /* PlanView.swift in Sources */,
 				97F812922F9468CE0068A42A /* RouteDetailView.swift in Sources */,
+				978915AA2F9EF2730047D8F7 /* WaypointListSheet.swift in Sources */,
 				9789155E2F9DD0080047D8F7 /* TimeInterval+Formatting.swift in Sources */,
 				978915832F9DF8A70047D8F7 /* CyclingRouteOverlay.swift in Sources */,
 				978915842F9DF8A70047D8F7 /* RouteNoticeView.swift in Sources */,
@@ -486,6 +501,7 @@
 				978915802F9DF86B0047D8F7 /* CyclingRouteService.swift in Sources */,
 				97F812962F9468CE0068A42A /* SettingsView.swift in Sources */,
 				97F812972F9468CE0068A42A /* GPXParser.swift in Sources */,
+				978915A62F9EF24F0047D8F7 /* PlanRouteEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
