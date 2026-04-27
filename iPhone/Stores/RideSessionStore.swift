@@ -1,3 +1,8 @@
+//
+//  RideSessionStore.swift
+//  VeloGPX
+//
+
 import Foundation
 import CoreLocation
 import MapKit
@@ -23,12 +28,16 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var lastError: String? = nil
 
     private var manager: CLLocationManager!
-    private var route: RouteModel?
-    private var pois: [POIModel] = []
+
+    // internal (not private) so that file-separated extensions (e.g. RideSessionStore+Spurs)
+    // can read these without duplicating state.
+    var route: RouteModel?
+    var pois: [POIModel] = []
+    var nearestTrackIndex: Int = 0
+
     private var lastLocation: CLLocation?
     private var startTime: Date?
     private var lastAlertedPOIID: UUID?
-    private var nearestTrackIndex: Int = 0
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
     private var errorClearTask: Task<Void, Never>?
@@ -226,10 +235,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // MARK: - Error helpers
 
-    private func showError(_ message: String) {
+    func showError(_ message: String) {
         errorClearTask?.cancel()
         lastError = message
-        // Auto-dismiss after 6 seconds
         errorClearTask = Task {
             try? await Task.sleep(for: .seconds(6))
             guard !Task.isCancelled else { return }
@@ -237,7 +245,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    private func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+    func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
         let lat1 = from.latitude * .pi / 180
         let lat2 = to.latitude * .pi / 180
         let dLon = (to.longitude - from.longitude) * .pi / 180
@@ -266,7 +274,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         progressPercent = Double(bestIndex) / Double(points.count - 1)
     }
 
-    private func minimumDistance(from coordinate: CLLocationCoordinate2D, to route: RouteModel) -> Double {
+    func minimumDistance(from coordinate: CLLocationCoordinate2D, to route: RouteModel) -> Double {
         let points = route.trackPoints
         guard points.count > 1 else { return .greatestFiniteMagnitude }
         var minDistance = Double.greatestFiniteMagnitude
