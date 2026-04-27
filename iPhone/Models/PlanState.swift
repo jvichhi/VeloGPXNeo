@@ -5,7 +5,7 @@
 //  Observable model for the Plan tab. Holds ordered waypoints and
 //  the road-snapped segments computed between them.
 //
-//  @MainActor is intentionally NOT on the class — it conflicts with
+//  @MainActor is intentionally NOT on the class - it conflicts with
 //  ObservableObject's objectWillChange publisher in some toolchain versions.
 //  All mutating methods are individually @MainActor isolated.
 //
@@ -44,7 +44,7 @@ struct PlanSegment: Identifiable {
     let coordinates: [CLLocationCoordinate2D]
     let distance: CLLocationDistance
     let elevationGain: Double
-    /// `true` for the synthetic close-loop leg (last → first waypoint).
+    /// `true` for the synthetic close-loop leg (last -> first waypoint).
     let isLoop: Bool
 
     init(
@@ -210,6 +210,6 @@ final class PlanState: ObservableObject {
     static func autoName() -> String {
         let df = DateFormatter()
         df.dateFormat = "MMM d, h:mm a"
-        return "Planned Route \u2014 " + df.string(from: Date())
+        return "Planned Route \u{2014} " + df.string(from: Date())
     }
 }

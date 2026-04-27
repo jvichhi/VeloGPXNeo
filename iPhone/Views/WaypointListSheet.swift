@@ -25,7 +25,6 @@ struct WaypointListSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Summary bar
                 summaryBar
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
@@ -33,7 +32,6 @@ struct WaypointListSheet: View {
 
                 Divider()
 
-                // Waypoint list
                 if plan.waypoints.isEmpty {
                     emptyPrompt
                 } else {
@@ -42,14 +40,12 @@ struct WaypointListSheet: View {
 
                 Divider()
 
-                // Close loop toggle
                 closeLoopRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
 
                 Divider()
 
-                // Action buttons
                 actionRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -77,7 +73,7 @@ struct WaypointListSheet: View {
             if plan.isRouting {
                 HStack(spacing: 4) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Routing…")
+                    Text("Routing\u{2026}")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -140,7 +136,9 @@ struct WaypointListSheet: View {
 
     private var closeLoopRow: some View {
         HStack {
-            Image(systemName: plan.isLoopClosed ? "arrow.triangle.turn.up.right.circle.fill" : "arrow.triangle.turn.up.right.circle")
+            Image(systemName: plan.isLoopClosed
+                    ? "arrow.triangle.turn.up.right.circle.fill"
+                    : "arrow.triangle.turn.up.right.circle")
                 .foregroundStyle(plan.isLoopClosed ? .blue : .secondary)
                 .font(.system(size: 20))
             VStack(alignment: .leading, spacing: 1) {
@@ -173,7 +171,6 @@ struct WaypointListSheet: View {
 
     private var actionRow: some View {
         HStack(spacing: 12) {
-            // Save to Library
             Button {
                 routeName = PlanState.autoName()
                 showSaveAlert = true
@@ -187,7 +184,6 @@ struct WaypointListSheet: View {
             }
             .disabled(!plan.isRideable)
 
-            // Ride Now
             Button {
                 let route = plan.buildRouteModel(name: PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
@@ -197,8 +193,10 @@ struct WaypointListSheet: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(plan.isRideable ? .blue : Color(.systemGray4),
-                                in: RoundedRectangle(cornerRadius: 12))
+                    .background(
+                        plan.isRideable ? Color.blue : Color(.systemGray4),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
                     .foregroundStyle(.white)
             }
             .disabled(!plan.isRideable)
@@ -247,5 +245,5 @@ struct WaypointListSheet: View {
     }
 
     private var distanceString: String { formatDistance(plan.totalDistance) }
-    private var elevationString: String { String(format: "\u2191 %.0f m", plan.totalElevationGain) }
+    private var elevationString: String { String(format: "\u{2191} %.0f m", plan.totalElevationGain) }
 }

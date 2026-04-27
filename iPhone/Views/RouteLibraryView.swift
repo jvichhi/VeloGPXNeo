@@ -177,7 +177,7 @@ private struct RouteCard: View {
 
                 HStack(spacing: 6) {
                     StatBadge(icon: "arrow.left.and.right", value: String(format: "%.1f km", route.totalDistance / 1000))
-                    StatBadge(icon: "mountain.2",           value: String(format: "%.0f m \u2191", route.elevationGain))
+                    StatBadge(icon: "mountain.2", value: String(format: "%.0f m \u{2191}", route.elevationGain))
                     formatBadge
                 }
             }
@@ -208,8 +208,6 @@ private struct RouteCard: View {
         )
         .animation(.spring(duration: 0.25), value: isActive)
     }
-
-    // MARK: Planned vs imported styling
 
     private var isPlanned: Bool { route.sourceFormat == .planned }
 
