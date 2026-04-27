@@ -136,22 +136,19 @@ final class PlanState: ObservableObject {
         routingError = nil
     }
 
-    /// Reconstruct waypoints from an existing RouteModel so the user can
-    /// edit a previously saved or imported route in the Plan tab.
-    /// Segments are cleared — PlanRouteEngine will re-route between the
-    /// loaded waypoints when the user taps the map or via recomputeAll.
+    /// Reconstruct waypoints from an existing RouteModel.
+    /// WaypointPoint.coordinate and TrackPoint.coordinate are typed as the
+    /// app's own `Coordinate` struct — use .clCoordinate to get CLLocationCoordinate2D.
     @MainActor
     func loadFrom(route: RouteModel) {
         clearAll()
-        // Use explicit waypoints if the route has them, otherwise
-        // sample the track at most every ~200 m to avoid flooding the map.
         if !route.waypoints.isEmpty {
             waypoints = route.waypoints.map {
-                PlanWaypoint(coordinate: $0.coordinate, name: $0.name)
+                PlanWaypoint(coordinate: $0.coordinate.clCoordinate, name: $0.name)
             }
         } else {
             waypoints = sampleTrack(route.trackPoints, maxInterval: 200)
-                .map { PlanWaypoint(coordinate: $0.coordinate) }
+                .map { PlanWaypoint(coordinate: $0.coordinate.clCoordinate) }
         }
     }
 
@@ -214,21 +211,25 @@ final class PlanState: ObservableObject {
 
     // MARK: - Private Helpers
 
+    /// Reduce a dense track to at most one point per `maxInterval` metres.
     private func sampleTrack(_ points: [TrackPoint], maxInterval: CLLocationDistance) -> [TrackPoint] {
         guard !points.isEmpty else { return [] }
         var result: [TrackPoint] = [points[0]]
-        var lastCoord = CLLocation(latitude: points[0].coordinate.latitude,
-                                   longitude: points[0].coordinate.longitude)
+        var lastLoc = CLLocation(
+            latitude:  points[0].coordinate.clCoordinate.latitude,
+            longitude: points[0].coordinate.clCoordinate.longitude
+        )
         for pt in points.dropFirst() {
-            let loc = CLLocation(latitude: pt.coordinate.latitude, longitude: pt.coordinate.longitude)
-            if loc.distance(from: lastCoord) >= maxInterval {
+            let cl = pt.coordinate.clCoordinate
+            let loc = CLLocation(latitude: cl.latitude, longitude: cl.longitude)
+            if loc.distance(from: lastLoc) >= maxInterval {
                 result.append(pt)
-                lastCoord = loc
+                lastLoc = loc
             }
         }
-        // Always include the last point
-        if result.last.map({ $0.coordinate.latitude != points.last!.coordinate.latitude }) ?? false {
-            result.append(points.last!)
+        // Always include the final point
+        if let last = points.last, result.last?.coordinate != last.coordinate {
+            result.append(last)
         }
         return result
     }
