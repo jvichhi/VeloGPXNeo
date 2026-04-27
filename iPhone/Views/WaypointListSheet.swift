@@ -51,7 +51,6 @@ struct WaypointListSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Plan Route")
                         .font(.headline)
-                    // Inline stats — no extra summaryBar section
                     HStack(spacing: 10) {
                         Label(distanceString, systemImage: "arrow.left.and.right")
                         Label(elevationString, systemImage: "mountain.2")
@@ -106,8 +105,6 @@ struct WaypointListSheet: View {
     }
 
     // MARK: - Waypoint List
-    // Capped height so it doesn't bloat the drawer. List has
-    // internal scroll; the drawer itself handles full-height drag.
 
     private var waypointList: some View {
         List {
@@ -126,7 +123,10 @@ struct WaypointListSheet: View {
                 }
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
-                .listRowSeparatorTint(.separator.opacity(0.5))
+                // listRowSeparatorTint only accepts Color, not ShapeStyle.
+                // Color(UIColor.separator) gives the system-adaptive separator colour
+                // and .opacity() on Color returns Color, satisfying the Color? parameter.
+                .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
             }
             .onDelete { offsets in
                 let ids = offsets.map { plan.waypoints[$0].id }
@@ -141,7 +141,6 @@ struct WaypointListSheet: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(.active))
-        // Cap list height — drawer drag handles expansion beyond this
         .frame(maxHeight: CGFloat(min(plan.waypoints.count, 5)) * 52)
     }
 
@@ -202,7 +201,6 @@ struct WaypointListSheet: View {
 
     private var actionRow: some View {
         HStack(spacing: 10) {
-            // Save
             Button {
                 routeName = PlanState.autoName()
                 showSaveAlert = true
@@ -216,7 +214,6 @@ struct WaypointListSheet: View {
             }
             .disabled(!plan.isRideable)
 
-            // Ride Now
             Button {
                 let route = plan.buildRouteModel(name: PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
@@ -230,7 +227,7 @@ struct WaypointListSheet: View {
                         plan.isRideable ? AnyShapeStyle(Color.blue) : AnyShapeStyle(Color(.systemGray4)),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.white)
             }
             .disabled(!plan.isRideable)
         }
@@ -260,7 +257,7 @@ struct WaypointListSheet: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(.blue, in: RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.white)
                 }
                 Button {
                     savedRouteName = nil
@@ -297,7 +294,7 @@ struct WaypointListSheet: View {
                 .frame(width: 26, height: 26)
             Text(badgeLabel(index: index, total: total))
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.white)
         }
     }
 
@@ -328,6 +325,6 @@ struct WaypointListSheet: View {
     }
 
     private var elevationString: String {
-        String(format: "%.0f m↑", plan.totalElevationGain)
+        String(format: "%.0f m\u{2191}", plan.totalElevationGain)
     }
 }
