@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-public struct RouteModel: Identifiable, Codable, Equatable, Sendable {
+public struct RouteModel: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: UUID
     public var name: String
     public var sourceFormat: RouteFormat
@@ -12,6 +12,11 @@ public struct RouteModel: Identifiable, Codable, Equatable, Sendable {
     public var elevationLoss: Double
     public var createdAt: Date
     public var originalFilename: String?
+
+    // Hash on id only — cheap and correct for navigation identity.
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 
     public init(
         id: UUID = UUID(),
@@ -53,7 +58,7 @@ public struct RouteModel: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-public struct TrackPoint: Codable, Sendable, Equatable {
+public struct TrackPoint: Codable, Hashable, Sendable, Equatable {
     public let coordinate: Coordinate
     public let elevation: Double?
     public let timestamp: Date?
@@ -65,7 +70,7 @@ public struct TrackPoint: Codable, Sendable, Equatable {
     }
 }
 
-public struct WaypointPoint: Codable, Identifiable, Sendable, Equatable {
+public struct WaypointPoint: Codable, Identifiable, Hashable, Sendable, Equatable {
     public let id: UUID
     public let coordinate: Coordinate
     public let name: String?
@@ -79,7 +84,7 @@ public struct WaypointPoint: Codable, Identifiable, Sendable, Equatable {
     }
 }
 
-public enum RouteFormat: String, Codable, Sendable {
+public enum RouteFormat: String, Codable, Hashable, Sendable {
     case gpx
     case geojson
     /// Route created interactively in the Plan tab.
