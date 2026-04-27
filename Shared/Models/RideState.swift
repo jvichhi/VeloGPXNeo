@@ -2,7 +2,9 @@ import Foundation
 import CoreLocation
 import MapKit
 
-public struct Coordinate: Codable, Sendable, Equatable {
+// Coordinate is Hashable so TrackPoint/WaypointPoint can synthesize Hashable,
+// which is required for navigationDestination(item:) on RouteModel.
+public struct Coordinate: Codable, Hashable, Sendable, Equatable {
     public var latitude: Double
     public var longitude: Double
 
@@ -22,7 +24,7 @@ public extension CLLocationCoordinate2D {
     }
 }
 
-public struct RerouteStep: Codable, Sendable, Equatable {
+public struct RerouteStep: Codable, Hashable, Sendable, Equatable {
     public var instructions: String
     public var distanceMeters: Double
 }
@@ -42,8 +44,8 @@ public struct RideState: Codable, Sendable {
     public var heartRate: Double?
     public var elevationGain: Double
     public var elevationLoss: Double
-    public var bearingToRoute: Double?       // degrees, when off-route < 200m
-    public var rerouteSteps: [RerouteStep]   // when off-route > 200m
+    public var bearingToRoute: Double?
+    public var rerouteSteps: [RerouteStep]
     public var isRerouting: Bool
 
     public init(
