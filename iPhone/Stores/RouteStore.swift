@@ -70,6 +70,22 @@ final class RouteStore: ObservableObject {
         loadFromDisk()
     }
 
+    /// Saves a route built in the Plan tab and selects it.
+    /// - Parameters:
+    ///   - route: The `RouteModel` produced by `PlanState.buildRouteModel(name:)`.
+    ///   - select: If `true` (default), sets `selectedRoute` to the saved route.
+    func addPlannedRoute(_ route: RouteModel, select: Bool = true) {
+        do {
+            try save(route)
+            loadFromDisk()
+            if select {
+                selectedRoute = routes.first(where: { $0.id == route.id })
+            }
+        } catch {
+            lastImportMessage = "Could not save planned route."
+        }
+    }
+
     func deleteRoute(_ route: RouteModel) {
         let url = storageDirectory().appendingPathComponent("\(route.id.uuidString).json")
         try? FileManager.default.removeItem(at: url)
@@ -87,7 +103,7 @@ final class RouteStore: ObservableObject {
         loadFromDisk()
         if selectedRoute?.id == route.id { selectedRoute = updated }
     }
-    
+
     func reverseRoute(_ route: RouteModel) {
         guard var updated = routes.first(where: { $0.id == route.id }) else { return }
         updated.trackPoints = updated.trackPoints.reversed()
