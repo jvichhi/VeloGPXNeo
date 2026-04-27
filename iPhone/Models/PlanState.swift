@@ -5,10 +5,15 @@
 //  Observable model for the Plan tab. Holds ordered waypoints and
 //  the road-snapped segments computed between them.
 //
+//  @MainActor is intentionally NOT on the class — it conflicts with
+//  ObservableObject's objectWillChange publisher in some toolchain versions.
+//  All mutating methods are individually @MainActor isolated.
+//
 
 import Foundation
 import CoreLocation
 import MapKit
+import Combine
 
 // MARK: - Supporting Types
 
@@ -62,7 +67,6 @@ struct PlanSegment: Identifiable {
 
 // MARK: - PlanState
 
-@MainActor
 final class PlanState: ObservableObject {
 
     // MARK: Published
@@ -75,17 +79,14 @@ final class PlanState: ObservableObject {
 
     // MARK: Derived
 
-    /// Combined straight-line + road-snapped coordinates for the full route polyline.
     var fullPolyline: [CLLocationCoordinate2D] {
         segments.flatMap { $0.coordinates }
     }
 
-    /// Only the close-loop segment's coordinates (for separate dashed rendering).
     var loopPolyline: [CLLocationCoordinate2D] {
         segments.first(where: { $0.isLoop })?.coordinates ?? []
     }
 
-    /// Non-loop segment coordinates (for solid-line rendering).
     var routePolyline: [CLLocationCoordinate2D] {
         segments.filter { !$0.isLoop }.flatMap { $0.coordinates }
     }
@@ -98,9 +99,8 @@ final class PlanState: ObservableObject {
         segments.reduce(0) { $0 + $1.elevationGain }
     }
 
-    /// Route is rideable when at least one computed segment exists.
     var isRideable: Bool {
-        waypoints.count >= 2 && !segments.filter({ !$0.isLoop }).isEmpty
+        waypoints.count >= 2 && segments.contains(where: { !$0.isLoop })
     }
 
     var canCloseLoop: Bool {
@@ -109,28 +109,29 @@ final class PlanState: ObservableObject {
 
     // MARK: Waypoint Mutation
 
+    @MainActor
     func addWaypoint(_ coordinate: CLLocationCoordinate2D) {
         let wp = PlanWaypoint(coordinate: coordinate)
         waypoints.append(wp)
     }
 
+    @MainActor
     func removeWaypoint(id: UUID) {
         waypoints.removeAll { $0.id == id }
-        // Clean up any segments that reference this waypoint.
         segments.removeAll { $0.fromWaypointID == id || $0.toWaypointID == id }
-        // If loop was closed it may now be invalid — clear it.
         if isLoopClosed {
             segments.removeAll { $0.isLoop }
             if waypoints.count < 2 { isLoopClosed = false }
         }
     }
 
+    @MainActor
     func moveWaypoint(fromOffsets: IndexSet, toOffset: Int) {
         waypoints.move(fromOffsets: fromOffsets, toOffset: toOffset)
-        // All segments are dirty after a reorder — engine will recompute.
         segments.removeAll()
     }
 
+    @MainActor
     func toggleLoop() {
         guard canCloseLoop else { return }
         if isLoopClosed {
@@ -138,10 +139,10 @@ final class PlanState: ObservableObject {
             isLoopClosed = false
         } else {
             isLoopClosed = true
-            // PlanRouteEngine will compute and insert the loop segment.
         }
     }
 
+    @MainActor
     func clearAll() {
         waypoints.removeAll()
         segments.removeAll()
@@ -152,7 +153,7 @@ final class PlanState: ObservableObject {
 
     // MARK: Segment Write-back (called by PlanRouteEngine)
 
-    /// Replaces or inserts a computed segment.
+    @MainActor
     func upsertSegment(_ segment: PlanSegment) {
         if let idx = segments.firstIndex(where: {
             $0.fromWaypointID == segment.fromWaypointID &&
@@ -160,14 +161,11 @@ final class PlanState: ObservableObject {
         }) {
             segments[idx] = segment
         } else {
-            // Insert in waypoint order: find the position of fromWaypoint in the list.
             if let fromIdx = waypoints.firstIndex(where: { $0.id == segment.fromWaypointID }) {
-                // Loop segment always goes last.
                 if segment.isLoop {
                     segments.removeAll { $0.isLoop }
                     segments.append(segment)
                 } else {
-                    // Insert after any existing segment whose fromWaypoint comes before this one.
                     let insertAt = segments.lastIndex(where: { seg in
                         guard !seg.isLoop,
                               let idx = waypoints.firstIndex(where: { $0.id == seg.fromWaypointID })
@@ -182,7 +180,7 @@ final class PlanState: ObservableObject {
         }
     }
 
-    /// Removes stale segments whose endpoint waypoints no longer exist.
+    @MainActor
     func pruneOrphanedSegments() {
         let ids = Set(waypoints.map { $0.id })
         segments.removeAll { !ids.contains($0.fromWaypointID) || !ids.contains($0.toWaypointID) }
@@ -212,6 +210,6 @@ final class PlanState: ObservableObject {
     static func autoName() -> String {
         let df = DateFormatter()
         df.dateFormat = "MMM d, h:mm a"
-        return "Planned Route — " + df.string(from: Date())
+        return "Planned Route \u2014 " + df.string(from: Date())
     }
 }
