@@ -10,7 +10,7 @@
 //  All mutating methods are individually @MainActor isolated.
 //
 
-import Foundation
+import SwiftUI
 import Combine
 import CoreLocation
 import MapKit
