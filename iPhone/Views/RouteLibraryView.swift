@@ -21,7 +21,6 @@ struct RouteLibraryView: View {
                                 RouteCard(route: route, isActive: isSelected)
                             }
                             .simultaneousGesture(TapGesture().onEnded {
-                                // Tapping an already-active card just navigates — no re-select needed
                                 if !isSelected {
                                     withAnimation(.spring(duration: 0.25)) {
                                         pendingSelectRoute = route
@@ -29,7 +28,6 @@ struct RouteLibraryView: View {
                                 }
                             })
 
-                            // Inline "Ride This Route" CTA — slides in when card is tapped
                             if isPending && !isSelected {
                                 HStack(spacing: 10) {
                                     Button {
@@ -125,7 +123,7 @@ struct RouteLibraryView: View {
                         VStack(spacing: 6) {
                             Text("No routes yet")
                                 .font(.title3.bold())
-                            Text("Import a GPX or GeoJSON file from\nSafari, Files, or Mail.")
+                            Text("Import a GPX or GeoJSON file, or use the Plan tab to build one.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -162,14 +160,13 @@ private struct RouteCard: View {
     var body: some View {
         HStack(spacing: 14) {
 
-            // Left icon — blue tint when active
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive ? Color.blue.opacity(0.18) : Color.blue.opacity(0.10))
+                    .fill(isActive ? iconTint.opacity(0.18) : iconTint.opacity(0.10))
                     .frame(width: 52, height: 52)
-                Image(systemName: "figure.outdoor.cycle")
+                Image(systemName: routeIcon)
                     .font(.system(size: 22))
-                    .foregroundStyle(isActive ? .blue : .blue.opacity(0.7))
+                    .foregroundStyle(isActive ? iconTint : iconTint.opacity(0.7))
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -180,14 +177,13 @@ private struct RouteCard: View {
 
                 HStack(spacing: 6) {
                     StatBadge(icon: "arrow.left.and.right", value: String(format: "%.1f km", route.totalDistance / 1000))
-                    StatBadge(icon: "mountain.2",           value: String(format: "%.0f m ↑", route.elevationGain))
-                    StatBadge(icon: "doc",                  value: route.sourceFormat.rawValue.uppercased())
+                    StatBadge(icon: "mountain.2",           value: String(format: "%.0f m \u2191", route.elevationGain))
+                    formatBadge
                 }
             }
 
             Spacer()
 
-            // Active checkmark badge OR chevron
             if isActive {
                 ZStack {
                     Circle()
@@ -205,18 +201,42 @@ private struct RouteCard: View {
             }
         }
         .padding(14)
-        .background(
-            isActive
-                ? AnyShapeStyle(.regularMaterial)
-                : AnyShapeStyle(.regularMaterial),
-            in: RoundedRectangle(cornerRadius: 16)
-        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
-            // Blue left edge accent on active card
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(isActive ? Color.blue.opacity(0.45) : Color.clear, lineWidth: 1.5)
         )
         .animation(.spring(duration: 0.25), value: isActive)
+    }
+
+    // MARK: Planned vs imported styling
+
+    private var isPlanned: Bool { route.sourceFormat == .planned }
+
+    private var routeIcon: String {
+        isPlanned ? "map.fill" : "figure.outdoor.cycle"
+    }
+
+    private var iconTint: Color {
+        isPlanned ? .purple : .blue
+    }
+
+    @ViewBuilder
+    private var formatBadge: some View {
+        if isPlanned {
+            HStack(spacing: 3) {
+                Image(systemName: "map.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                Text("PLANNED")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(.purple, in: Capsule())
+        } else {
+            StatBadge(icon: "doc", value: route.sourceFormat.rawValue.uppercased())
+        }
     }
 }
 
