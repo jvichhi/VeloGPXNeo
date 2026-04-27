@@ -54,7 +54,7 @@ struct WaypointListSheet: View {
                         plan.clearAll()
                     } label: {
                         Text("Clear")
-                            .foregroundStyle(plan.waypoints.isEmpty ? .tertiary : .red)
+                            .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.red)
                     }
                     .disabled(plan.waypoints.isEmpty)
                 }
@@ -87,7 +87,7 @@ struct WaypointListSheet: View {
             }
             Spacer()
         }
-        .foregroundStyle(plan.waypoints.isEmpty ? .secondary : .primary)
+        .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.primary)
     }
 
     // MARK: - Waypoint List
@@ -146,7 +146,7 @@ struct WaypointListSheet: View {
             Image(systemName: plan.isLoopClosed
                     ? "arrow.triangle.turn.up.right.circle.fill"
                     : "arrow.triangle.turn.up.right.circle")
-                .foregroundStyle(plan.isLoopClosed ? .blue : .secondary)
+                .foregroundStyle(plan.isLoopClosed ? Color.blue : Color.secondary)
                 .font(.system(size: 20))
             VStack(alignment: .leading, spacing: 1) {
                 Text("Close Loop")
@@ -178,7 +178,6 @@ struct WaypointListSheet: View {
 
     private var actionRow: some View {
         HStack(spacing: 12) {
-            // Save to Library
             Button {
                 routeName = PlanState.autoName()
                 showSaveAlert = true
@@ -188,11 +187,10 @@ struct WaypointListSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(plan.isRideable ? .primary : .tertiary)
+                    .foregroundStyle(plan.isRideable ? Color.primary : Color.secondary)
             }
             .disabled(!plan.isRideable)
 
-            // Ride Now
             Button {
                 let route = plan.buildRouteModel(name: PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
@@ -206,7 +204,7 @@ struct WaypointListSheet: View {
                         plan.isRideable ? Color.blue : Color(.systemGray4),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.white)
             }
             .disabled(!plan.isRideable)
         }
@@ -228,7 +226,7 @@ struct WaypointListSheet: View {
                 .frame(width: 28, height: 28)
             Text(badgeLabel(index: index, total: total))
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.white)
         }
     }
 
@@ -257,6 +255,7 @@ struct WaypointListSheet: View {
     private var distanceString: String {
         plan.waypoints.isEmpty ? "0.0 km" : formatDistance(plan.totalDistance)
     }
+
     private var elevationString: String {
         String(format: "%.0f m gain", plan.totalElevationGain)
     }
