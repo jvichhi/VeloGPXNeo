@@ -23,62 +23,67 @@ struct PlanView: View {
     @State private var showSavedBanner = false
 
     var body: some View {
-        ZStack(alignment: .top) {
-            mapLayer
-                .ignoresSafeArea(edges: .top)
+        NavigationStack {
+            ZStack(alignment: .top) {
+                mapLayer
+                    .ignoresSafeArea(edges: .top)
 
-            // Error banner
-            if showErrorBanner, let err = plan.routingError {
-                errorBanner(message: err, isError: true)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(10)
-                    .padding(.top, 8)
-            }
-
-            // Saved confirmation banner
-            if showSavedBanner {
-                errorBanner(message: "Route saved to library", isError: false)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(10)
-                    .padding(.top, 8)
-            }
-        }
-        .sheet(isPresented: $isSheetPresented) {
-            WaypointListSheet(
-                plan: plan,
-                engine: engine,
-                onRideNow: {
-                    isSheetPresented = false
-                    // Brief delay lets sheet dismiss animate before tab switches
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        switchToRide()
-                    }
-                },
-                onSaved: {
-                    withAnimation { showSavedBanner = true }
-                    Task {
-                        try? await Task.sleep(for: .seconds(2.5))
-                        withAnimation { showSavedBanner = false }
-                    }
-                    // Reset plan so user can start a new one
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        plan.clearAll()
-                        sheetDetent = .height(220)
-                    }
+                if showErrorBanner, let err = plan.routingError {
+                    errorBanner(message: err, isError: true)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(10)
+                        .padding(.top, 8)
                 }
-            )
-            .presentationDetents([.height(220), .medium, .large], selection: $sheetDetent)
-            .presentationDragIndicator(.visible)
-            .presentationBackgroundInteraction(.enabled)
-            .interactiveDismissDisabled()
-        }
-        .onChange(of: plan.routingError) { _, newVal in
-            if newVal != nil {
-                withAnimation { showErrorBanner = true }
-                Task {
-                    try? await Task.sleep(for: .seconds(3))
-                    withAnimation { showErrorBanner = false }
-                    plan.routingError = nil
+
+                if showSavedBanner {
+                    errorBanner(message: "Route saved to library", isError: false)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(10)
+                        .padding(.top, 8)
+                }
+            }
+            .navigationBarHidden(true)
+            // Re-present sheet whenever this tab becomes active
+            .onAppear {
+                if !isSheetPresented {
+                    isSheetPresented = true
+                }
+            }
+            .sheet(isPresented: $isSheetPresented) {
+                WaypointListSheet(
+                    plan: plan,
+                    engine: engine,
+                    onRideNow: {
+                        isSheetPresented = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            switchToRide()
+                        }
+                    },
+                    onSaved: {
+                        withAnimation { showSavedBanner = true }
+                        Task {
+                            try? await Task.sleep(for: .seconds(2.5))
+                            withAnimation { showSavedBanner = false }
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            plan.clearAll()
+                            sheetDetent = .height(220)
+                        }
+                    }
+                )
+                .presentationDetents([.height(220), .medium, .large], selection: $sheetDetent)
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled)
+                .interactiveDismissDisabled()
+            }
+            .onChange(of: plan.routingError) { _, newVal in
+                if newVal != nil {
+                    withAnimation { showErrorBanner = true }
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        withAnimation { showErrorBanner = false }
+                        plan.routingError = nil
+                    }
                 }
             }
         }
@@ -99,11 +104,14 @@ struct PlanView: View {
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [8, 6]))
                 }
                 ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
-                    Annotation(wp.name ?? "", coordinate: wp.coordinate, anchor: .bottom) {
+                    // Pass empty string as label — name is rendered inside WaypointPin
+                    // to avoid MapKit callout overlapping the pin view
+                    Annotation("", coordinate: wp.coordinate, anchor: .bottom) {
                         WaypointPin(
                             index: index,
                             total: plan.waypoints.count,
-                            isLoopClosed: plan.isLoopClosed
+                            isLoopClosed: plan.isLoopClosed,
+                            name: wp.name
                         )
                     }
                 }
@@ -139,10 +147,10 @@ struct PlanView: View {
     private func errorBanner(message: String, isError: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                .foregroundStyle(isError ? .orange : .green)
+                .foregroundStyle(isError ? Color.orange : Color.green)
             Text(message)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
             Spacer()
             if isError {
                 Button {
@@ -150,7 +158,7 @@ struct PlanView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                 }
             }
         }
@@ -168,16 +176,30 @@ private struct WaypointPin: View {
     let index: Int
     let total: Int
     let isLoopClosed: Bool
+    var name: String?
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(fillColor)
-                .frame(width: 30, height: 30)
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-            Text(label)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
+        VStack(spacing: 2) {
+            ZStack {
+                Circle()
+                    .fill(fillColor)
+                    .frame(width: 30, height: 30)
+                    .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                Text(label)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.white)
+            }
+            // Show name tag below pin only when a custom name exists,
+            // so it never overlaps the circle
+            if let name, !name.isEmpty {
+                Text(name)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.primary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
+                    .fixedSize()
+            }
         }
     }
 
