@@ -2,9 +2,6 @@
 //  WaypointListSheet.swift
 //  VeloGPX
 //
-//  Bottom sheet showing the ordered waypoint list, close-loop toggle,
-//  route summary, and Save / Ride Now actions.
-//
 
 import SwiftUI
 import CoreLocation
@@ -13,9 +10,8 @@ struct WaypointListSheet: View {
 
     @ObservedObject var plan: PlanState
     let engine: PlanRouteEngine
-
-    /// Injected by PlanView so "Ride Now" can switch tabs.
     let onRideNow: () -> Void
+    let onSaved: () -> Void
 
     @EnvironmentObject private var routeStore: RouteStore
 
@@ -52,13 +48,24 @@ struct WaypointListSheet: View {
             }
             .navigationTitle("Waypoints")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        plan.clearAll()
+                    } label: {
+                        Text("Clear")
+                            .foregroundStyle(plan.waypoints.isEmpty ? .tertiary : .red)
+                    }
+                    .disabled(plan.waypoints.isEmpty)
+                }
+            }
         }
         .alert("Save Route", isPresented: $showSaveAlert) {
             TextField("Route name", text: $routeName)
             Button("Save") { saveToLibrary() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Enter a name for your route.")
+            Text("Enter a name for your planned route.")
         }
     }
 
@@ -73,14 +80,14 @@ struct WaypointListSheet: View {
             if plan.isRouting {
                 HStack(spacing: 4) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Routing\u{2026}")
+                    Text("Routing...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
         }
-        .foregroundStyle(.primary)
+        .foregroundStyle(plan.waypoints.isEmpty ? .secondary : .primary)
     }
 
     // MARK: - Waypoint List
@@ -171,6 +178,7 @@ struct WaypointListSheet: View {
 
     private var actionRow: some View {
         HStack(spacing: 12) {
+            // Save to Library
             Button {
                 routeName = PlanState.autoName()
                 showSaveAlert = true
@@ -180,10 +188,11 @@ struct WaypointListSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(plan.isRideable ? .primary : .tertiary)
             }
             .disabled(!plan.isRideable)
 
+            // Ride Now
             Button {
                 let route = plan.buildRouteModel(name: PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
@@ -209,6 +218,7 @@ struct WaypointListSheet: View {
         let name = routeName.trimmingCharacters(in: .whitespaces)
         let route = plan.buildRouteModel(name: name.isEmpty ? PlanState.autoName() : name)
         routeStore.addPlannedRoute(route, select: false)
+        onSaved()
     }
 
     private func waypointBadge(index: Int, total: Int) -> some View {
@@ -244,6 +254,10 @@ struct WaypointListSheet: View {
             : String(format: "%.0f m", metres)
     }
 
-    private var distanceString: String { formatDistance(plan.totalDistance) }
-    private var elevationString: String { String(format: "\u{2191} %.0f m", plan.totalElevationGain) }
+    private var distanceString: String {
+        plan.waypoints.isEmpty ? "0.0 km" : formatDistance(plan.totalDistance)
+    }
+    private var elevationString: String {
+        String(format: "%.0f m gain", plan.totalElevationGain)
+    }
 }
