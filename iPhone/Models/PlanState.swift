@@ -11,16 +11,15 @@
 //
 
 import Foundation
+import Combine
 import CoreLocation
 import MapKit
-import Combine
 
 // MARK: - Supporting Types
 
 struct PlanWaypoint: Identifiable, Equatable {
     let id: UUID
     var coordinate: CLLocationCoordinate2D
-    /// Reverse-geocoded street/place label; nil until resolved.
     var name: String?
 
     init(coordinate: CLLocationCoordinate2D, name: String? = nil) {
@@ -36,15 +35,11 @@ struct PlanWaypoint: Identifiable, Equatable {
 
 struct PlanSegment: Identifiable {
     let id: UUID
-    /// ID of the origin `PlanWaypoint`.
     let fromWaypointID: UUID
-    /// ID of the destination `PlanWaypoint`.
     let toWaypointID: UUID
-    /// Road-snapped coordinate array returned by MapKit.
     let coordinates: [CLLocationCoordinate2D]
     let distance: CLLocationDistance
     let elevationGain: Double
-    /// `true` for the synthetic close-loop leg (last -> first waypoint).
     let isLoop: Bool
 
     init(
@@ -68,8 +63,6 @@ struct PlanSegment: Identifiable {
 // MARK: - PlanState
 
 final class PlanState: ObservableObject {
-
-    // MARK: Published
 
     @Published var waypoints: [PlanWaypoint] = []
     @Published var segments: [PlanSegment] = []
@@ -111,8 +104,7 @@ final class PlanState: ObservableObject {
 
     @MainActor
     func addWaypoint(_ coordinate: CLLocationCoordinate2D) {
-        let wp = PlanWaypoint(coordinate: coordinate)
-        waypoints.append(wp)
+        waypoints.append(PlanWaypoint(coordinate: coordinate))
     }
 
     @MainActor
@@ -151,7 +143,7 @@ final class PlanState: ObservableObject {
         routingError = nil
     }
 
-    // MARK: Segment Write-back (called by PlanRouteEngine)
+    // MARK: Segment Write-back
 
     @MainActor
     func upsertSegment(_ segment: PlanSegment) {
@@ -192,11 +184,8 @@ final class PlanState: ObservableObject {
         let trackPoints: [TrackPoint] = segments
             .flatMap { $0.coordinates }
             .map { TrackPoint(coordinate: $0) }
-
-        let waypointPoints: [WaypointPoint] = waypoints.map {
-            WaypointPoint(coordinate: $0.coordinate, name: $0.name)
-        }
-
+        let waypointPoints: [WaypointPoint] = waypoints
+            .map { WaypointPoint(coordinate: $0.coordinate, name: $0.name) }
         return RouteModel(
             name: name,
             sourceFormat: .planned,
@@ -205,11 +194,9 @@ final class PlanState: ObservableObject {
         )
     }
 
-    // MARK: Auto-name helper
-
     static func autoName() -> String {
         let df = DateFormatter()
         df.dateFormat = "MMM d, h:mm a"
-        return "Planned Route \u{2014} " + df.string(from: Date())
+        return "Planned Route - " + df.string(from: Date())
     }
 }
