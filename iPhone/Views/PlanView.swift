@@ -7,8 +7,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-// Snap heights
-private let kDrawerPeek:   CGFloat = 72   // just the handle + title row
+private let kDrawerPeek:   CGFloat = 72
 private let kDrawerMedium: CGFloat = 320
 
 struct PlanView: View {
@@ -20,24 +19,22 @@ struct PlanView: View {
 
     var switchToRide: () -> Void = {}
     var switchToRoutes: () -> Void = {}
-
-    // Optional pre-loaded route for "Edit in Plan" from the library
     var preloadRoute: RouteModel? = nil
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var drawerHeight: CGFloat = kDrawerMedium   // starts expanded
+    @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
 
-                // ── Map fills the entire tab area ──
+                // Map fills entire tab area
                 mapLayer
                     .ignoresSafeArea(edges: .top)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // ── Error banner floats at top ──
+                // Floating error banner
                 if showErrorBanner, let err = plan.routingError {
                     errorBanner(message: err)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -46,12 +43,21 @@ struct PlanView: View {
                         .zIndex(20)
                 }
 
-                // ── Floating drawer above the map, below the tab bar ──
+                // Floating drawer — .regularMaterial = semi-transparent
                 drawerCard(geo: geo)
                     .zIndex(10)
             }
         }
         .ignoresSafeArea(edges: .bottom)
+        .task {
+            // .task runs on MainActor by default, so @MainActor func calls are safe here
+            if let route = preloadRoute {
+                await plan.loadFrom(route: route)
+                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                    drawerHeight = kDrawerMedium
+                }
+            }
+        }
         .onChange(of: plan.routingError) { _, newVal in
             if newVal != nil {
                 withAnimation { showErrorBanner = true }
@@ -62,24 +68,15 @@ struct PlanView: View {
                 }
             }
         }
-        .onAppear {
-            if let route = preloadRoute {
-                plan.loadFrom(route: route)
-                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                    drawerHeight = kDrawerMedium
-                }
-            }
-        }
     }
 
     // MARK: - Drawer
 
     private func drawerCard(geo: GeometryProxy) -> some View {
         let safeBottom = geo.safeAreaInsets.bottom
-        let maxDrawer  = geo.size.height - safeBottom - 60   // leave at least 60pt of map visible
+        let maxDrawer  = geo.size.height - safeBottom - 60
 
         return VStack(spacing: 0) {
-            // Handle
             Capsule()
                 .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
@@ -102,14 +99,12 @@ struct PlanView: View {
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
                 }
             )
-            // Bottom padding so action buttons clear the home indicator
             .padding(.bottom, safeBottom > 0 ? safeBottom : 16)
         }
         .frame(maxWidth: .infinity)
         .frame(height: min(drawerHeight, maxDrawer))
         .background(.regularMaterial, in: RoundedCorners(tl: 20, tr: 20, bl: 0, br: 0))
         .shadow(color: .black.opacity(0.14), radius: 16, y: -3)
-        // ── Drag gesture ──
         .gesture(
             DragGesture()
                 .onChanged { val in
@@ -190,6 +185,7 @@ struct PlanView: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
+        .padding(.top, 52)
     }
 }
 
@@ -221,7 +217,7 @@ private struct WaypointPin: View {
     }
 }
 
-// MARK: - Rounded Corners (top only)
+// MARK: - Top-only rounded corners
 
 private struct RoundedCorners: Shape {
     var tl: CGFloat; var tr: CGFloat; var bl: CGFloat; var br: CGFloat
