@@ -11,52 +11,40 @@ struct WaypointListSheet: View {
     @ObservedObject var plan: PlanState
     let engine: PlanRouteEngine
     let onRideNow: () -> Void
-    let onSaved: () -> Void
+    let onGoToRoutes: () -> Void
+    let onPlanAnother: () -> Void
 
     @EnvironmentObject private var routeStore: RouteStore
 
+    // Save alert
     @State private var showSaveAlert = false
     @State private var routeName = ""
 
+    // Post-save confirmation
+    @State private var savedRouteName: String? = nil
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                summaryBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
-                Divider()
-
-                if plan.waypoints.isEmpty {
-                    emptyPrompt
+            Group {
+                if let name = savedRouteName {
+                    savedConfirmation(name: name)
                 } else {
-                    waypointList
+                    planningContent
                 }
-
-                Divider()
-
-                closeLoopRow
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-
-                Divider()
-
-                actionRow
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
             }
-            .navigationTitle("Waypoints")
+            .navigationTitle(savedRouteName == nil ? "Plan Route" : "Saved!")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        plan.clearAll()
-                    } label: {
-                        Text("Clear")
-                            .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.red)
+                if savedRouteName == nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            plan.clearAll()
+                        } label: {
+                            Text("Clear")
+                                .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.red)
+                        }
+                        .disabled(plan.waypoints.isEmpty)
                     }
-                    .disabled(plan.waypoints.isEmpty)
                 }
             }
         }
@@ -66,6 +54,78 @@ struct WaypointListSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Enter a name for your planned route.")
+        }
+    }
+
+    // MARK: - Planning Content
+
+    private var planningContent: some View {
+        VStack(spacing: 0) {
+            summaryBar
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            Divider()
+
+            if plan.waypoints.isEmpty {
+                emptyPrompt
+            } else {
+                waypointList
+            }
+
+            Divider()
+
+            closeLoopRow
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+            Divider()
+
+            actionRow
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Post-Save Confirmation
+
+    private func savedConfirmation(name: String) -> some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(Color.green)
+            Text("\"\(name)\" saved to your library.")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            VStack(spacing: 10) {
+                Button {
+                    onGoToRoutes()
+                } label: {
+                    Label("View in Routes", systemImage: "list.bullet")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(Color.white)
+                }
+                Button {
+                    savedRouteName = nil
+                    onPlanAnother()
+                } label: {
+                    Label("Plan Another Route", systemImage: "plus.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(Color.primary)
+                }
+            }
+            .padding(.horizontal, 20)
+            Spacer()
         }
     }
 
@@ -185,7 +245,7 @@ struct WaypointListSheet: View {
                 Label("Save", systemImage: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 13)
                     .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(plan.isRideable ? Color.primary : Color.secondary)
             }
@@ -199,7 +259,7 @@ struct WaypointListSheet: View {
                 Label("Ride Now", systemImage: "bicycle")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 13)
                     .background(
                         plan.isRideable ? Color.blue : Color(.systemGray4),
                         in: RoundedRectangle(cornerRadius: 12)
@@ -214,9 +274,11 @@ struct WaypointListSheet: View {
 
     private func saveToLibrary() {
         let name = routeName.trimmingCharacters(in: .whitespaces)
-        let route = plan.buildRouteModel(name: name.isEmpty ? PlanState.autoName() : name)
+        let finalName = name.isEmpty ? PlanState.autoName() : name
+        let route = plan.buildRouteModel(name: finalName)
         routeStore.addPlannedRoute(route, select: false)
-        onSaved()
+        // Show in-sheet confirmation — no external banner needed
+        withAnimation { savedRouteName = finalName }
     }
 
     private func waypointBadge(index: Int, total: Int) -> some View {

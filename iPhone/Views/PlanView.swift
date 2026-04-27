@@ -15,12 +15,12 @@ struct PlanView: View {
     @EnvironmentObject private var routeStore: RouteStore
 
     var switchToRide: () -> Void = {}
+    var switchToRoutes: () -> Void = {}
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var sheetDetent: PresentationDetent = .height(220)
+    @State private var sheetDetent: PresentationDetent = .height(160)
     @State private var isSheetPresented = true
     @State private var showErrorBanner = false
-    @State private var showSavedBanner = false
 
     var body: some View {
         NavigationStack {
@@ -29,25 +29,15 @@ struct PlanView: View {
                     .ignoresSafeArea(edges: .top)
 
                 if showErrorBanner, let err = plan.routingError {
-                    errorBanner(message: err, isError: true)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .zIndex(10)
-                        .padding(.top, 8)
-                }
-
-                if showSavedBanner {
-                    errorBanner(message: "Route saved to library", isError: false)
+                    errorBanner(message: err)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .zIndex(10)
                         .padding(.top, 8)
                 }
             }
             .navigationBarHidden(true)
-            // Re-present sheet whenever this tab becomes active
             .onAppear {
-                if !isSheetPresented {
-                    isSheetPresented = true
-                }
+                if !isSheetPresented { isSheetPresented = true }
             }
             .sheet(isPresented: $isSheetPresented) {
                 WaypointListSheet(
@@ -59,22 +49,24 @@ struct PlanView: View {
                             switchToRide()
                         }
                     },
-                    onSaved: {
-                        withAnimation { showSavedBanner = true }
-                        Task {
-                            try? await Task.sleep(for: .seconds(2.5))
-                            withAnimation { showSavedBanner = false }
+                    onGoToRoutes: {
+                        isSheetPresented = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            switchToRoutes()
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            plan.clearAll()
-                            sheetDetent = .height(220)
-                        }
+                    },
+                    onPlanAnother: {
+                        plan.clearAll()
+                        sheetDetent = .height(160)
                     }
                 )
-                .presentationDetents([.height(220), .medium, .large], selection: $sheetDetent)
+                .presentationDetents([.height(160), .medium, .large], selection: $sheetDetent)
                 .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled)
+                // Allow tapping map in compact detent; tab bar sits above sheet naturally
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(160)))
                 .interactiveDismissDisabled()
+                // Sheet content manages its own bottom safe area
+                .presentationContentInteraction(.scrolls)
             }
             .onChange(of: plan.routingError) { _, newVal in
                 if newVal != nil {
@@ -104,8 +96,6 @@ struct PlanView: View {
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [8, 6]))
                 }
                 ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
-                    // Pass empty string as label — name is rendered inside WaypointPin
-                    // to avoid MapKit callout overlapping the pin view
                     Annotation("", coordinate: wp.coordinate, anchor: .bottom) {
                         WaypointPin(
                             index: index,
@@ -142,24 +132,22 @@ struct PlanView: View {
         }
     }
 
-    // MARK: - Banner
+    // MARK: - Error Banner
 
-    private func errorBanner(message: String, isError: Bool) -> some View {
+    private func errorBanner(message: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                .foregroundStyle(isError ? Color.orange : Color.green)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.orange)
             Text(message)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.primary)
             Spacer()
-            if isError {
-                Button {
-                    withAnimation { showErrorBanner = false; plan.routingError = nil }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
-                }
+            Button {
+                withAnimation { showErrorBanner = false; plan.routingError = nil }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.secondary)
             }
         }
         .padding(.horizontal, 14)
@@ -189,8 +177,6 @@ private struct WaypointPin: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.white)
             }
-            // Show name tag below pin only when a custom name exists,
-            // so it never overlaps the circle
             if let name, !name.isEmpty {
                 Text(name)
                     .font(.system(size: 10, weight: .semibold))
