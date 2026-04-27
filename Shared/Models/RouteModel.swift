@@ -82,4 +82,6 @@ public struct WaypointPoint: Codable, Identifiable, Sendable, Equatable {
 public enum RouteFormat: String, Codable, Sendable {
     case gpx
     case geojson
+    /// Route created interactively in the Plan tab.
+    case planned
 }
