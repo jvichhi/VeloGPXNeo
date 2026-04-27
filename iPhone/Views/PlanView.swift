@@ -7,8 +7,9 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-private let kDrawerCollapsed: CGFloat = 120
-private let kDrawerMedium: CGFloat = 340
+// Snap heights
+private let kDrawerPeek:   CGFloat = 72   // just the handle + title row
+private let kDrawerMedium: CGFloat = 320
 
 struct PlanView: View {
 
@@ -20,33 +21,37 @@ struct PlanView: View {
     var switchToRide: () -> Void = {}
     var switchToRoutes: () -> Void = {}
 
+    // Optional pre-loaded route for "Edit in Plan" from the library
+    var preloadRoute: RouteModel? = nil
+
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var drawerHeight: CGFloat = kDrawerCollapsed
+    @State private var drawerHeight: CGFloat = kDrawerMedium   // starts expanded
     @State private var showErrorBanner = false
 
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
 
-                // Map takes all space above the drawer — shrinks as drawer grows
-                ZStack(alignment: .top) {
-                    mapLayer
-                    if showErrorBanner, let err = plan.routingError {
-                        errorBanner(message: err)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .padding(.top, 8)
-                    }
+                // ── Map fills the entire tab area ──
+                mapLayer
+                    .ignoresSafeArea(edges: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // ── Error banner floats at top ──
+                if showErrorBanner, let err = plan.routingError {
+                    errorBanner(message: err)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 56)
+                        .zIndex(20)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: max(100, geo.size.height - drawerHeight))
-                .clipped()
 
-                // Drawer sits directly below map in normal flow
-                // Tab bar is rendered by TabView outside this entire view
-                drawerCard(maxDrawer: geo.size.height * 0.72)
+                // ── Floating drawer above the map, below the tab bar ──
+                drawerCard(geo: geo)
+                    .zIndex(10)
             }
-            .ignoresSafeArea(edges: .top)
         }
+        .ignoresSafeArea(edges: .bottom)
         .onChange(of: plan.routingError) { _, newVal in
             if newVal != nil {
                 withAnimation { showErrorBanner = true }
@@ -57,12 +62,24 @@ struct PlanView: View {
                 }
             }
         }
+        .onAppear {
+            if let route = preloadRoute {
+                plan.loadFrom(route: route)
+                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                    drawerHeight = kDrawerMedium
+                }
+            }
+        }
     }
 
     // MARK: - Drawer
 
-    private func drawerCard(maxDrawer: CGFloat) -> some View {
-        VStack(spacing: 0) {
+    private func drawerCard(geo: GeometryProxy) -> some View {
+        let safeBottom = geo.safeAreaInsets.bottom
+        let maxDrawer  = geo.size.height - safeBottom - 60   // leave at least 60pt of map visible
+
+        return VStack(spacing: 0) {
+            // Handle
             Capsule()
                 .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
@@ -73,59 +90,49 @@ struct PlanView: View {
                 plan: plan,
                 engine: engine,
                 onRideNow: {
-                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                        drawerHeight = kDrawerCollapsed
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRide() }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerPeek }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { switchToRide() }
                 },
                 onGoToRoutes: {
-                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                        drawerHeight = kDrawerCollapsed
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { switchToRoutes() }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerPeek }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { switchToRoutes() }
                 },
                 onPlanAnother: {
                     plan.clearAll()
-                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                        drawerHeight = kDrawerCollapsed
-                    }
+                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
                 }
             )
+            // Bottom padding so action buttons clear the home indicator
+            .padding(.bottom, safeBottom > 0 ? safeBottom : 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: drawerHeight)
-        .clipped()
-        .background(.regularMaterial)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.2))
-                .frame(height: 0.5)
-        }
+        .frame(height: min(drawerHeight, maxDrawer))
+        .background(.regularMaterial, in: RoundedCorners(tl: 20, tr: 20, bl: 0, br: 0))
+        .shadow(color: .black.opacity(0.14), radius: 16, y: -3)
+        // ── Drag gesture ──
         .gesture(
             DragGesture()
                 .onChanged { val in
                     let proposed = drawerHeight - val.translation.height
-                    drawerHeight = min(max(proposed, kDrawerCollapsed), maxDrawer)
+                    drawerHeight = min(max(proposed, kDrawerPeek), maxDrawer)
                 }
                 .onEnded { val in
-                    let velocity = val.predictedEndTranslation.height
-                    let snaps: [CGFloat] = [kDrawerCollapsed, kDrawerMedium, maxDrawer]
+                    let v = val.predictedEndTranslation.height
+                    let snaps: [CGFloat] = [kDrawerPeek, kDrawerMedium, maxDrawer]
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                        if velocity > 180 {
-                            drawerHeight = kDrawerCollapsed
-                        } else if velocity < -180 {
+                        if v > 180 {
+                            drawerHeight = drawerHeight > kDrawerMedium ? kDrawerMedium : kDrawerPeek
+                        } else if v < -180 {
                             drawerHeight = drawerHeight < kDrawerMedium ? kDrawerMedium : maxDrawer
                         } else {
-                            drawerHeight = snaps.min(by: { abs($0 - drawerHeight) < abs($1 - drawerHeight) }) ?? kDrawerCollapsed
+                            drawerHeight = snaps.min(by: { abs($0 - drawerHeight) < abs($1 - drawerHeight) }) ?? kDrawerMedium
                         }
                     }
                 }
         )
         .onTapGesture {
-            if drawerHeight <= kDrawerCollapsed {
-                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                    drawerHeight = kDrawerMedium
-                }
+            if drawerHeight <= kDrawerPeek {
+                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
             }
         }
     }
@@ -146,12 +153,8 @@ struct PlanView: View {
                 }
                 ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
                     Annotation("", coordinate: wp.coordinate, anchor: .bottom) {
-                        WaypointPin(
-                            index: index,
-                            total: plan.waypoints.count,
-                            isLoopClosed: plan.isLoopClosed,
-                            name: wp.name
-                        )
+                        WaypointPin(index: index, total: plan.waypoints.count,
+                                    isLoopClosed: plan.isLoopClosed, name: wp.name)
                     }
                 }
                 UserAnnotation()
@@ -164,20 +167,10 @@ struct PlanView: View {
             }
             .onTapGesture { screenPoint in
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
-                let waypointCount = plan.waypoints.count
+                let before = plan.waypoints.count
                 plan.addWaypoint(coord)
-                if waypointCount >= 1 {
-                    Task {
-                        await engine.refreshSegments(
-                            in: plan,
-                            affectedWaypointIndices: [waypointCount]
-                        )
-                    }
-                }
-                if plan.waypoints.count == 1 {
-                    withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
-                        drawerHeight = kDrawerMedium
-                    }
+                if before >= 1 {
+                    Task { await engine.refreshSegments(in: plan, affectedWaypointIndices: [before]) }
                 }
             }
         }
@@ -187,68 +180,65 @@ struct PlanView: View {
 
     private func errorBanner(message: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color.orange)
-            Text(message)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.primary)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(message).font(.caption.weight(.medium))
             Spacer()
-            Button {
-                withAnimation { showErrorBanner = false; plan.routingError = nil }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
+            Button { withAnimation { showErrorBanner = false; plan.routingError = nil } } label: {
+                Image(systemName: "xmark").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14).padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
-        .padding(.top, 52)
     }
 }
 
 // MARK: - Waypoint Pin
 
 private struct WaypointPin: View {
-    let index: Int
-    let total: Int
-    let isLoopClosed: Bool
-    var name: String?
-
+    let index: Int; let total: Int; let isLoopClosed: Bool; var name: String?
     var body: some View {
         VStack(spacing: 2) {
             ZStack {
-                Circle()
-                    .fill(fillColor)
-                    .frame(width: 30, height: 30)
+                Circle().fill(fillColor).frame(width: 30, height: 30)
                     .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                Text(label)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.white)
+                Text(label).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
             }
             if let name, !name.isEmpty {
-                Text(name)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.primary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
-                    .fixedSize()
+                Text(name).font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5)).fixedSize()
             }
         }
     }
-
     private var fillColor: Color {
-        if index == 0 { return .green }
-        if index == total - 1 && !isLoopClosed { return .red }
-        return Color(.darkGray)
+        index == 0 ? .green : (index == total - 1 && !isLoopClosed ? .red : Color(.darkGray))
     }
-
     private var label: String {
         if index == 0 { return isLoopClosed && total > 1 ? "S/E" : "S" }
         if index == total - 1 && !isLoopClosed { return "E" }
         return "\(index + 1)"
+    }
+}
+
+// MARK: - Rounded Corners (top only)
+
+private struct RoundedCorners: Shape {
+    var tl: CGFloat; var tr: CGFloat; var bl: CGFloat; var br: CGFloat
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+        p.addQuadCurve(to: CGPoint(x: rect.minX + tl, y: rect.minY),
+                       control: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + tr),
+                       control: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX - br, y: rect.maxY),
+                       control: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        p.closeSubpath()
+        return p
     }
 }

@@ -4,7 +4,9 @@ import UniformTypeIdentifiers
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
-    @State private var pendingSelectRoute: RouteModel? = nil
+
+    // "Edit in Plan" deep-link
+    @State private var routeToEdit: RouteModel? = nil
 
     var body: some View {
         NavigationStack {
@@ -12,59 +14,54 @@ struct RouteLibraryView: View {
                 LazyVStack(spacing: 12) {
                     ForEach(routeStore.routes) { route in
                         let isSelected = routeStore.selectedRoute?.id == route.id
-                        let isPending  = pendingSelectRoute?.id == route.id
 
-                        VStack(spacing: 0) {
-                            NavigationLink {
-                                RouteDetailView(route: route)
+                        NavigationLink {
+                            RouteDetailView(route: route)
+                        } label: {
+                            RouteCard(route: route, isActive: isSelected)
+                        }
+                        // ── Swipe actions ──
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            // Delete
+                            Button(role: .destructive) {
+                                routeStore.deleteRoute(route)
                             } label: {
-                                RouteCard(route: route, isActive: isSelected)
-                            }
-                            .simultaneousGesture(TapGesture().onEnded {
-                                if !isSelected {
-                                    withAnimation(.spring(duration: 0.25)) {
-                                        pendingSelectRoute = route
-                                    }
-                                }
-                            })
-
-                            if isPending && !isSelected {
-                                HStack(spacing: 10) {
-                                    Button {
-                                        withAnimation(.spring(duration: 0.3)) {
-                                            routeStore.selectedRoute = route
-                                            pendingSelectRoute = nil
-                                        }
-                                    } label: {
-                                        Label("Ride This Route", systemImage: "bicycle")
-                                            .font(.subheadline.weight(.semibold))
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 12)
-                                            .background(.blue, in: RoundedRectangle(cornerRadius: 12))
-                                            .foregroundStyle(.white)
-                                    }
-
-                                    Button {
-                                        withAnimation(.spring(duration: 0.2)) {
-                                            pendingSelectRoute = nil
-                                        }
-                                    } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 40, height: 40)
-                                            .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
-                                    }
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.bottom, 12)
-                                .padding(.top, -4)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                                .transition(.move(edge: .top).combined(with: .opacity))
+                                Label("Delete", systemImage: "trash")
                             }
                         }
-                        .shadow(color: .black.opacity(isSelected ? 0.10 : 0.06), radius: isSelected ? 8 : 6, y: isSelected ? 3 : 2)
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            // Ride
+                            Button {
+                                withAnimation(.spring(duration: 0.3)) {
+                                    routeStore.selectedRoute = route
+                                }
+                            } label: {
+                                Label("Ride", systemImage: "bicycle")
+                            }
+                            .tint(.blue)
+
+                            // Edit in Plan
+                            Button {
+                                routeToEdit = route
+                            } label: {
+                                Label("Edit Plan", systemImage: "pencil.and.map")
+                            }
+                            .tint(.purple)
+                        }
+                        .shadow(color: .black.opacity(isSelected ? 0.10 : 0.06),
+                                radius: isSelected ? 8 : 6, y: isSelected ? 3 : 2)
                         .contextMenu {
+                            Button {
+                                withAnimation { routeStore.selectedRoute = route }
+                            } label: {
+                                Label("Ride This Route", systemImage: "bicycle")
+                            }
+                            Button {
+                                routeToEdit = route
+                            } label: {
+                                Label("Edit in Plan", systemImage: "pencil.and.map")
+                            }
+                            Divider()
                             Button(role: .destructive) {
                                 routeStore.deleteRoute(route)
                             } label: {
@@ -81,16 +78,11 @@ struct RouteLibraryView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isImporterPresented = true
-                    } label: {
+                    Button { isImporterPresented = true } label: {
                         ZStack {
-                            Circle()
-                                .fill(.blue)
-                                .frame(width: 32, height: 32)
+                            Circle().fill(.blue).frame(width: 32, height: 32)
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
+                                .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
                         }
                     }
                 }
@@ -102,9 +94,7 @@ struct RouteLibraryView: View {
             ) { result in
                 switch result {
                 case .success(let urls):
-                    if let url = urls.first {
-                        Task { await routeStore.importRoute(from: url) }
-                    }
+                    if let url = urls.first { Task { await routeStore.importRoute(from: url) } }
                 case .failure:
                     routeStore.lastImportMessage = "Import cancelled"
                 }
@@ -113,34 +103,28 @@ struct RouteLibraryView: View {
                 if routeStore.routes.isEmpty {
                     VStack(spacing: 20) {
                         ZStack {
-                            Circle()
-                                .fill(Color(.systemGray5))
-                                .frame(width: 72, height: 72)
-                            Image(systemName: "map")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.secondary)
+                            Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
+                            Image(systemName: "map").font(.system(size: 30)).foregroundStyle(.secondary)
                         }
                         VStack(spacing: 6) {
-                            Text("No routes yet")
-                                .font(.title3.bold())
+                            Text("No routes yet").font(.title3.bold())
                             Text("Import a GPX or GeoJSON file, or use the Plan tab to build one.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
+                                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         }
-                        Button {
-                            isImporterPresented = true
-                        } label: {
+                        Button { isImporterPresented = true } label: {
                             Label("Import a Route", systemImage: "square.and.arrow.down")
                                 .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(.blue, in: Capsule())
-                                .foregroundStyle(.white)
+                                .padding(.horizontal, 20).padding(.vertical, 12)
+                                .background(.blue, in: Capsule()).foregroundStyle(.white)
                         }
-                    }
-                    .padding()
+                    }.padding()
                 }
+            }
+            // ── Navigate to Plan tab with the route pre-loaded ──
+            .navigationDestination(item: $routeToEdit) { route in
+                PlanView(switchToRide: {}, switchToRoutes: {}, preloadRoute: route)
+                    .navigationTitle("Edit: \(route.name)")
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
         .alert("VeloGPX", isPresented: .constant(routeStore.lastImportMessage != nil), actions: {
@@ -152,6 +136,7 @@ struct RouteLibraryView: View {
 }
 
 // MARK: - Route Card
+// (unchanged - kept as-is)
 
 private struct RouteCard: View {
     let route: RouteModel
@@ -159,7 +144,6 @@ private struct RouteCard: View {
 
     var body: some View {
         HStack(spacing: 14) {
-
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(isActive ? iconTint.opacity(0.18) : iconTint.opacity(0.10))
@@ -168,69 +152,45 @@ private struct RouteCard: View {
                     .font(.system(size: 22))
                     .foregroundStyle(isActive ? iconTint : iconTint.opacity(0.7))
             }
-
             VStack(alignment: .leading, spacing: 6) {
                 Text(route.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-
                 HStack(spacing: 6) {
                     StatBadge(icon: "arrow.left.and.right", value: String(format: "%.1f km", route.totalDistance / 1000))
                     StatBadge(icon: "mountain.2", value: String(format: "%.0f m \u{2191}", route.elevationGain))
                     formatBadge
                 }
             }
-
             Spacer()
-
             if isActive {
                 ZStack {
-                    Circle()
-                        .fill(.blue)
-                        .frame(width: 26, height: 26)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .transition(.scale.combined(with: .opacity))
+                    Circle().fill(.blue).frame(width: 26, height: 26)
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                }.transition(.scale.combined(with: .opacity))
             } else {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.tertiary)
             }
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(isActive ? Color.blue.opacity(0.45) : Color.clear, lineWidth: 1.5)
-        )
+        .overlay(RoundedRectangle(cornerRadius: 16)
+            .strokeBorder(isActive ? Color.blue.opacity(0.45) : Color.clear, lineWidth: 1.5))
         .animation(.spring(duration: 0.25), value: isActive)
     }
 
     private var isPlanned: Bool { route.sourceFormat == .planned }
+    private var routeIcon: String { isPlanned ? "map.fill" : "figure.outdoor.cycle" }
+    private var iconTint: Color { isPlanned ? .purple : .blue }
 
-    private var routeIcon: String {
-        isPlanned ? "map.fill" : "figure.outdoor.cycle"
-    }
-
-    private var iconTint: Color {
-        isPlanned ? .purple : .blue
-    }
-
-    @ViewBuilder
-    private var formatBadge: some View {
+    @ViewBuilder private var formatBadge: some View {
         if isPlanned {
             HStack(spacing: 3) {
-                Image(systemName: "map.fill")
-                    .font(.system(size: 9, weight: .semibold))
-                Text("PLANNED")
-                    .font(.system(size: 11, weight: .medium))
+                Image(systemName: "map.fill").font(.system(size: 9, weight: .semibold))
+                Text("PLANNED").font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
+            .foregroundStyle(.white).padding(.horizontal, 7).padding(.vertical, 4)
             .background(.purple, in: Capsule())
         } else {
             StatBadge(icon: "doc", value: route.sourceFormat.rawValue.uppercased())
@@ -238,22 +198,14 @@ private struct RouteCard: View {
     }
 }
 
-// MARK: - Stat Badge
-
 private struct StatBadge: View {
-    let icon: String
-    let value: String
-
+    let icon: String; let value: String
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
-            Text(value)
-                .font(.system(size: 11, weight: .medium))
+            Image(systemName: icon).font(.system(size: 9, weight: .semibold))
+            Text(value).font(.system(size: 11, weight: .medium))
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
+        .foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 4)
         .background(Color(.systemGray5), in: Capsule())
     }
 }
