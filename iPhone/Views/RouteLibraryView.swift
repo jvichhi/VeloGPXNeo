@@ -78,7 +78,7 @@ struct RouteLibraryView: View {
                     }
                 }
 
-                // ── Leading: Ride (full-swipe) + Edit in Plan ──
+                // ── Leading: Ride (full-swipe) + Plan ──
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
                         withAnimation(.spring(duration: 0.3)) {
@@ -181,9 +181,11 @@ private struct RouteRow: View {
                     PillBadge(icon: "mountain.2",
                               label: String(format: "%.0f m", route.elevationGain))
                     if isPlanned {
-                        PillBadge(icon: "map.fill", label: "PLANNED", tint: .purple)
+                        PillBadge(icon: "map.fill", label: "PLANNED",
+                                  color: .purple, filled: true)
                     } else {
-                        PillBadge(icon: "doc", label: route.sourceFormat.rawValue.uppercased())
+                        PillBadge(icon: "doc",
+                                  label: route.sourceFormat.rawValue.uppercased())
                     }
                 }
             }
@@ -193,9 +195,10 @@ private struct RouteRow: View {
             // Active indicator / chevron
             if isActive {
                 ZStack {
-                    Circle().fill(.blue).frame(width: 22, height: 22)
+                    Circle().fill(Color.blue).frame(width: 22, height: 22)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white)
                 }
                 .transition(.scale.combined(with: .opacity))
             } else {
@@ -222,24 +225,22 @@ private struct RouteRow: View {
 }
 
 // MARK: - Pill Badge
+// `filled: true`  → solid `color` background, white text
+// `filled: false` → systemGray5 background, secondary text  (default)
 
 private struct PillBadge: View {
     let icon: String
     let label: String
-    var tint: Color = .secondary
+    var color: Color = .blue
+    var filled: Bool = false
 
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 9, weight: .semibold))
             Text(label).font(.system(size: 10, weight: .medium))
         }
-        .foregroundStyle(tint == .secondary ? .secondary : .white)
+        .foregroundStyle(filled ? Color.white : Color.secondary)
         .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(
-            tint == .secondary
-                ? AnyShapeStyle(Color(.systemGray5))
-                : AnyShapeStyle(tint),
-            in: Capsule()
-        )
+        .background(filled ? color : Color(.systemGray5), in: Capsule())
     }
 }
