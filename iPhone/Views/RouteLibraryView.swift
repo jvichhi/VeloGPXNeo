@@ -4,208 +4,242 @@ import UniformTypeIdentifiers
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
-
-    // "Edit in Plan" deep-link
     @State private var routeToEdit: RouteModel? = nil
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(routeStore.routes) { route in
-                        let isSelected = routeStore.selectedRoute?.id == route.id
-
-                        NavigationLink {
-                            RouteDetailView(route: route)
-                        } label: {
-                            RouteCard(route: route, isActive: isSelected)
-                        }
-                        // ── Swipe actions ──
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            // Delete
-                            Button(role: .destructive) {
-                                routeStore.deleteRoute(route)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            // Ride
-                            Button {
-                                withAnimation(.spring(duration: 0.3)) {
-                                    routeStore.selectedRoute = route
-                                }
-                            } label: {
-                                Label("Ride", systemImage: "bicycle")
-                            }
-                            .tint(.blue)
-
-                            // Edit in Plan
-                            Button {
-                                routeToEdit = route
-                            } label: {
-                                Label("Edit Plan", systemImage: "pencil.and.map")
-                            }
-                            .tint(.purple)
-                        }
-                        .shadow(color: .black.opacity(isSelected ? 0.10 : 0.06),
-                                radius: isSelected ? 8 : 6, y: isSelected ? 3 : 2)
-                        .contextMenu {
-                            Button {
-                                withAnimation { routeStore.selectedRoute = route }
-                            } label: {
-                                Label("Ride This Route", systemImage: "bicycle")
-                            }
-                            Button {
-                                routeToEdit = route
-                            } label: {
-                                Label("Edit in Plan", systemImage: "pencil.and.map")
-                            }
-                            Divider()
-                            Button(role: .destructive) {
-                                routeStore.deleteRoute(route)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
+            Group {
+                if routeStore.routes.isEmpty {
+                    emptyState
+                } else {
+                    routeList
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("Routes")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { isImporterPresented = true } label: {
-                        ZStack {
-                            Circle().fill(.blue).frame(width: 32, height: 32)
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                        }
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 32, height: 32)
+                            .background(.tint.opacity(0.12), in: Circle())
                     }
                 }
             }
             .fileImporter(
                 isPresented: $isImporterPresented,
-                allowedContentTypes: [UTType(filenameExtension: "gpx")!, UTType(filenameExtension: "geojson")!, .json],
+                allowedContentTypes: [
+                    UTType(filenameExtension: "gpx")!,
+                    UTType(filenameExtension: "geojson")!,
+                    .json
+                ],
                 allowsMultipleSelection: false
             ) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first { Task { await routeStore.importRoute(from: url) } }
-                case .failure:
-                    routeStore.lastImportMessage = "Import cancelled"
+                if case .success(let urls) = result, let url = urls.first {
+                    Task { await routeStore.importRoute(from: url) }
                 }
             }
-            .overlay {
-                if routeStore.routes.isEmpty {
-                    VStack(spacing: 20) {
-                        ZStack {
-                            Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
-                            Image(systemName: "map").font(.system(size: 30)).foregroundStyle(.secondary)
-                        }
-                        VStack(spacing: 6) {
-                            Text("No routes yet").font(.title3.bold())
-                            Text("Import a GPX or GeoJSON file, or use the Plan tab to build one.")
-                                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                        }
-                        Button { isImporterPresented = true } label: {
-                            Label("Import a Route", systemImage: "square.and.arrow.down")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 20).padding(.vertical, 12)
-                                .background(.blue, in: Capsule()).foregroundStyle(.white)
-                        }
-                    }.padding()
-                }
-            }
-            // ── Navigate to Plan tab with the route pre-loaded ──
             .navigationDestination(item: $routeToEdit) { route in
                 PlanView(switchToRide: {}, switchToRoutes: {}, preloadRoute: route)
                     .navigationTitle("Edit: \(route.name)")
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .alert("VeloGPX", isPresented: .constant(routeStore.lastImportMessage != nil), actions: {
-            Button("OK") { routeStore.lastImportMessage = nil }
-        }, message: {
-            Text(routeStore.lastImportMessage ?? "")
-        })
+        .alert("VeloGPX",
+               isPresented: .constant(routeStore.lastImportMessage != nil),
+               actions: { Button("OK") { routeStore.lastImportMessage = nil } },
+               message: { Text(routeStore.lastImportMessage ?? "") })
+    }
+
+    // MARK: - Route List
+    // swipeActions ONLY work on List rows — LazyVStack/ScrollView rows silently ignore them.
+
+    private var routeList: some View {
+        List {
+            ForEach(routeStore.routes) { route in
+                let isSelected = routeStore.selectedRoute?.id == route.id
+
+                NavigationLink {
+                    RouteDetailView(route: route)
+                } label: {
+                    RouteRow(route: route, isActive: isSelected)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                .listRowSeparator(.hidden)
+
+                // ── Trailing: Delete ──
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        routeStore.deleteRoute(route)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+
+                // ── Leading: Ride (full-swipe) + Edit in Plan ──
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        withAnimation(.spring(duration: 0.3)) {
+                            routeStore.selectedRoute = route
+                        }
+                    } label: {
+                        Label("Ride", systemImage: "bicycle")
+                    }
+                    .tint(.blue)
+
+                    Button {
+                        routeToEdit = route
+                    } label: {
+                        Label("Plan", systemImage: "pencil.and.map")
+                    }
+                    .tint(.purple)
+                }
+
+                .contextMenu {
+                    Button {
+                        withAnimation { routeStore.selectedRoute = route }
+                    } label: {
+                        Label("Ride This Route", systemImage: "bicycle")
+                    }
+                    Button {
+                        routeToEdit = route
+                    } label: {
+                        Label("Edit in Plan", systemImage: "pencil.and.map")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        routeStore.deleteRoute(route)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
+                Image(systemName: "map")
+                    .font(.system(size: 30)).foregroundStyle(.secondary)
+            }
+            VStack(spacing: 6) {
+                Text("No routes yet").font(.title3.bold())
+                Text("Import a GPX or GeoJSON, or use the Plan tab to build one.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Button { isImporterPresented = true } label: {
+                Label("Import a Route", systemImage: "square.and.arrow.down")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+                    .background(.blue, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
     }
 }
 
-// MARK: - Route Card
-// (unchanged - kept as-is)
+// MARK: - Route Row
 
-private struct RouteCard: View {
+private struct RouteRow: View {
     let route: RouteModel
     let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
+            // Icon badge
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isActive ? iconTint.opacity(0.18) : iconTint.opacity(0.10))
-                    .frame(width: 52, height: 52)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(iconTint.opacity(isActive ? 0.18 : 0.10))
+                    .frame(width: 44, height: 44)
                 Image(systemName: routeIcon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 19))
                     .foregroundStyle(isActive ? iconTint : iconTint.opacity(0.7))
             }
-            VStack(alignment: .leading, spacing: 6) {
+
+            // Text
+            VStack(alignment: .leading, spacing: 4) {
                 Text(route.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                HStack(spacing: 6) {
-                    StatBadge(icon: "arrow.left.and.right", value: String(format: "%.1f km", route.totalDistance / 1000))
-                    StatBadge(icon: "mountain.2", value: String(format: "%.0f m \u{2191}", route.elevationGain))
-                    formatBadge
+
+                HStack(spacing: 5) {
+                    PillBadge(icon: "arrow.left.and.right",
+                              label: String(format: "%.1f km", route.totalDistance / 1000))
+                    PillBadge(icon: "mountain.2",
+                              label: String(format: "%.0f m", route.elevationGain))
+                    if isPlanned {
+                        PillBadge(icon: "map.fill", label: "PLANNED", tint: .purple)
+                    } else {
+                        PillBadge(icon: "doc", label: route.sourceFormat.rawValue.uppercased())
+                    }
                 }
             }
+
             Spacer()
+
+            // Active indicator / chevron
             if isActive {
                 ZStack {
-                    Circle().fill(.blue).frame(width: 26, height: 26)
-                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
-                }.transition(.scale.combined(with: .opacity))
+                    Circle().fill(.blue).frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                }
+                .transition(.scale.combined(with: .opacity))
             } else {
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
             }
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16)
-            .strokeBorder(isActive ? Color.blue.opacity(0.45) : Color.clear, lineWidth: 1.5))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    isActive ? Color.blue.opacity(0.4) : Color.clear,
+                    lineWidth: 1.5
+                )
+        }
         .animation(.spring(duration: 0.25), value: isActive)
     }
 
-    private var isPlanned: Bool { route.sourceFormat == .planned }
+    private var isPlanned: Bool   { route.sourceFormat == .planned }
     private var routeIcon: String { isPlanned ? "map.fill" : "figure.outdoor.cycle" }
-    private var iconTint: Color { isPlanned ? .purple : .blue }
-
-    @ViewBuilder private var formatBadge: some View {
-        if isPlanned {
-            HStack(spacing: 3) {
-                Image(systemName: "map.fill").font(.system(size: 9, weight: .semibold))
-                Text("PLANNED").font(.system(size: 11, weight: .medium))
-            }
-            .foregroundStyle(.white).padding(.horizontal, 7).padding(.vertical, 4)
-            .background(.purple, in: Capsule())
-        } else {
-            StatBadge(icon: "doc", value: route.sourceFormat.rawValue.uppercased())
-        }
-    }
+    private var iconTint: Color   { isPlanned ? .purple : .blue }
 }
 
-private struct StatBadge: View {
-    let icon: String; let value: String
+// MARK: - Pill Badge
+
+private struct PillBadge: View {
+    let icon: String
+    let label: String
+    var tint: Color = .secondary
+
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 9, weight: .semibold))
-            Text(value).font(.system(size: 11, weight: .medium))
+            Text(label).font(.system(size: 10, weight: .medium))
         }
-        .foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 4)
-        .background(Color(.systemGray5), in: Capsule())
+        .foregroundStyle(tint == .secondary ? .secondary : .white)
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .background(
+            tint == .secondary
+                ? AnyShapeStyle(Color(.systemGray5))
+                : AnyShapeStyle(tint),
+            in: Capsule()
+        )
     }
 }

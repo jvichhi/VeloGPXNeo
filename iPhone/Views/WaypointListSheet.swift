@@ -2,8 +2,9 @@
 //  WaypointListSheet.swift
 //  VeloGPX
 //
-//  Embedded in PlanView's bottom drawer — NOT presented as a .sheet.
-//  No NavigationStack here; PlanView owns the chrome.
+//  Embedded in PlanView's bottom drawer — NOT a .sheet presentation.
+//  Height is controlled by PlanView's drawerHeight state; this view
+//  must NOT stretch beyond its given space.
 //
 
 import SwiftUI
@@ -44,10 +45,26 @@ struct WaypointListSheet: View {
 
     private var planningContent: some View {
         VStack(spacing: 0) {
-            // Title row
-            HStack {
-                Text("Plan Route")
-                    .font(.headline)
+
+            // ── Header row: title + stats + clear ──
+            HStack(alignment: .center, spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plan Route")
+                        .font(.headline)
+                    // Inline stats — no extra summaryBar section
+                    HStack(spacing: 10) {
+                        Label(distanceString, systemImage: "arrow.left.and.right")
+                        Label(elevationString, systemImage: "mountain.2")
+                        if plan.isRouting {
+                            HStack(spacing: 3) {
+                                ProgressView().scaleEffect(0.65)
+                                Text("Routing").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(plan.waypoints.isEmpty ? .tertiary : .secondary)
+                }
                 Spacer()
                 Button {
                     plan.clearAll()
@@ -59,14 +76,12 @@ struct WaypointListSheet: View {
                 .disabled(plan.waypoints.isEmpty)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 6)
-
-            summaryBar
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
 
             Divider()
 
+            // ── Waypoint list or empty hint ──
             if plan.waypoints.isEmpty {
                 emptyPrompt
             } else {
@@ -75,100 +90,43 @@ struct WaypointListSheet: View {
 
             Divider()
 
+            // ── Close Loop toggle ──
             closeLoopRow
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
 
             Divider()
 
+            // ── Save / Ride Now ──
             actionRow
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
         }
-    }
-
-    // MARK: - Post-Save Confirmation
-
-    private func savedConfirmation(name: String) -> some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.green)
-            Text("\"\(name)\"")
-                .font(.headline)
-                .multilineTextAlignment(.center)
-            Text("Saved to your library")
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
-            VStack(spacing: 10) {
-                Button {
-                    onGoToRoutes()
-                } label: {
-                    Label("View in Routes", systemImage: "list.bullet")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(Color.white)
-                }
-                Button {
-                    savedRouteName = nil
-                    onPlanAnother()
-                } label: {
-                    Label("Plan Another", systemImage: "plus.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(Color.primary)
-                }
-            }
-            .padding(.horizontal, 20)
-            Spacer()
-        }
-    }
-
-    // MARK: - Summary Bar
-
-    private var summaryBar: some View {
-        HStack(spacing: 16) {
-            Label(distanceString, systemImage: "arrow.left.and.right")
-                .font(.subheadline.weight(.semibold))
-            Label(elevationString, systemImage: "mountain.2")
-                .font(.subheadline.weight(.semibold))
-            if plan.isRouting {
-                HStack(spacing: 4) {
-                    ProgressView().scaleEffect(0.7)
-                    Text("Routing...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-        }
-        .foregroundStyle(plan.waypoints.isEmpty ? Color.secondary : Color.primary)
     }
 
     // MARK: - Waypoint List
+    // Capped height so it doesn't bloat the drawer. List has
+    // internal scroll; the drawer itself handles full-height drag.
 
     private var waypointList: some View {
         List {
             ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(wp.name ?? coordinateLabel(wp.coordinate))
                             .font(.subheadline)
                             .lineLimit(1)
                         Text(coordinateLabel(wp.coordinate))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                     Spacer()
                 }
-                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
+                .listRowBackground(Color.clear)
+                .listRowSeparatorTint(.separator.opacity(0.5))
             }
             .onDelete { offsets in
                 let ids = offsets.map { plan.waypoints[$0].id }
@@ -181,47 +139,53 @@ struct WaypointListSheet: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(.active))
+        // Cap list height — drawer drag handles expansion beyond this
+        .frame(maxHeight: CGFloat(min(plan.waypoints.count, 5)) * 52)
     }
 
     // MARK: - Empty Prompt
 
     private var emptyPrompt: some View {
-        HStack {
+        HStack(spacing: 8) {
             Image(systemName: "mappin.and.ellipse")
                 .foregroundStyle(.secondary)
             Text("Tap the map to drop waypoints")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 11)
     }
 
     // MARK: - Close Loop Row
 
     private var closeLoopRow: some View {
-        HStack {
+        HStack(spacing: 10) {
             Image(systemName: plan.isLoopClosed
                     ? "arrow.triangle.turn.up.right.circle.fill"
                     : "arrow.triangle.turn.up.right.circle")
                 .foregroundStyle(plan.isLoopClosed ? Color.blue : Color.secondary)
-                .font(.system(size: 20))
+                .font(.system(size: 18))
+
             VStack(alignment: .leading, spacing: 1) {
                 Text("Close Loop")
                     .font(.subheadline.weight(.medium))
-                if plan.isLoopClosed, let loopSeg = plan.segments.first(where: { $0.isLoop }) {
-                    Text("Return: " + formatDistance(loopSeg.distance))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Add a return leg to the start")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Group {
+                    if plan.isLoopClosed, let loopSeg = plan.segments.first(where: { $0.isLoop }) {
+                        Text("Return: " + formatDistance(loopSeg.distance))
+                    } else {
+                        Text("Return leg back to start")
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
+
             Spacer()
+
             Toggle("", isOn: Binding(
                 get: { plan.isLoopClosed },
                 set: { _ in
@@ -237,7 +201,8 @@ struct WaypointListSheet: View {
     // MARK: - Action Row
 
     private var actionRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            // Save
             Button {
                 routeName = PlanState.autoName()
                 showSaveAlert = true
@@ -245,12 +210,13 @@ struct WaypointListSheet: View {
                 Label("Save", systemImage: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(plan.isRideable ? Color.primary : Color.secondary)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(plan.isRideable ? .primary : .secondary)
             }
             .disabled(!plan.isRideable)
 
+            // Ride Now
             Button {
                 let route = plan.buildRouteModel(name: PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
@@ -259,15 +225,59 @@ struct WaypointListSheet: View {
                 Label("Ride Now", systemImage: "bicycle")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
+                    .padding(.vertical, 12)
                     .background(
-                        plan.isRideable ? Color.blue : Color(.systemGray4),
+                        plan.isRideable ? AnyShapeStyle(Color.blue) : AnyShapeStyle(Color(.systemGray4)),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(.white)
             }
             .disabled(!plan.isRideable)
         }
+    }
+
+    // MARK: - Post-Save Confirmation
+
+    private func savedConfirmation(name: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.green)
+            VStack(spacing: 4) {
+                Text("\"\(name)\"")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                Text("Saved to your library")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            VStack(spacing: 8) {
+                Button {
+                    onGoToRoutes()
+                } label: {
+                    Label("View in Routes", systemImage: "list.bullet")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                }
+                Button {
+                    savedRouteName = nil
+                    onPlanAnother()
+                } label: {
+                    Label("Plan Another", systemImage: "plus.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
     }
 
     // MARK: - Helpers
@@ -284,10 +294,10 @@ struct WaypointListSheet: View {
         ZStack {
             Circle()
                 .fill(badgeColor(index: index, total: total))
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 26)
             Text(badgeLabel(index: index, total: total))
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
         }
     }
 
@@ -318,6 +328,6 @@ struct WaypointListSheet: View {
     }
 
     private var elevationString: String {
-        String(format: "%.0f m gain", plan.totalElevationGain)
+        String(format: "%.0f m↑", plan.totalElevationGain)
     }
 }
