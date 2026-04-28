@@ -194,9 +194,11 @@ struct RideView: View {
             .padding(.bottom, 12)
         }
         .sheet(isPresented: $showNearbySheet) {
-            NearbySearchSheet()
-                .environmentObject(routeStore)
-                .environmentObject(rideStore)
+            NearbySearchSheet(
+                coordinate: rideStore.rideState.currentCoordinate?.clCoordinate
+                    ?? CLLocationCoordinate2D()
+            )
+            .environmentObject(routeStore)
         }
     }
 
@@ -448,7 +450,7 @@ struct RideView: View {
         guard let progress = rideStore.routeProgress else { return route.totalDistance }
         return progress.remaining.isEmpty ? 0 :
             zip(progress.remaining, progress.remaining.dropFirst())
-                .reduce(0) { $0 + $1.0.distance(from: $1.1) }
+                .reduce(0) { $0 + $1.0.distance(to: $1.1) }
     }
 
     private func formatDistance(_ metres: CLLocationDistance) -> String {
