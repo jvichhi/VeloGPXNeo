@@ -129,17 +129,24 @@ struct RideView: View {
                         }
                     }
 
-                    Button {
-                        rideStore.start(route: route, pois: routeStore.selectedPOIs)
-                    } label: {
-                        Text("Start Ride")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(.blue, in: RoundedRectangle(cornerRadius: 14))
-                            .foregroundStyle(Color.white)
+                    VStack(spacing: 6) {
+                        Button {
+                            rideStore.start(route: route, pois: routeStore.selectedPOIs)
+                        } label: {
+                            Text("Start Ride")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(.blue, in: RoundedRectangle(cornerRadius: 14))
+                                .foregroundStyle(Color.white)
+                        }
+
+                        if rideStore.rideState.currentCoordinate == nil {
+                            Label("Waiting for GPS…", systemImage: "location.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .disabled(rideStore.rideState.currentCoordinate == nil)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
