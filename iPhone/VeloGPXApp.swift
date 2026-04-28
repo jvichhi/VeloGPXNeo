@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct VeloGPXApp: App {
     @StateObject private var routeStore   = RouteStore()
     @StateObject private var historyStore = RideHistoryStore()
+    @StateObject private var rideStore    = RideSessionStore()
     @StateObject private var lm           = LocalizationManager.shared
 
     var body: some Scene {
@@ -13,6 +14,7 @@ struct VeloGPXApp: App {
             RootView()
                 .environmentObject(routeStore)
                 .environmentObject(historyStore)
+                .environmentObject(rideStore)
                 .environmentObject(lm)
                 // Inject locale so SwiftUI Text(), formatters, and
                 // date/number formatting all use the selected language.
