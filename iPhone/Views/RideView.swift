@@ -153,7 +153,7 @@ struct RideView: View {
             fitCameraToRoute(route)
         }
         .sheet(isPresented: $showDiscoverySheet) {
-            POIDiscoverySheet()
+            POIDiscoverySheet(route: route)
                 .environmentObject(routeStore)
         }
     }
