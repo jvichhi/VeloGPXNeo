@@ -150,8 +150,6 @@ struct PlanView: View {
     }
 
     // MARK: - Map
-    // Promoted to func so geo.safeAreaInsets.top is accessible for
-    // pushing map controls below the status bar.
 
     private func mapLayer(geo: GeometryProxy) -> some View {
         MapReader { proxy in
@@ -185,10 +183,12 @@ struct PlanView: View {
                 MapCompass()
                 MapPitchToggle()
             }
-            // Push MapKit's built-in controls below the status bar.
-            // The map canvas itself still bleeds full-screen via .ignoresSafeArea()
-            // on the caller — this only affects the control widget positions.
-            .safeAreaPadding(.top, geo.safeAreaInsets.top)
+            // NOTE: No .safeAreaPadding here. MapKit's native controls
+            // (MapUserLocationButton, MapCompass, MapPitchToggle) already
+            // position themselves inside the safe area automatically.
+            // Adding .safeAreaPadding(.top, ...) to the Map shifts the
+            // MapKit rendering viewport, which corrupts proxy.convert()
+            // and causes dropped waypoints to land below the tap point.
             .onTapGesture { screenPoint in
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
                 let before = plan.waypoints.count
