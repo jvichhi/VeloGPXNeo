@@ -13,11 +13,12 @@ public struct RideSummary: Identifiable, Sendable {
     public let endDate: Date
 
     // Stats
-    public let totalDistance: Double       // metres
-    public let elevationGain: Double       // metres
-    public let elevationLoss: Double       // metres
-    public let maxSpeed: Double            // m/s
-    public let elapsedTime: TimeInterval
+    public let totalDistance: Double        // metres
+    public let elevationGain: Double        // metres
+    public let elevationLoss: Double        // metres
+    public let maxSpeed: Double             // m/s
+    public let elapsedTime: TimeInterval    // wall-clock total (includes pauses)
+    public let movingTime: TimeInterval     // elapsedTime − pausedDuration
 
     // Tracks
     /// Actual GPS breadcrumb trail recorded during the ride
@@ -39,6 +40,7 @@ public struct RideSummary: Identifiable, Sendable {
         elevationLoss: Double = 0,
         maxSpeed: Double,
         elapsedTime: TimeInterval,
+        movingTime: TimeInterval? = nil,
         actualTrack: [CLLocationCoordinate2D],
         plannedTrack: [CLLocationCoordinate2D],
         pois: [POIModel]
@@ -52,6 +54,8 @@ public struct RideSummary: Identifiable, Sendable {
         self.elevationLoss = elevationLoss
         self.maxSpeed = maxSpeed
         self.elapsedTime = elapsedTime
+        // If no movingTime supplied (e.g. old call sites), fall back to elapsedTime.
+        self.movingTime = movingTime ?? elapsedTime
         self.actualTrack = actualTrack
         self.plannedTrack = plannedTrack
         self.pois = pois
@@ -61,8 +65,13 @@ public struct RideSummary: Identifiable, Sendable {
 
     public var distanceKm: Double { totalDistance / 1000 }
     public var maxSpeedKmh: Double { maxSpeed * 3.6 }
+
+    /// Average speed based on moving time only — excludes paused segments.
     public var avgSpeedKmh: Double {
-        guard elapsedTime > 0 else { return 0 }
-        return (totalDistance / elapsedTime) * 3.6
+        guard movingTime > 0 else { return 0 }
+        return (totalDistance / movingTime) * 3.6
     }
+
+    /// True if the rider paused at least once during this ride.
+    public var hadPauses: Bool { movingTime < elapsedTime - 1 }
 }
