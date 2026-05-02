@@ -10,6 +10,12 @@ final class RouteStore: ObservableObject {
     @Published var selectedPOIs: [POIModel] = []
     @Published var lastImportMessage: String?
 
+    // Tab navigation: set this to .plan (with routeToEditInPlan) to deep-link
+    // from any view into the Plan tab without needing a NavigationStack push.
+    @Published var selectedTab: AppTab = .routes
+    // When non-nil, PlanView preloads this route on appear then clears it.
+    @Published var routeToEditInPlan: RouteModel? = nil
+
     private let directoryName = "ImportedRoutes"
     // Bug 1 fix: sidecar directory for per-route POI persistence.
     private let poisDirectoryName = "RoutePOIs"

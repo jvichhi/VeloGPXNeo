@@ -7,18 +7,17 @@ enum AppTab: Int {
 struct RootView: View {
     @EnvironmentObject private var lm: LocalizationManager
     @EnvironmentObject private var routeStore: RouteStore
-    @State private var selectedTab: AppTab = .routes
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $routeStore.selectedTab) {
 
             RouteLibraryView()
                 .tabItem { Label("Routes".localized, systemImage: "map") }
                 .tag(AppTab.routes)
 
             PlanView(
-                switchToRide: { selectedTab = .ride },
-                switchToRoutes: { selectedTab = .routes }
+                switchToRide: { routeStore.selectedTab = .ride },
+                switchToRoutes: { routeStore.selectedTab = .routes }
             )
             .tabItem { Label("Plan".localized, systemImage: "map.fill") }
             .tag(AppTab.plan)
@@ -36,12 +35,17 @@ struct RootView: View {
                 .tag(AppTab.settings)
         }
         .id(lm.currentLanguage)
-        // Bug 1 fix: whenever the selected route changes, reload its persisted POIs
-        // so that previously saved POIs are restored on app relaunch.
-        .onChange(of: routeStore.selectedRoute?.id) { _, newID in
-            guard let route = routeStore.selectedRoute else {
-                return
+        // When routeToEditInPlan is set (e.g. from Routes "Plan" swipe action
+        // or context menu), switch to the Plan tab. PlanView reads and clears
+        // routeToEditInPlan in its own .task so there is no timing race.
+        .onChange(of: routeStore.routeToEditInPlan) { _, route in
+            if route != nil {
+                routeStore.selectedTab = .plan
             }
+        }
+        // Reload persisted POIs whenever the selected route changes.
+        .onChange(of: routeStore.selectedRoute?.id) { _, _ in
+            guard let route = routeStore.selectedRoute else { return }
             routeStore.loadPOIs(forRoute: route)
         }
     }

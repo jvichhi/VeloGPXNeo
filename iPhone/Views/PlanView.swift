@@ -19,6 +19,8 @@ struct PlanView: View {
 
     var switchToRide: () -> Void = {}
     var switchToRoutes: () -> Void = {}
+    // preloadRoute is kept for direct instantiation (e.g. tests, previews).
+    // In production the tab flow uses routeStore.routeToEditInPlan instead.
     var preloadRoute: RouteModel? = nil
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -50,8 +52,26 @@ struct PlanView: View {
         }
         .ignoresSafeArea(edges: .bottom)
         .task {
-            if let route = preloadRoute {
+            // Prefer the store-driven deep-link route; fall back to the
+            // direct preloadRoute param (tests / previews).
+            let routeToLoad = routeStore.routeToEditInPlan ?? preloadRoute
+            if let route = routeToLoad {
                 await plan.loadFrom(route: route)
+                // Clear the pending edit request so re-appearing the tab
+                // later doesn't reload the same route unexpectedly.
+                routeStore.routeToEditInPlan = nil
+                withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
+                    drawerHeight = kDrawerMedium
+                }
+            }
+        }
+        // Respond to a new routeToEditInPlan set while PlanView is already
+        // on screen (tab was already active, user swipes Plan on a second route).
+        .onChange(of: routeStore.routeToEditInPlan) { _, route in
+            guard let route else { return }
+            Task {
+                await plan.loadFrom(route: route)
+                routeStore.routeToEditInPlan = nil
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
                 }
