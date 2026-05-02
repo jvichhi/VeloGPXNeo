@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
-    @State private var routeToEdit: RouteModel? = nil
 
     var body: some View {
         NavigationStack {
@@ -40,11 +39,10 @@ struct RouteLibraryView: View {
                     Task { await routeStore.importRoute(from: url) }
                 }
             }
-            .navigationDestination(item: $routeToEdit) { route in
-                PlanView(switchToRide: {}, switchToRoutes: {}, preloadRoute: route)
-                    .navigationTitle("Edit: \(route.name)")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
+            // navigationDestination(item: $routeToEdit) removed — the Plan
+            // swipe/context actions now set routeStore.routeToEditInPlan, which
+            // triggers RootView to switch to the Plan tab. PlanView picks it up
+            // via its own .task { plan.loadFrom(route:) }.
         }
         .alert("VeloGPX",
                isPresented: .constant(routeStore.lastImportMessage != nil),
@@ -90,7 +88,7 @@ struct RouteLibraryView: View {
                     .tint(.blue)
 
                     Button {
-                        routeToEdit = route
+                        routeStore.routeToEditInPlan = route
                     } label: {
                         Label("Plan", systemImage: "pencil.and.map")
                     }
@@ -104,7 +102,7 @@ struct RouteLibraryView: View {
                         Label("Ride This Route", systemImage: "bicycle")
                     }
                     Button {
-                        routeToEdit = route
+                        routeStore.routeToEditInPlan = route
                     } label: {
                         Label("Edit in Plan", systemImage: "pencil.and.map")
                     }
