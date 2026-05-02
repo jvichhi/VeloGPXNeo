@@ -7,7 +7,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-private let kDrawerPeek:   CGFloat = 88   // handle(15) + header(~58) + buffer(15)
+private let kDrawerPeek:   CGFloat = 88
 private let kDrawerMedium: CGFloat = 320
 
 struct PlanView: View {
@@ -22,6 +22,7 @@ struct PlanView: View {
     var preloadRoute: RouteModel? = nil
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var isPitchEnabled: Bool = true
     @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
 
@@ -30,12 +31,18 @@ struct PlanView: View {
             ZStack(alignment: .bottom) {
 
                 // Map fills entire screen — bleeds behind status bar AND tab bar.
-                // .ignoresSafeArea() is on the map layer only so the ZStack
-                // still respects the tab bar safe area; the drawer therefore
-                // stops naturally above the tab bar without extra math.
+                // .ignoresSafeArea() scoped to mapLayer only; ZStack still respects
+                // the tab bar safe area so the drawer stops above it naturally.
                 mapLayer(geo: geo)
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Map control buttons — plain SwiftUI overlay, safe-area-aware.
+                // Native MapKit controls (MapUserLocationButton etc.) are NOT used
+                // outside .mapControls{} — they are undocumented in that position
+                // and may be inert on device. Plain buttons are fully reliable.
+                mapControlsOverlay(geo: geo)
+                    .zIndex(5)
 
                 // Floating error banner
                 if showErrorBanner, let err = plan.routingError {
@@ -50,8 +57,6 @@ struct PlanView: View {
                 drawerCard(geo: geo)
                     .zIndex(10)
             }
-            // ZStack intentionally does NOT have .ignoresSafeArea(edges: .bottom).
-            // Removing it is what keeps the drawer above the tab bar.
         }
         .task {
             let routeToLoad = routeStore.routeToEditInPlan ?? preloadRoute
@@ -80,6 +85,90 @@ struct PlanView: View {
                     try? await Task.sleep(for: .seconds(3))
                     withAnimation { showErrorBanner = false }
                     plan.routingError = nil
+                }
+            }
+        }
+    }
+
+    // MARK: - Map Controls Overlay
+
+    private func mapControlsOverlay(geo: GeometryProxy) -> some View {
+        VStack(spacing: 10) {
+            // Re-centre on user location
+            Button {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    position = .userLocation(fallback: .automatic)
+                }
+            } label: {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 42, height: 42)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            }
+            .accessibilityLabel("Re-centre map on my location")
+
+            // 3D / Flat pitch toggle
+            Button {
+                isPitchEnabled.toggle()
+            } label: {
+                Image(systemName: isPitchEnabled ? "view.3d" : "map")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 42, height: 42)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            }
+            .accessibilityLabel(isPitchEnabled ? "Switch to flat map" : "Switch to 3D map")
+        }
+        .padding(.top, geo.safeAreaInsets.top + 8)
+        .padding(.trailing, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        // Allow taps on buttons but pass map taps through transparent areas
+        .allowsHitTesting(true)
+    }
+
+    // MARK: - Map
+
+    private func mapLayer(geo: GeometryProxy) -> some View {
+        MapReader { proxy in
+            Map(position: $position) {
+                if !plan.routePolyline.isEmpty {
+                    MapPolyline(coordinates: plan.routePolyline)
+                        .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                }
+                if plan.isLoopClosed && !plan.loopPolyline.isEmpty {
+                    MapPolyline(coordinates: plan.loopPolyline)
+                        .stroke(.blue.opacity(0.55),
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [8, 6]))
+                }
+
+                let routeExists = !plan.routePolyline.isEmpty
+                ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
+                    let isStartOrEnd = index == 0 || index == plan.waypoints.count - 1
+                    if !routeExists || isStartOrEnd {
+                        Annotation("", coordinate: wp.coordinate, anchor: .center) {
+                            WaypointPin(index: index, total: plan.waypoints.count,
+                                        isLoopClosed: plan.isLoopClosed, name: wp.name)
+                        }
+                    }
+                }
+
+                UserAnnotation()
+            }
+            .mapStyle(isPitchEnabled
+                ? .standard(elevation: .realistic)
+                : .standard(elevation: .flat)
+            )
+            // Hide all native MapKit controls — replaced by mapControlsOverlay.
+            // Do NOT add .safeAreaPadding or any inset here: any viewport inset
+            // corrupts proxy.convert() and shifts waypoint drop coordinates.
+            .mapControlVisibility(.hidden)
+            .onTapGesture { screenPoint in
+                guard let coord = proxy.convert(screenPoint, from: .local) else { return }
+                let before = plan.waypoints.count
+                plan.addWaypoint(coord)
+                if before >= 1 {
+                    Task { await engine.refreshSegments(in: plan, affectedWaypointIndices: [before]) }
                 }
             }
         }
@@ -145,57 +234,6 @@ struct PlanView: View {
         .onTapGesture {
             if drawerHeight <= kDrawerPeek {
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
-            }
-        }
-    }
-
-    // MARK: - Map
-
-    private func mapLayer(geo: GeometryProxy) -> some View {
-        MapReader { proxy in
-            Map(position: $position) {
-                if !plan.routePolyline.isEmpty {
-                    MapPolyline(coordinates: plan.routePolyline)
-                        .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-                }
-                if plan.isLoopClosed && !plan.loopPolyline.isEmpty {
-                    MapPolyline(coordinates: plan.loopPolyline)
-                        .stroke(.blue.opacity(0.55),
-                                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [8, 6]))
-                }
-
-                let routeExists = !plan.routePolyline.isEmpty
-                ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
-                    let isStartOrEnd = index == 0 || index == plan.waypoints.count - 1
-                    if !routeExists || isStartOrEnd {
-                        Annotation("", coordinate: wp.coordinate, anchor: .center) {
-                            WaypointPin(index: index, total: plan.waypoints.count,
-                                        isLoopClosed: plan.isLoopClosed, name: wp.name)
-                        }
-                    }
-                }
-
-                UserAnnotation()
-            }
-            .mapStyle(.standard(elevation: .realistic))
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-                MapPitchToggle()
-            }
-            // NOTE: No .safeAreaPadding here. MapKit's native controls
-            // (MapUserLocationButton, MapCompass, MapPitchToggle) already
-            // position themselves inside the safe area automatically.
-            // Adding .safeAreaPadding(.top, ...) to the Map shifts the
-            // MapKit rendering viewport, which corrupts proxy.convert()
-            // and causes dropped waypoints to land below the tap point.
-            .onTapGesture { screenPoint in
-                guard let coord = proxy.convert(screenPoint, from: .local) else { return }
-                let before = plan.waypoints.count
-                plan.addWaypoint(coord)
-                if before >= 1 {
-                    Task { await engine.refreshSegments(in: plan, affectedWaypointIndices: [before]) }
-                }
             }
         }
     }
