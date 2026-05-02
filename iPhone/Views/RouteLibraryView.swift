@@ -39,10 +39,6 @@ struct RouteLibraryView: View {
                     Task { await routeStore.importRoute(from: url) }
                 }
             }
-            // navigationDestination(item: $routeToEdit) removed — the Plan
-            // swipe/context actions now set routeStore.routeToEditInPlan, which
-            // triggers RootView to switch to the Plan tab. PlanView picks it up
-            // via its own .task { plan.loadFrom(route:) }.
         }
         .alert("VeloGPX",
                isPresented: .constant(routeStore.lastImportMessage != nil),
@@ -57,6 +53,7 @@ struct RouteLibraryView: View {
         List {
             ForEach(routeStore.routes) { route in
                 let isSelected = routeStore.selectedRoute?.id == route.id
+                let isPlanned  = route.sourceFormat == .planned
 
                 NavigationLink {
                     RouteDetailView(route: route)
@@ -76,7 +73,7 @@ struct RouteLibraryView: View {
                     }
                 }
 
-                // ── Leading: Ride (full-swipe) + Plan ──
+                // ── Leading: Ride (full-swipe) + Plan (planned routes only) ──
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
                         withAnimation(.spring(duration: 0.3)) {
@@ -87,12 +84,14 @@ struct RouteLibraryView: View {
                     }
                     .tint(.blue)
 
-                    Button {
-                        routeStore.routeToEditInPlan = route
-                    } label: {
-                        Label("Plan", systemImage: "pencil.and.map")
+                    if isPlanned {
+                        Button {
+                            routeStore.routeToEditInPlan = route
+                        } label: {
+                            Label("Plan", systemImage: "pencil.and.map")
+                        }
+                        .tint(.purple)
                     }
-                    .tint(.purple)
                 }
 
                 .contextMenu {
@@ -101,10 +100,12 @@ struct RouteLibraryView: View {
                     } label: {
                         Label("Ride This Route", systemImage: "bicycle")
                     }
-                    Button {
-                        routeStore.routeToEditInPlan = route
-                    } label: {
-                        Label("Edit in Plan", systemImage: "pencil.and.map")
+                    if isPlanned {
+                        Button {
+                            routeStore.routeToEditInPlan = route
+                        } label: {
+                            Label("Edit in Plan", systemImage: "pencil.and.map")
+                        }
                     }
                     Divider()
                     Button(role: .destructive) {
@@ -125,7 +126,7 @@ struct RouteLibraryView: View {
         VStack(spacing: 20) {
             ZStack {
                 Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
-                Image(systemName: "map")
+                Image(systemName: "list.bullet.below.rectangle")
                     .font(.system(size: 30)).foregroundStyle(.secondary)
             }
             VStack(spacing: 6) {

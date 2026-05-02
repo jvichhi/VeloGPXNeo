@@ -12,7 +12,7 @@ struct RootView: View {
         TabView(selection: $routeStore.selectedTab) {
 
             RouteLibraryView()
-                .tabItem { Label("Routes".localized, systemImage: "map") }
+                .tabItem { Label("Routes".localized, systemImage: "list.bullet.below.rectangle") }
                 .tag(AppTab.routes)
 
             PlanView(
