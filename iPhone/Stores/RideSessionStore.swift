@@ -55,9 +55,14 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         manager.distanceFilter = 5
-        manager.pausesLocationUpdatesAutomatically = false
+        // Allow iOS to pause updates when the user isn't moving — saves GPS power.
+        // Overridden to false only during an active ride so tracking stays continuous.
+        manager.pausesLocationUpdatesAutomatically = true
+        // Background location is OFF by default. Enabled only in start() and
+        // disabled again in stop()/stopAndBuildSummary() so the GPS radio doesn't
+        // run while the app is backgrounded between rides.
         #if !targetEnvironment(simulator)
-        manager.allowsBackgroundLocationUpdates = true
+        manager.allowsBackgroundLocationUpdates = false
         #endif
         if WCSession.isSupported() {
             WCSession.default.delegate = self
@@ -85,6 +90,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.breadcrumbs = []
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
+        // Enable continuous background GPS only for the duration of the ride.
+        #if !targetEnvironment(simulator)
+        manager.allowsBackgroundLocationUpdates = true
+        #endif
+        manager.pausesLocationUpdatesAutomatically = false
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
     }
@@ -106,12 +116,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     @discardableResult
     func stopAndBuildSummary() -> RideSummary? {
-        UIApplication.shared.isIdleTimerDisabled = false
-        manager.stopUpdatingLocation()
-        manager.stopUpdatingHeading()
-        rideState.isActive = false
-        reroutePolyline = []
-        sendWatchUpdate()
+        endLocationUpdates()
 
         guard let route, let startTime else { return nil }
         let summary = RideSummary(
@@ -132,16 +137,27 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func stop() {
-        UIApplication.shared.isIdleTimerDisabled = false
-        manager.stopUpdatingLocation()
-        manager.stopUpdatingHeading()
-        rideState.isActive = false
-        reroutePolyline = []
-        sendWatchUpdate()
+        endLocationUpdates()
     }
 
     func setHistoryStore(_ store: RideHistoryStore) {
         historyStore = store
+    }
+
+    // MARK: - Private stop helper
+    // Single place to shut down GPS so stop() and stopAndBuildSummary() stay in sync.
+    private func endLocationUpdates() {
+        UIApplication.shared.isIdleTimerDisabled = false
+        manager.stopUpdatingLocation()
+        manager.stopUpdatingHeading()
+        // Return to battery-friendly defaults immediately.
+        #if !targetEnvironment(simulator)
+        manager.allowsBackgroundLocationUpdates = false
+        #endif
+        manager.pausesLocationUpdatesAutomatically = true
+        rideState.isActive = false
+        reroutePolyline = []
+        sendWatchUpdate()
     }
 
     // MARK: - Location
