@@ -66,7 +66,9 @@ struct RideView: View {
             }
         }
         .onChange(of: rideStore.rideState.currentCoordinate) { _, newValue in
-            guard rideStore.rideState.isActive, let coord = newValue?.clCoordinate else { return }
+            guard rideStore.rideState.isActive,
+                  !rideStore.rideState.isPaused,
+                  let coord = newValue?.clCoordinate else { return }
             updateRidingCamera(to: coord)
             Task { poiSpurs = await rideStore.computeSpurs() }
         }
@@ -148,7 +150,7 @@ struct RideView: View {
                         }
 
                         if rideStore.rideState.currentCoordinate == nil {
-                            Label("Waiting for GPS\u{2026}", systemImage: "location.circle")
+                            Label("Waiting for GPS…", systemImage: "location.circle")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -174,20 +176,16 @@ struct RideView: View {
     // MARK: - Riding Layout
 
     private func ridingLayout(route: RouteModel) -> some View {
-        // ZStack with .top alignment so the floating nav banner sits at the top
-        // of the screen independently of the bottom HUD panel.
         ZStack(alignment: .top) {
             // Map fills the whole screen.
             mapLayer(route: route, topControlInset: 62)
                 .ignoresSafeArea()
 
             // Floating turn-by-turn banner — only visible when a reroute with
-            // steps is active. Sits at the top, clear of the map controls.
-            // The offRouteChip in the bottom chips row handles the <200 m
-            // "turn back" case, so the two never compete.
+            // steps is active.
             if !rideStore.rideState.rerouteSteps.isEmpty {
                 floatingNavBanner
-                    .padding(.top, 56) // clears the status bar / Dynamic Island
+                    .padding(.top, 56)
                     .padding(.horizontal, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -196,6 +194,14 @@ struct RideView: View {
             VStack(spacing: 0) {
                 Spacer()
                 VStack(spacing: 0) {
+                    // PAUSED banner — sits above the chips row when ride is paused.
+                    if rideStore.rideState.isPaused {
+                        pausedBanner
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
                     chipsRow
                         .padding(.horizontal, 12)
                         .padding(.top, 6)
@@ -219,6 +225,7 @@ struct RideView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
         .sheet(isPresented: $showNearbySheet) {
             if let loc = rideStore.currentLocation {
                 NearbySearchSheet(coordinate: loc.coordinate)
@@ -227,11 +234,26 @@ struct RideView: View {
         }
     }
 
+    // MARK: - Paused Banner
+
+    private var pausedBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "pause.circle.fill")
+                .foregroundStyle(.orange)
+                .font(.system(size: 13))
+            Text("Ride Paused")
+                .font(.system(size: 12, weight: .semibold))
+            Spacer()
+            Text(formatDuration(rideStore.rideState.movingTime) + " moving")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.orange.opacity(0.15), in: Capsule())
+    }
+
     // MARK: - Floating Nav Banner
-    //
-    // Shows the first upcoming reroute step in a Google-Maps-style card.
-    // Only present when rerouteSteps is non-empty (i.e. a full reroute is
-    // active, not just the short <200 m "turn back" nudge handled by offRouteChip).
 
     private var floatingNavBanner: some View {
         let steps = rideStore.rideState.rerouteSteps
@@ -239,14 +261,12 @@ struct RideView: View {
         let second = steps.dropFirst().first
 
         return HStack(spacing: 14) {
-            // Large turn arrow
             Image(systemName: turnArrowSymbol(for: first?.instructions))
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
                 .background(Color.orange, in: RoundedRectangle(cornerRadius: 14))
 
-            // Primary step
             VStack(alignment: .leading, spacing: 3) {
                 if let dist = first?.distanceMeters, dist > 0 {
                     Text(formatDistance(dist))
@@ -257,7 +277,6 @@ struct RideView: View {
                     .font(.system(size: 17, weight: .bold))
                     .lineLimit(2)
 
-                // Peek at next step
                 if let next = second {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.right")
@@ -273,7 +292,6 @@ struct RideView: View {
 
             Spacer()
 
-            // Rerouting spinner or step count badge
             if rideStore.rideState.isRerouting {
                 ProgressView()
             } else if steps.count > 1 {
@@ -290,7 +308,6 @@ struct RideView: View {
         .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
     }
 
-    /// Maps a step instruction string to the most appropriate SF Symbol arrow.
     private func turnArrowSymbol(for instruction: String?) -> String {
         guard let instruction = instruction?.lowercased() else { return "arrow.up" }
         if instruction.contains("left")   { return "arrow.turn.up.left" }
@@ -301,10 +318,6 @@ struct RideView: View {
     }
 
     // MARK: - Chips Row
-    // Note: rerouteStepsList is intentionally removed — the floating banner
-    // above replaces it. offRouteChip stays: it handles the short-range
-    // "you're 80 m off route, turn back" nudge, which is a different signal
-    // from a full multi-step reroute.
 
     private var chipsRow: some View {
         HStack(spacing: 8) {
@@ -314,6 +327,7 @@ struct RideView: View {
             nearbyButton
                 .disabled(rideStore.currentLocation == nil)
                 .opacity(rideStore.currentLocation == nil ? 0.4 : 1)
+            pauseResumeButton
             endRideButton
         }
     }
@@ -382,6 +396,30 @@ struct RideView: View {
         }
     }
 
+    // Pause / Resume toggle button.
+    // ⏸ grey capsule while riding → ▶ green capsule while paused.
+    private var pauseResumeButton: some View {
+        let isPaused = rideStore.rideState.isPaused
+        return Button {
+            if isPaused {
+                rideStore.resume()
+            } else {
+                rideStore.pause()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 11, weight: .bold))
+                Text(isPaused ? "Resume" : "Pause")
+                    .font(.system(size: 12, weight: .bold))
+            }
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(isPaused ? Color.green : Color.gray.opacity(0.8), in: Capsule())
+        }
+        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isPaused)
+    }
+
     private var endRideButton: some View {
         Button {
             completedSummary = rideStore.stopAndBuildSummary()
@@ -421,7 +459,9 @@ struct RideView: View {
                 Divider().frame(height: 32)
                 metricCell(value: formatSpeed(s.speed),                         label: "Speed")
                 Divider().frame(height: 32)
-                metricCell(value: formatDuration(s.elapsedTime),                label: "Time")
+                // Show moving time while paused so the rider can see
+                // how long they've actually been riding.
+                metricCell(value: formatDuration(s.movingTime),                 label: s.isPaused ? "Moving" : "Time")
                 Divider().frame(height: 32)
                 metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
             }
@@ -445,36 +485,23 @@ struct RideView: View {
     @ViewBuilder
     private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
         Map(position: $position) {
-
-            // Route polylines — two-pass outlined stroke for sunlight readability.
-            // Pass 1 (bottom): wide white halo.
-            // Pass 2 (top):    coloured line.
-            // This technique is standard on Komoot / Strava and ensures the line
-            // pops off both pale road maps and dark satellite imagery.
-
             if let progress = rideStore.routeProgress {
-                // Ridden segment — white halo
                 MapPolyline(coordinates: progress.ridden)
                     .stroke(.white, lineWidth: 7)
-                // Ridden segment — faded blue on top
                 MapPolyline(coordinates: progress.ridden)
                     .stroke(.blue.opacity(0.45), lineWidth: 4)
 
-                // Remaining segment — white halo
                 MapPolyline(coordinates: progress.remaining)
                     .stroke(.white, lineWidth: 9)
-                // Remaining segment — solid blue on top
                 MapPolyline(coordinates: progress.remaining)
                     .stroke(.blue, lineWidth: 6)
             } else {
-                // Pre-ride birds-eye: full route, no progress split
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
                     .stroke(.white, lineWidth: 9)
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
                     .stroke(.blue, lineWidth: 6)
             }
 
-            // Reroute polyline — orange with white halo
             if !rideStore.reroutePolyline.isEmpty {
                 MapPolyline(coordinates: rideStore.reroutePolyline)
                     .stroke(.white, lineWidth: 8)
