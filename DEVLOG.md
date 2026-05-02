@@ -24,23 +24,20 @@
 - Start Ride `.disabled` guard removed — replaced with "Waiting for GPS…" caption
 - Background GPS battery drain — `allowsBackgroundLocationUpdates` only `true` during active ride; `pausesLocationUpdatesAutomatically` restored to `true` when idle
 - `RouteStore.savePOIs()` + `loadPOIs(forRoute:)` + `poisStorageURL(for:)` implemented — POIs now persisted to a sidecar JSON file keyed to route UUID
-- `NearbySearchSheet.load()` guards against `(0,0)` / invalid coordinate (Bug 2 fix already in file)
+- `NearbySearchSheet.load()` guards against `(0,0)` / invalid coordinate (Bug 2 fix)
+- **Bug 3 — Elevation noise:** 3-reading rolling `altitudeBuffer` + `smoothedAltitude` + 1.5 m threshold gate already implemented in `RideSessionStore.locationManager(_:didUpdateLocations:)`
 
 ---
 
 ## Open Bugs
 
-### 🐛 Bug 3 — Elevation gain noise (P2)
-- **File:** `iPhone/Stores/RideSessionStore.swift` — `locationManager(_:didUpdateLocations:)`
-- **Problem:** Every GPS altitude delta, no matter how small, accumulates into `elevationGain`/`elevationLoss`. GPS/barometric jitter (±1–3 m) inflates both figures significantly on long flat rides.
-- **Fix:** Gate accumulation behind `abs(elevationDelta) > 2.0` threshold. Optionally smooth altitude with a rolling average of last 3–5 readings.
-- **Also tracked in:** `TECH_DEBT.md` → P2 "Elevation gain has no noise smoothing"
+> None currently. All identified bugs are resolved. ✅
 
 ---
 
 ## Planned Features
 
-### ✨ Feature 1 — Ride Pause / Resume  *(Priority: HIGH)*
+### ✨ Feature 1 — Ride Pause / Resume  *(Priority: HIGH — up next)*
 **Motivation:** No way to pause at a café mid-ride without ending the session. Core use-case given the POI system.
 
 **Files to touch:**
@@ -71,7 +68,6 @@
 
 ```
 main
-  └── fix/elevation-noise-threshold      (2-line change, ship fast)
   └── feature/ride-pause-resume          (biggest, most impactful)
   └── feature/grade-hud-tile             (self-contained, can run parallel)
 ```
