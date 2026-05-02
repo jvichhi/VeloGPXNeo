@@ -100,16 +100,32 @@ struct RideSummaryView: View {
 
     @ViewBuilder
     private var statsGridSection: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-            spacing: 10
-        ) {
-            MetricTile(label: "TIME",  value: summary.elapsedTime.hhmm,                      unit: summary.elapsedTime.unit, icon: "clock.fill",                        color: .purple)
-            MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh),   unit: "km/h",                   icon: "speedometer",                       color: .blue)
-            MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh),   unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
-            MetricTile(label: "GAIN",  value: String(format: "%.0f", summary.elevationGain), unit: "m",                      icon: "mountain.2.fill",                    color: .green)
-            MetricTile(label: "LOSS",  value: String(format: "%.0f", summary.elevationLoss), unit: "m",                      icon: "arrow.down.to.line",                 color: .cyan)
-            MetricTile(label: "POIs",  value: "\(summary.pois.count)",                       unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
+        VStack(spacing: 8) {
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 10
+            ) {
+                // TIME tile shows moving time — excludes pauses.
+                MetricTile(label: "MOVING",  value: summary.movingTime.hhmm,                    unit: summary.movingTime.unit,  icon: "figure.outdoor.cycle",               color: .purple)
+                MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh),   unit: "km/h",                   icon: "speedometer",                       color: .blue)
+                MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh),   unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
+                MetricTile(label: "GAIN",  value: String(format: "%.0f", summary.elevationGain), unit: "m",                      icon: "mountain.2.fill",                    color: .green)
+                MetricTile(label: "LOSS",  value: String(format: "%.0f", summary.elevationLoss), unit: "m",                      icon: "arrow.down.to.line",                 color: .cyan)
+                MetricTile(label: "POIs",  value: "\(summary.pois.count)",                       unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
+            }
+
+            // Show total elapsed (including pauses) only when the rider actually paused.
+            if summary.hadPauses {
+                HStack(spacing: 4) {
+                    Image(systemName: "pause.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text("Total time including stops: \(summary.elapsedTime.hhmm)\(summary.elapsedTime.unit)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 2)
+            }
         }
     }
 
