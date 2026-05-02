@@ -10,8 +10,8 @@ import Charts
 // MARK: - View Mode
 
 enum RideViewMode {
-    case birdsEye   // pre-ride overview — full route visible, no HUD
-    case riding     // active ride — camera follows rider, HUD visible
+    case birdsEye
+    case riding
 }
 
 struct RideView: View {
@@ -177,12 +177,9 @@ struct RideView: View {
 
     private func ridingLayout(route: RouteModel) -> some View {
         ZStack(alignment: .top) {
-            // Map fills the whole screen.
             mapLayer(route: route, topControlInset: 62)
                 .ignoresSafeArea()
 
-            // Floating turn-by-turn banner — only visible when a reroute with
-            // steps is active.
             if !rideStore.rideState.rerouteSteps.isEmpty {
                 floatingNavBanner
                     .padding(.top, 56)
@@ -190,11 +187,9 @@ struct RideView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Bottom HUD — anchored to the bottom of the ZStack.
             VStack(spacing: 0) {
                 Spacer()
                 VStack(spacing: 0) {
-                    // PAUSED banner — sits above the chips row when ride is paused.
                     if rideStore.rideState.isPaused {
                         pausedBanner
                             .padding(.horizontal, 12)
@@ -257,7 +252,7 @@ struct RideView: View {
 
     private var floatingNavBanner: some View {
         let steps = rideStore.rideState.rerouteSteps
-        let first = steps.first
+        let first  = steps.first
         let second = steps.dropFirst().first
 
         return HStack(spacing: 14) {
@@ -396,16 +391,10 @@ struct RideView: View {
         }
     }
 
-    // Pause / Resume toggle button.
-    // ⏸ grey capsule while riding → ▶ green capsule while paused.
     private var pauseResumeButton: some View {
         let isPaused = rideStore.rideState.isPaused
         return Button {
-            if isPaused {
-                rideStore.resume()
-            } else {
-                rideStore.pause()
-            }
+            if isPaused { rideStore.resume() } else { rideStore.pause() }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: isPaused ? "play.fill" : "pause.fill")
@@ -437,6 +426,7 @@ struct RideView: View {
     private func metricsHUD(route: RouteModel) -> some View {
         let s = rideStore.rideState
         let pct = rideStore.progressPercent
+        let grade = rideStore.currentGrade
         return VStack(spacing: 6) {
             VStack(spacing: 2) {
                 ProgressView(value: pct)
@@ -455,17 +445,59 @@ struct RideView: View {
             .padding(.horizontal, 2)
 
             HStack(spacing: 0) {
-                metricCell(value: formatDistance(s.totalDistance),              label: "Distance")
+                metricCell(value: formatDistance(s.totalDistance),                label: "Distance")
                 Divider().frame(height: 32)
-                metricCell(value: formatSpeed(s.speed),                         label: "Speed")
+                metricCell(value: formatSpeed(s.speed),                           label: "Speed")
                 Divider().frame(height: 32)
-                // Show moving time while paused so the rider can see
-                // how long they've actually been riding.
-                metricCell(value: formatDuration(s.movingTime),                 label: s.isPaused ? "Moving" : "Time")
+                metricCell(value: formatDuration(s.movingTime),                   label: s.isPaused ? "Moving" : "Time")
                 Divider().frame(height: 32)
                 metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
+                Divider().frame(height: 32)
+                // Grade tile — colour-coded by severity.
+                gradeTile(grade: grade)
             }
         }
+    }
+
+    /// Colour-coded gradient tile.
+    /// grey  < 2%  — flat
+    /// green 2–5%  — gentle climb
+    /// amber 5–8%  — moderate
+    /// red   > 8%  — steep
+    /// Negative grades mirror the same thresholds (descent).
+    private func gradeTile(grade: Double) -> some View {
+        let abs = abs(grade)
+        let color: Color = {
+            switch abs {
+            case 0..<2:  return .secondary
+            case 2..<5:  return .green
+            case 5..<8:  return .orange
+            default:     return .red
+            }
+        }()
+        let arrow: String = {
+            if abs < 0.5 { return "minus" }
+            return grade > 0 ? "arrow.up.right" : "arrow.down.right"
+        }()
+        let valueText = abs < 0.5
+            ? "—"
+            : String(format: "%+.1f%%", grade)
+
+        return VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                Image(systemName: arrow)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(color)
+                Text(valueText)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(color)
+            }
+            Text("Grade")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.4), value: grade)
     }
 
     private func metricCell(value: String, label: String) -> some View {

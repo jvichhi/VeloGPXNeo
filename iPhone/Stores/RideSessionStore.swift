@@ -27,6 +27,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Cleared automatically after 6 seconds or when the user taps the banner.
     @Published var lastError: String? = nil
 
+    // MARK: - Grade
+    /// Current road gradient in percent, smoothed over the last 3 breadcrumb pairs
+    /// spanning at least 20 m of horizontal distance. Zero when insufficient data.
+    @Published var currentGrade: Double = 0
+
     private var manager: CLLocationManager!
 
     // internal (not private) so that file-separated extensions (e.g. RideSessionStore+Spurs)
@@ -48,10 +53,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private let watchUpdateInterval: TimeInterval = 1.0
 
     // MARK: - Breadcrumb trail
-    private var breadcrumbs: [CLLocationCoordinate2D] = []
+    // Stored as CLLocation (not just coordinate) so we retain altitude at each point.
+    private var breadcrumbLocations: [CLLocation] = []
 
-    // Bug 3 fix: rolling altitude buffer for smoothing barometric/GPS jitter.
-    // We average the last 3 altitude readings before computing delta.
+    // MARK: - Altitude smoothing (Bug 3 fix)
+    // Rolling average over last 3 altitude readings suppresses barometric/GPS jitter.
     private var altitudeBuffer: [Double] = []
     private let altitudeBufferSize = 3
     private var smoothedAltitude: Double? {
@@ -65,12 +71,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         manager.distanceFilter = 5
-        // Allow iOS to pause updates when the user isn't moving — saves GPS power.
-        // Overridden to false only during an active ride so tracking stays continuous.
         manager.pausesLocationUpdatesAutomatically = true
-        // Background location is OFF by default. Enabled only in start() and
-        // disabled again in stop()/stopAndBuildSummary() so the GPS radio doesn't
-        // run while the app is backgrounded between rides.
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = false
         #endif
@@ -98,11 +99,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.routeProgress = nil
         self.progressPercent = 0
         self.reroutePolyline = []
-        self.breadcrumbs = []
+        self.breadcrumbLocations = []
         self.altitudeBuffer = []
+        self.currentGrade = 0
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
-        // Enable continuous background GPS only for the duration of the ride.
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -117,16 +118,14 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         guard rideState.isActive, !rideState.isPaused else { return }
         pauseStartTime = Date()
         rideState.isPaused = true
-        // Stop GPS to save battery — same as endLocationUpdates() but without
-        // clearing isActive or resetting state.
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = false
         #endif
         manager.pausesLocationUpdatesAutomatically = true
-        // Clear stale speed so the HUD doesn't show a frozen value.
         rideState.speed = 0
+        currentGrade = 0
         sendWatchUpdate()
     }
 
@@ -156,7 +155,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         sendWatchUpdate()
     }
 
-    /// Dismiss the error banner manually (called when user taps it).
     func clearError() {
         errorClearTask?.cancel()
         lastError = nil
@@ -164,12 +162,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     @discardableResult
     func stopAndBuildSummary() -> RideSummary? {
-        // If the rider taps End while paused, flush the current pause segment
-        // so pausedDuration is complete before we compute movingTime.
         if rideState.isPaused { resume() }
-
         endLocationUpdates()
-
         guard let route, let startTime else { return nil }
         let summary = RideSummary(
             routeName: route.name,
@@ -181,7 +175,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             maxSpeed: rideState.maxSpeed,
             elapsedTime: rideState.elapsedTime,
             movingTime: rideState.movingTime,
-            actualTrack: breadcrumbs,
+            actualTrack: breadcrumbLocations.map { $0.coordinate },
             plannedTrack: route.trackPoints.map { $0.coordinate.clCoordinate },
             pois: pois
         )
@@ -197,19 +191,17 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         historyStore = store
     }
 
-    // MARK: - Private stop helper
-    // Single place to shut down GPS so stop() and stopAndBuildSummary() stay in sync.
     private func endLocationUpdates() {
         UIApplication.shared.isIdleTimerDisabled = false
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
-        // Return to battery-friendly defaults immediately.
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = false
         #endif
         manager.pausesLocationUpdatesAutomatically = true
         rideState.isActive = false
         rideState.isPaused = false
+        currentGrade = 0
         reroutePolyline = []
         sendWatchUpdate()
     }
@@ -218,8 +210,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        // Safety: ignore location callbacks that fire while paused (can happen
-        // briefly after stopUpdatingLocation is called).
         guard !rideState.isPaused else { return }
 
         currentLocation = location
@@ -232,24 +222,20 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             let delta = location.distance(from: lastLocation)
             if delta < 200 {
                 rideState.totalDistance += delta
-                breadcrumbs.append(location.coordinate)
+                breadcrumbLocations.append(location)
             }
 
-            // Bug 3 fix: smooth altitude with a rolling average, then only
-            // accumulate gain/loss when the delta exceeds 1.5 m to suppress
-            // barometric/GPS jitter on flat sections.
+            // Altitude smoothing: rolling average over last 3 readings,
+            // 1.5 m threshold to suppress barometric/GPS jitter.
             altitudeBuffer.append(location.altitude)
             if altitudeBuffer.count > altitudeBufferSize {
                 altitudeBuffer.removeFirst()
             }
             if let currentSmoothed = smoothedAltitude {
-                let prevSmoothed: Double
-                if altitudeBuffer.count > 1 {
-                    let prevBuf = Array(altitudeBuffer.dropLast())
-                    prevSmoothed = prevBuf.reduce(0, +) / Double(prevBuf.count)
-                } else {
-                    prevSmoothed = lastLocation.altitude
-                }
+                let prevBuf = Array(altitudeBuffer.dropLast())
+                let prevSmoothed: Double = prevBuf.isEmpty
+                    ? lastLocation.altitude
+                    : prevBuf.reduce(0, +) / Double(prevBuf.count)
                 let elevationDelta = currentSmoothed - prevSmoothed
                 if abs(elevationDelta) > 1.5 {
                     if elevationDelta > 0 {
@@ -260,7 +246,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
             }
         } else {
-            breadcrumbs.append(location.coordinate)
+            breadcrumbLocations.append(location)
             altitudeBuffer.append(location.altitude)
         }
         self.lastLocation = location
@@ -268,6 +254,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         if let startTime {
             rideState.elapsedTime = Date().timeIntervalSince(startTime)
         }
+
+        updateGrade()
 
         if let route {
             rideState.offRouteDistance = minimumDistance(from: location.coordinate, to: route)
@@ -282,6 +270,46 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         rideState.currentHeading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+    }
+
+    // MARK: - Grade computation
+    //
+    // Walk back through breadcrumbLocations until we have accumulated at least
+    // gradeWindowDistance metres of horizontal distance, then compute:
+    //   grade% = (Δaltitude / Δdistance) × 100
+    //
+    // Smoothed over up to 3 breadcrumb pairs to damp GPS altitude noise.
+    // Returns 0 when there is insufficient track data (< 20 m accumulated).
+
+    private let gradeWindowDistance: Double = 50   // metres of look-back
+    private let gradeMinDistance:    Double = 20   // minimum before we trust the result
+
+    private func updateGrade() {
+        guard breadcrumbLocations.count >= 2 else { currentGrade = 0; return }
+
+        var accumulated: Double = 0
+        var altitudeDelta: Double = 0
+        var pairs = 0
+
+        // Walk backwards from the most recent crumb.
+        let crumbs = breadcrumbLocations
+        var i = crumbs.count - 1
+        while i > 0 && accumulated < gradeWindowDistance {
+            let a = crumbs[i]
+            let b = crumbs[i - 1]
+            let horizDist = a.distance(from: b)   // CLLocation.distance ignores altitude
+            let altDiff   = a.altitude - b.altitude
+            accumulated   += horizDist
+            altitudeDelta += altDiff
+            pairs         += 1
+            i             -= 1
+        }
+
+        guard accumulated >= gradeMinDistance else { currentGrade = 0; return }
+
+        // Raw grade, clamped to ±30% to discard spurious spikes.
+        let raw = (altitudeDelta / accumulated) * 100
+        currentGrade = min(max(raw, -30), 30)
     }
 
     // MARK: - Off-route handling
@@ -309,7 +337,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    // MARK: - Reroute via CyclingRouteService (.cycling on iOS 26+)
+    // MARK: - Reroute
 
     private func requestReroute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
         rideState.isRerouting = true
