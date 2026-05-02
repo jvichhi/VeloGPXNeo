@@ -374,9 +374,14 @@ struct RideView: View {
                          ? "\(Int(dist))m"
                          : String(format: "%.1fkm", dist / 1000))
                         .font(.system(size: 11, weight: .semibold))
-                    // Dismiss button — removes this POI from the active ride list.
+                    // Dismiss button — removes POI from the active ride list,
+                    // the map annotation, and persists the change to the sidecar
+                    // so it doesn't ghost back on the next ride.
                     Button {
-                        rideStore.updatePOIs(rideStore.pois.filter { $0.id != poi.id })
+                        let filtered = rideStore.pois.filter { $0.id != poi.id }
+                        rideStore.updatePOIs(filtered)
+                        routeStore.selectedPOIs = routeStore.selectedPOIs.filter { $0.id != poi.id }
+                        routeStore.savePOIs()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 13))
