@@ -15,37 +15,54 @@ import MapKit
 @MainActor
 final class PlanRouteEngine {
 
+    // Cancels any in-flight routing task before starting a new one.
+    // Prevents stale upsertSegment calls from a prior add/delete/move
+    // landing on a state that has already moved on.
+    private var currentTask: Task<Void, Never>?
+
     // MARK: - Public API
 
     func refreshSegments(in state: PlanState, affectedWaypointIndices: [Int]) async {
-        state.pruneOrphanedSegments()
-        let pairs = dirtyPairs(
-            for: affectedWaypointIndices,
-            waypoints: state.waypoints,
-            existingSegments: state.segments,
-            isLoop: state.isLoopClosed
-        )
-        await computeAndApply(pairs: pairs, state: state)
+        currentTask?.cancel()
+        currentTask = Task {
+            state.pruneOrphanedSegments()
+            let pairs = dirtyPairs(
+                for: affectedWaypointIndices,
+                waypoints: state.waypoints,
+                existingSegments: state.segments,
+                isLoop: state.isLoopClosed
+            )
+            await computeAndApply(pairs: pairs, state: state)
+        }
+        await currentTask?.value
     }
 
     func recomputeAll(in state: PlanState) async {
-        state.segments.removeAll()
-        let pairs = allPairs(waypoints: state.waypoints, isLoop: state.isLoopClosed)
-        await computeAndApply(pairs: pairs, state: state)
+        currentTask?.cancel()
+        currentTask = Task {
+            state.segments.removeAll()
+            let pairs = allPairs(waypoints: state.waypoints, isLoop: state.isLoopClosed)
+            await computeAndApply(pairs: pairs, state: state)
+        }
+        await currentTask?.value
     }
 
     func refreshLoopSegment(in state: PlanState) async {
-        if state.isLoopClosed,
-           let first = state.waypoints.first,
-           let last  = state.waypoints.last,
-           first.id != last.id {
-            await computeAndApply(
-                pairs: [(from: last, to: first, isLoop: true)],
-                state: state
-            )
-        } else {
-            state.segments.removeAll { $0.isLoop }
+        currentTask?.cancel()
+        currentTask = Task {
+            if state.isLoopClosed,
+               let first = state.waypoints.first,
+               let last  = state.waypoints.last,
+               first.id != last.id {
+                await computeAndApply(
+                    pairs: [(from: last, to: first, isLoop: true)],
+                    state: state
+                )
+            } else {
+                state.segments.removeAll { $0.isLoop }
+            }
         }
+        await currentTask?.value
     }
 
     // MARK: - Pair Building
@@ -105,6 +122,9 @@ final class PlanRouteEngine {
                 }
             }
             for await segment in group {
+                // Drop results from a cancelled task — the Task wrapper above
+                // will have set isCancelled before any await resumes.
+                guard !Task.isCancelled else { continue }
                 guard let seg = segment else { continue }
                 await MainActor.run { state.upsertSegment(seg) }
             }

@@ -23,6 +23,10 @@ struct WaypointListSheet: View {
     @State private var showSaveAlert = false
     @State private var routeName = ""
     @State private var savedRouteName: String? = nil
+    // Real @State so SwiftUI can animate through swipe-delete reveal states
+    // on iOS 17+. .constant(.active) prevented the confirm button from
+    // animating in correctly on first swipe.
+    @State private var editMode: EditMode = .active
 
     var body: some View {
         Group {
@@ -123,24 +127,31 @@ struct WaypointListSheet: View {
                 }
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
-                // listRowSeparatorTint only accepts Color, not ShapeStyle.
-                // Color(UIColor.separator) gives the system-adaptive separator colour
-                // and .opacity() on Color returns Color, satisfying the Color? parameter.
                 .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
             }
             .onDelete { offsets in
-                let ids = offsets.map { plan.waypoints[$0].id }
+                let sortedOffsets = offsets.sorted()
+                let ids = sortedOffsets.map { plan.waypoints[$0].id }
+                // Compute bridging index before mutation (indices shift after removal)
+                let bridgeIndex = sortedOffsets.first.map { max(0, $0 - 1) }
                 ids.forEach { plan.removeWaypoint(id: $0) }
-                Task { await engine.recomputeAll(in: plan) }
+                Task {
+                    if plan.waypoints.count >= 2, let idx = bridgeIndex {
+                        // Targeted: only recompute the new bridging segment
+                        await engine.refreshSegments(in: plan, affectedWaypointIndices: [idx])
+                    }
+                    // If < 2 waypoints remain, removeWaypoint already cleared all segments
+                }
             }
             .onMove { from, to in
                 plan.moveWaypoint(fromOffsets: from, toOffset: to)
+                // Full recompute correct here — a reorder invalidates all segment pairs
                 Task { await engine.recomputeAll(in: plan) }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .environment(\.editMode, .constant(.active))
+        .environment(\.editMode, $editMode)
         .frame(maxHeight: CGFloat(min(plan.waypoints.count, 5)) * 52)
     }
 
