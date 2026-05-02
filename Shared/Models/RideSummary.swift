@@ -5,7 +5,7 @@ import CoreLocation
 /// stats accumulated in RideState, visited POIs, and the original
 /// planned route — so it can be displayed in RideSummaryView and
 /// exported via GPXExporter.
-public struct RideSummary: Sendable {
+public struct RideSummary: Identifiable, Sendable {
     // Ride identity
     public let id: UUID
     public let routeName: String
