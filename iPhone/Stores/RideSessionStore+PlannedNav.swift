@@ -20,17 +20,36 @@
 import CoreLocation
 import MapKit
 
-extension RideSessionStore {
+// MARK: - NavStep protocol
+//
+// Shared by RerouteStep (off-route, orange) and PlannedNavStep (on-route, blue)
+// so RideView.floatingNavBanner() can accept either as `[any NavStep]`.
 
-    // MARK: - Published state
-    // Stored as plain arrays/index on RideSessionStore via associated-object
-    // pattern isn't available in extensions, so we use @Published vars
-    // declared in the main class file — but to avoid touching the 19 KB
-    // RideSessionStore.swift, we piggyback on rideState for the published
-    // surface and keep the mutable backing here using nonisolated storage.
-    //
-    // Simpler approach: expose a computed var that reads the private storage.
-    // RideView observes rideStore.$plannedNavSteps directly.
+protocol NavStep {
+    var instructions: String { get }
+    var distanceMeters: Double { get }
+}
+
+// RerouteStep already has matching stored properties — retroactive conformance only.
+extension RerouteStep: NavStep {}
+
+// MARK: - PlannedNavStep
+
+struct PlannedNavStep: Identifiable {
+    let id = UUID()
+    /// Human-readable turn instruction from MKRouteStep (e.g. "Turn left onto Rue Saint-Jacques").
+    let instructions: String
+    /// Distance in metres until the next maneuver.
+    let distanceMeters: Double
+    /// The coordinate the rider must reach before we advance to the next step.
+    let maneuverCoordinate: CLLocationCoordinate2D
+}
+
+extension PlannedNavStep: NavStep {}
+
+// MARK: - Extension
+
+extension RideSessionStore {
 
     // MARK: - Step advancement
 
@@ -83,14 +102,14 @@ extension RideSessionStore {
                     guard let mkRoute = response.routes.first else { continue }
                     for step in mkRoute.steps where !step.instructions.isEmpty {
                         steps.append(PlannedNavStep(
-                            instruction: step.instructions,
-                            maneuverCoordinate: step.polyline.coordinate,
-                            distanceMeters: step.distance
+                            instructions: step.instructions,
+                            distanceMeters: step.distance,
+                            maneuverCoordinate: step.polyline.coordinate
                         ))
                     }
                 } catch {
                     // Network or routing failure — skip this segment silently.
-                    // The rider can still ride; they just won't get turn prompts
+                    // The rider can still ride; they just won’t get turn prompts
                     // for the failed leg.
                 }
             }
@@ -120,7 +139,7 @@ extension RideSessionStore {
         return plannedNavSteps[currentStepIndex]
     }
 
-    /// The step after the current one, for the "Then: …" preview line.
+    /// The step after the current one, for the “Then: …” preview line in the banner.
     var nextPlannedStep: PlannedNavStep? {
         let next = currentStepIndex + 1
         guard plannedNavSteps.indices.contains(next) else { return nil }
