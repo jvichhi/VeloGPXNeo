@@ -461,26 +461,46 @@ struct RideView: View {
             .padding(.horizontal, 2)
 
             HStack(spacing: 0) {
-                metricCell(value: formatDistance(s.totalDistance),                label: "Distance")
+                metricCell(value: formatDistance(s.totalDistance),   label: "Distance")
                 Divider().frame(height: 32)
-                metricCell(value: formatSpeed(s.speed),                           label: "Speed")
+                metricCell(value: formatSpeed(s.speed),              label: "Speed")
                 Divider().frame(height: 32)
-                metricCell(value: formatDuration(s.elapsedTime),                  label: s.isPaused ? "Moving" : "Time")
+                metricCell(value: formatDuration(s.elapsedTime),     label: s.isPaused ? "Moving" : "Time")
                 Divider().frame(height: 32)
-                metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
+                etaTile
                 Divider().frame(height: 32)
-                // Grade tile — colour-coded by severity.
                 gradeTile(grade: grade)
             }
         }
     }
 
+    // MARK: - ETA Tile
+    // Shows estimated arrival time once 10 s of speed data is available.
+    // Falls back to remaining distance while ETA is warming up or rider is stopped.
+
+    private var etaTile: some View {
+        VStack(spacing: 2) {
+            if let eta = rideStore.eta {
+                Text(eta, style: .time)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
+                    .transition(.opacity)
+            } else {
+                // Fallback: show remaining distance
+                let remaining = remainingDistance(route: routeStore.selectedRoute)
+                Text(formatDistance(remaining))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .transition(.opacity)
+            }
+            Text(rideStore.eta != nil ? "ETA" : "Remain")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.4), value: rideStore.eta != nil)
+    }
+
     /// Colour-coded gradient tile.
-    /// grey  < 2%  — flat
-    /// green 2–5%  — gentle climb
-    /// amber 5–8%  — moderate
-    /// red   > 8%  — steep
-    /// Negative grades mirror the same thresholds (descent).
     private func gradeTile(grade: Double) -> some View {
         let abs = abs(grade)
         let color: Color = {
@@ -643,7 +663,8 @@ struct RideView: View {
 
     // MARK: - Formatters
 
-    private func remainingDistance(route: RouteModel) -> CLLocationDistance {
+    private func remainingDistance(route: RouteModel?) -> CLLocationDistance {
+        guard let route else { return 0 }
         guard let progress = rideStore.routeProgress else { return route.totalDistance }
         return progress.remaining.isEmpty ? 0 :
             zip(progress.remaining, progress.remaining.dropFirst())

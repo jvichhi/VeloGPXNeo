@@ -23,6 +23,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var routeProgress: RouteProgress?
     @Published var progressPercent: Double = 0
     @Published var reroutePolyline: [CLLocationCoordinate2D] = []
+    /// Estimated arrival time — nil until the rider has enough speed history (10+ s).
+    @Published var eta: Date? = nil
     /// Surfaced routing/rerouting error message. Shown as a dismissible HUD banner in RideView.
     /// Cleared automatically after 6 seconds or when the user taps the banner.
     @Published var lastError: String? = nil
@@ -70,6 +72,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return altitudeBuffer.reduce(0, +) / Double(altitudeBuffer.count)
     }
 
+    // MARK: - ETA speed buffer
+    // Rolling window of (timestamp, speed) pairs over the last 30 seconds.
+    // Used to compute a smoothed average speed for ETA rather than relying
+    // on the noisy instantaneous speed reading.
+    private var speedBuffer: [(date: Date, speed: Double)] = []
+    private let speedBufferWindow: TimeInterval = 30
+
     override init() {
         super.init()
         manager = CLLocationManager()
@@ -106,7 +115,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.reroutePolyline = []
         self.breadcrumbLocations = []
         self.altitudeBuffer = []
+        self.speedBuffer = []
         self.currentGrade = 0
+        self.eta = nil
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
         #if !targetEnvironment(simulator)
@@ -131,7 +142,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.rideState.elapsedTime = Date().timeIntervalSince(startTime) - self.rideState.pausedDuration
             }
         }
-        // Keep firing when the run loop is tracking scroll views etc.
         RunLoop.main.add(elapsedTimer!, forMode: .common)
     }
 
@@ -155,6 +165,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.pausesLocationUpdatesAutomatically = true
         rideState.speed = 0
         currentGrade = 0
+        eta = nil
         sendWatchUpdate()
     }
 
@@ -166,6 +177,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         pauseStartTime = nil
         rideState.isPaused = false
         lastLocation = nil   // discard stale last location so distance delta doesn't spike
+        speedBuffer = []     // discard stale speed readings from before the pause
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -233,6 +245,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         rideState.isActive = false
         rideState.isPaused = false
         currentGrade = 0
+        eta = nil
         reroutePolyline = []
         sendWatchUpdate()
     }
@@ -298,6 +311,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         updateNextPOI(from: location.coordinate)
+        updateSpeedBuffer(speed: newSpeed)
+        updateETA()
         sendWatchUpdate()
     }
 
@@ -306,16 +321,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - Grade computation
-    //
-    // Walk back through breadcrumbLocations until we have accumulated at least
-    // gradeWindowDistance metres of horizontal distance, then compute:
-    //   grade% = (Δaltitude / Δdistance) × 100
-    //
-    // Smoothed over up to 3 breadcrumb pairs to damp GPS altitude noise.
-    // Returns 0 when there is insufficient track data (< 20 m accumulated).
 
-    private let gradeWindowDistance: Double = 50   // metres of look-back
-    private let gradeMinDistance:    Double = 20   // minimum before we trust the result
+    private let gradeWindowDistance: Double = 50
+    private let gradeMinDistance:    Double = 20
 
     private func updateGrade() {
         guard breadcrumbLocations.count >= 2 else { currentGrade = 0; return }
@@ -324,13 +332,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         var altitudeDelta: Double = 0
         var pairs = 0
 
-        // Walk backwards from the most recent crumb.
         let crumbs = breadcrumbLocations
         var i = crumbs.count - 1
         while i > 0 && accumulated < gradeWindowDistance {
             let a = crumbs[i]
             let b = crumbs[i - 1]
-            let horizDist = a.distance(from: b)   // CLLocation.distance ignores altitude
+            let horizDist = a.distance(from: b)
             let altDiff   = a.altitude - b.altitude
             accumulated   += horizDist
             altitudeDelta += altDiff
@@ -340,9 +347,54 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
         guard accumulated >= gradeMinDistance else { currentGrade = 0; return }
 
-        // Raw grade, clamped to ±30% to discard spurious spikes.
         let raw = (altitudeDelta / accumulated) * 100
         currentGrade = min(max(raw, -30), 30)
+    }
+
+    // MARK: - ETA
+
+    /// Appends current speed to the rolling 30-second buffer, evicting stale entries.
+    private func updateSpeedBuffer(speed: Double) {
+        let now = Date()
+        speedBuffer.append((date: now, speed: speed))
+        // Evict readings older than the window
+        speedBuffer = speedBuffer.filter {
+            now.timeIntervalSince($0.date) <= speedBufferWindow
+        }
+    }
+
+    /// Recomputes ETA from the rolling average speed and remaining route distance.
+    /// Requires at least 10 seconds of speed data and a minimum avg speed of 1 km/h
+    /// to avoid nonsensical ETAs when the rider is stopped at a light.
+    private func updateETA() {
+        guard let route else { eta = nil; return }
+
+        // Need at least 10 s of data in the buffer before showing ETA
+        guard let oldest = speedBuffer.first,
+              Date().timeIntervalSince(oldest.date) >= 10 else {
+            eta = nil
+            return
+        }
+
+        let avgSpeed = speedBuffer.map { $0.speed }.reduce(0, +) / Double(speedBuffer.count)
+
+        // Suppress ETA if avg speed is below 1 km/h — rider is stopped
+        guard avgSpeed > (1.0 / 3.6) else { eta = nil; return }
+
+        let remainingDistance = remainingRouteDistance(route: route)
+        guard remainingDistance > 0 else { eta = nil; return }
+
+        let secondsRemaining = remainingDistance / avgSpeed
+        eta = Date().addingTimeInterval(secondsRemaining)
+    }
+
+    /// Returns the arc-length of the remaining route polyline from the current track position.
+    private func remainingRouteDistance(route: RouteModel) -> CLLocationDistance {
+        guard let progress = routeProgress, progress.remaining.count > 1 else {
+            return route.totalDistance
+        }
+        return zip(progress.remaining, progress.remaining.dropFirst())
+            .reduce(0) { $0 + $1.0.distance(to: $1.1) }
     }
 
     // MARK: - Off-route handling
@@ -411,15 +463,16 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - Route progress
+    //
+    // progressPercent is now distance-based: totalDistance / route.totalDistance.
+    // This is monotonically increasing, proportional to actual metres ridden, and
+    // immune to the index-based jump that occurred when the rider started mid-route
+    // or the GPX had unevenly spaced track points.
 
     private func updateRouteProgress(from coordinate: CLLocationCoordinate2D, route: RouteModel) {
         let points = route.trackPoints
         guard points.count > 1 else { return }
 
-        // On the very first call nearestTrackIndex is 0. Scan the full track
-        // so we snap to the true closest point regardless of where the ride
-        // starts relative to the GPX origin. Subsequent calls use the
-        // constrained +50 window which is fast enough for 60 Hz GPS updates.
         let searchStart = nearestTrackIndex
         let searchEnd = nearestTrackIndex == 0
             ? points.count - 1
@@ -435,7 +488,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         let ridden = Array(points[0...bestIndex].map { $0.coordinate.clCoordinate })
         let remaining = Array(points[bestIndex...].map { $0.coordinate.clCoordinate })
         routeProgress = RouteProgress(ridden: ridden, remaining: remaining)
-        progressPercent = Double(bestIndex) / Double(points.count - 1)
+
+        // Distance-based progress: clamp to [0, 1] so it never exceeds 100%
+        // if the rider overshoots the route end slightly.
+        let routeTotal = route.totalDistance
+        progressPercent = routeTotal > 0
+            ? min(rideState.totalDistance / routeTotal, 1.0)
+            : 0
     }
 
     func minimumDistance(from coordinate: CLLocationCoordinate2D, to route: RouteModel) -> Double {
