@@ -374,8 +374,19 @@ struct RideView: View {
                          ? "\(Int(dist))m"
                          : String(format: "%.1fkm", dist / 1000))
                         .font(.system(size: 11, weight: .semibold))
+                    // Dismiss button — removes this POI from the active ride list.
+                    Button {
+                        rideStore.updatePOIs(rideStore.pois.filter { $0.id != poi.id })
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 10).padding(.vertical, 6)
+                .padding(.leading, 10)
+                .padding(.trailing, 6)
+                .padding(.vertical, 6)
                 .background(.regularMaterial, in: Capsule())
                 .transition(.scale.combined(with: .opacity))
             }
@@ -449,7 +460,7 @@ struct RideView: View {
                 Divider().frame(height: 32)
                 metricCell(value: formatSpeed(s.speed),                           label: "Speed")
                 Divider().frame(height: 32)
-                metricCell(value: formatDuration(s.movingTime),                   label: s.isPaused ? "Moving" : "Time")
+                metricCell(value: formatDuration(s.elapsedTime),                  label: s.isPaused ? "Moving" : "Time")
                 Divider().frame(height: 32)
                 metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
                 Divider().frame(height: 32)

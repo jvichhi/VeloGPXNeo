@@ -48,6 +48,11 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var historyStore: RideHistoryStore?
     private var errorClearTask: Task<Void, Never>?
 
+    // MARK: - Elapsed-time timer
+    // Fires every second so the HUD clock keeps ticking even when GPS
+    // distanceFilter suppresses location events (e.g. rider is stationary).
+    private var elapsedTimer: Timer?
+
     // MARK: - Watch throttle
     private var lastWatchUpdateTime: Date = .distantPast
     private let watchUpdateInterval: TimeInterval = 1.0
@@ -110,6 +115,29 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.pausesLocationUpdatesAutomatically = false
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
+        startElapsedTimer()
+    }
+
+    // MARK: - Elapsed Timer
+
+    private func startElapsedTimer() {
+        elapsedTimer?.invalidate()
+        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      let startTime = self.startTime,
+                      self.rideState.isActive,
+                      !self.rideState.isPaused else { return }
+                self.rideState.elapsedTime = Date().timeIntervalSince(startTime) - self.rideState.pausedDuration
+            }
+        }
+        // Keep firing when the run loop is tracking scroll views etc.
+        RunLoop.main.add(elapsedTimer!, forMode: .common)
+    }
+
+    private func stopElapsedTimer() {
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
     }
 
     // MARK: - Pause / Resume
@@ -118,6 +146,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         guard rideState.isActive, !rideState.isPaused else { return }
         pauseStartTime = Date()
         rideState.isPaused = true
+        stopElapsedTimer()
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
         #if !targetEnvironment(simulator)
@@ -143,6 +172,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.pausesLocationUpdatesAutomatically = false
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
+        startElapsedTimer()
         sendWatchUpdate()
     }
 
@@ -192,6 +222,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func endLocationUpdates() {
+        stopElapsedTimer()
         UIApplication.shared.isIdleTimerDisabled = false
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
@@ -251,8 +282,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         self.lastLocation = location
 
+        // GPS ping syncs elapsedTime for accuracy; the 1 Hz Timer is the
+        // primary clock source so the HUD ticks even when stationary.
         if let startTime {
-            rideState.elapsedTime = Date().timeIntervalSince(startTime)
+            rideState.elapsedTime = Date().timeIntervalSince(startTime) - rideState.pausedDuration
         }
 
         updateGrade()
@@ -382,10 +415,19 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private func updateRouteProgress(from coordinate: CLLocationCoordinate2D, route: RouteModel) {
         let points = route.trackPoints
         guard points.count > 1 else { return }
-        var bestIndex = nearestTrackIndex
-        var bestDist = coordinate.distance(to: points[bestIndex].coordinate.clCoordinate)
-        let searchEnd = min(nearestTrackIndex + 50, points.count - 1)
-        for i in nearestTrackIndex...searchEnd {
+
+        // On the very first call nearestTrackIndex is 0. Scan the full track
+        // so we snap to the true closest point regardless of where the ride
+        // starts relative to the GPX origin. Subsequent calls use the
+        // constrained +50 window which is fast enough for 60 Hz GPS updates.
+        let searchStart = nearestTrackIndex
+        let searchEnd = nearestTrackIndex == 0
+            ? points.count - 1
+            : min(nearestTrackIndex + 50, points.count - 1)
+
+        var bestIndex = searchStart
+        var bestDist = coordinate.distance(to: points[searchStart].coordinate.clCoordinate)
+        for i in searchStart...searchEnd {
             let d = coordinate.distance(to: points[i].coordinate.clCoordinate)
             if d < bestDist { bestDist = d; bestIndex = i }
         }
