@@ -34,7 +34,59 @@
 
 ## Open Bugs
 
-> None currently. All identified bugs are resolved. ✅
+### 🐛 PlanView Drawer Obscured Behind Tab Bar
+**Branch:** `fix/planview-drawer-tab-overlap`  
+**File:** `iPhone/Views/PlanView.swift`  
+**Priority:** P1 — visible on every device
+
+**What's broken:** The Plan Route drawer's bottom content (the "Close Loop" toggle row and the lowest waypoint row) renders behind the system tab bar. The tab bar appears on top of the drawer.
+
+**Root cause:** `PlanView.body` applies `.ignoresSafeArea(edges: .bottom)` to the outer `ZStack`. Inside a `TabView` child, `geo.safeAreaInsets.bottom` only reflects the home indicator (~34 pt) — **not** the tab bar height (~49 pt). The drawer therefore calculates its height and bottom padding without accounting for the ~49 pt tab bar, causing content to bleed underneath it.
+
+`RideView` is unaffected because it presents full-screen outside the `TabView`.
+
+**Fix — Option A (preferred):**
+Move `.ignoresSafeArea` off the `ZStack` and onto the `mapLayer` only:
+
+```swift
+// BEFORE
+ZStack(alignment: .bottom) {
+    mapLayer
+        .ignoresSafeArea(edges: .top)
+    drawerCard(geo: geo).zIndex(10)
+}
+.ignoresSafeArea(edges: .bottom)  // ← remove
+
+// AFTER
+ZStack(alignment: .bottom) {
+    mapLayer
+        .ignoresSafeArea()         // ← map goes full-bleed top + bottom
+    drawerCard(geo: geo).zIndex(10)
+}
+// ZStack now respects tab bar safe area — drawer stops above tab bar automatically
+```
+
+Also update `maxDrawer` in `drawerCard(geo:)`:
+```swift
+// BEFORE
+let safeBottom = geo.safeAreaInsets.bottom
+let maxDrawer  = geo.size.height - safeBottom - 60
+
+// AFTER (geo.size.height now excludes tab bar after safe area fix)
+let maxDrawer = geo.size.height - 60
+```
+
+**Fix — Option B (fallback):** Read actual tab bar height via `UITabBarController` and add it to the `drawerCard` bottom padding. More brittle; use only if full-bleed-behind-tab-bar is a hard design requirement.
+
+**Also audit:** `WaypointListSheet.swift` — confirm it doesn't add its own bottom safe area padding that would double-pad after the fix.
+
+**Acceptance criteria:**
+- [ ] "Close Loop" toggle fully visible above tab bar at `kDrawerMedium` on SE / 14 Pro / 15 Pro Max
+- [ ] Map still full-bleed behind status bar at the top
+- [ ] Map extends to screen bottom edge (visible behind tab bar when drawer at `kDrawerPeek`)
+- [ ] Drag-to-snap still works at all three snap heights
+- [ ] Error banner positioning unchanged
+- [ ] No overflow on iPhone SE (667 pt screen)
 
 ---
 
