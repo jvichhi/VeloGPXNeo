@@ -7,16 +7,16 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Caf\u00e9"
+    @State private var selectedCategory = "Café"
     // Bug 2 fix: shown when coordinate is invalid so the user isn't
     // silently served results from (0, 0).
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Caf\u00e9",       "cup.and.saucer.fill",      "Caf\u00e9"),
-        ("Water",      "drop.fill",                "Water"),
-        ("Bike Shop",  "wrench.and.screwdriver",   "Bike Shop"),
-        ("Restaurant", "fork.knife",               "Restaurant")
+        ("Café",        "cup.and.saucer.fill",      "Café"),
+        ("Water",       "drop.fill",                "Water"),
+        ("Bike Shop",   "wrench.and.screwdriver",   "Bike Shop"),
+        ("Restaurant",  "fork.knife",               "Restaurant")
     ]
 
     var body: some View {
@@ -71,7 +71,7 @@ struct NearbySearchSheet: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if isLoading {
-                        ProgressView("Searching\u{2026}")
+                        ProgressView("Searching…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty {
                         VStack(spacing: 14) {
@@ -177,11 +177,11 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Caf\u00e9":       return .cafe
-        case "Water":      return .water
-        case "Bike Shop":  return .bikeRepair
-        case "Restaurant": return .restaurant
-        default:           return .custom
+        case "Café":        return .cafe
+        case "Water":       return .water
+        case "Bike Shop":   return .bikeRepair
+        case "Restaurant":  return .restaurant
+        default:            return .custom
         }
     }
 }
