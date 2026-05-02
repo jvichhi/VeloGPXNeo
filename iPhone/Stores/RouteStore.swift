@@ -11,6 +11,8 @@ final class RouteStore: ObservableObject {
     @Published var lastImportMessage: String?
 
     private let directoryName = "ImportedRoutes"
+    // Bug 1 fix: sidecar directory for per-route POI persistence.
+    private let poisDirectoryName = "RoutePOIs"
 
     func loadFromDisk() {
         let fm = FileManager.default
@@ -21,6 +23,26 @@ final class RouteStore: ObservableObject {
             return try? JSONDecoder().decode(RouteModel.self, from: data)
         }.sorted { $0.createdAt > $1.createdAt }
         if selectedRoute == nil { selectedRoute = routes.first }
+    }
+
+    // Bug 1 fix: load persisted POIs for a given route from the sidecar file.
+    // Call this whenever selectedRoute changes (wired in RootView).
+    func loadPOIs(forRoute route: RouteModel) {
+        let url = poisStorageURL(for: route.id)
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode([POIModel].self, from: data)
+        else { return }
+        selectedPOIs = decoded
+    }
+
+    // Bug 1 fix: persist selectedPOIs to a sidecar file keyed to the route UUID.
+    // Called from RouteDetailView.onDisappear and POIDiscoverySheet.onDisappear.
+    func savePOIs() {
+        guard let route = selectedRoute else { return }
+        let url = poisStorageURL(for: route.id)
+        guard let data = try? JSONEncoder().encode(selectedPOIs) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 
     func importRoute(from url: URL) async {
@@ -71,9 +93,6 @@ final class RouteStore: ObservableObject {
     }
 
     /// Saves a route built in the Plan tab and selects it.
-    /// - Parameters:
-    ///   - route: The `RouteModel` produced by `PlanState.buildRouteModel(name:)`.
-    ///   - select: If `true` (default), sets `selectedRoute` to the saved route.
     func addPlannedRoute(_ route: RouteModel, select: Bool = true) {
         do {
             try save(route)
@@ -89,6 +108,8 @@ final class RouteStore: ObservableObject {
     func deleteRoute(_ route: RouteModel) {
         let url = storageDirectory().appendingPathComponent("\(route.id.uuidString).json")
         try? FileManager.default.removeItem(at: url)
+        // Also clean up the POI sidecar.
+        try? FileManager.default.removeItem(at: poisStorageURL(for: route.id))
         if selectedRoute?.id == route.id {
             selectedRoute = nil
             selectedPOIs = []
@@ -126,5 +147,16 @@ final class RouteStore: ObservableObject {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir
+    }
+
+    // Bug 1 fix: sidecar storage for POIs, keyed by route UUID.
+    private func poisStorageURL(for routeID: UUID) -> URL {
+        let fm = FileManager.default
+        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = base.appendingPathComponent(poisDirectoryName, isDirectory: true)
+        if !fm.fileExists(atPath: dir.path) {
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir.appendingPathComponent("\(routeID.uuidString).json")
     }
 }

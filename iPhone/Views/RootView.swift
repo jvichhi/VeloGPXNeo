@@ -6,6 +6,7 @@ enum AppTab: Int {
 
 struct RootView: View {
     @EnvironmentObject private var lm: LocalizationManager
+    @EnvironmentObject private var routeStore: RouteStore
     @State private var selectedTab: AppTab = .routes
 
     var body: some View {
@@ -35,5 +36,13 @@ struct RootView: View {
                 .tag(AppTab.settings)
         }
         .id(lm.currentLanguage)
+        // Bug 1 fix: whenever the selected route changes, reload its persisted POIs
+        // so that previously saved POIs are restored on app relaunch.
+        .onChange(of: routeStore.selectedRoute?.id) { _, newID in
+            guard let route = routeStore.selectedRoute else {
+                return
+            }
+            routeStore.loadPOIs(forRoute: route)
+        }
     }
 }

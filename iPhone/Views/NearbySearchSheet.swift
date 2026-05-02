@@ -7,10 +7,13 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Café"
+    @State private var selectedCategory = "Caf\u00e9"
+    // Bug 2 fix: shown when coordinate is invalid so the user isn't
+    // silently served results from (0, 0).
+    @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Café",       "cup.and.saucer.fill",      "Café"),
+        ("Caf\u00e9",       "cup.and.saucer.fill",      "Caf\u00e9"),
         ("Water",      "drop.fill",                "Water"),
         ("Bike Shop",  "wrench.and.screwdriver",   "Bike Shop"),
         ("Restaurant", "fork.knife",               "Restaurant")
@@ -53,8 +56,22 @@ struct NearbySearchSheet: View {
 
                 // Content
                 Group {
-                    if isLoading {
-                        ProgressView("Searching…")
+                    if hasInvalidCoordinate {
+                        // Bug 2 fix: show a clear error instead of searching (0,0).
+                        VStack(spacing: 14) {
+                            Image(systemName: "location.slash.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.orange)
+                            Text("GPS signal lost")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Nearby search needs a valid location.\nMove to open sky and try again.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if isLoading {
+                        ProgressView("Searching\u{2026}")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty {
                         VStack(spacing: 14) {
@@ -90,17 +107,14 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
-    // MARK: - ID-based POI matching (P0-2 fix)
+    // MARK: - ID-based POI matching
     // MKMapItem has no stable ID, so we derive a deterministic UUID from
-    // the coordinate rounded to 6 decimal places. The same real-world
-    // location always produces the same UUID, making isAdded/toggle safe
-    // even when two cafés share a name.
+    // the coordinate rounded to 6 decimal places.
 
     private func deterministicID(for item: MKMapItem) -> UUID {
         let lat = (item.placemark.coordinate.latitude * 1_000_000).rounded() / 1_000_000
         let lon = (item.placemark.coordinate.longitude * 1_000_000).rounded() / 1_000_000
         let seed = "\(lat),\(lon)"
-        // Use UUID v5-style: hash the seed string into a UUID-shaped value.
         var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
             (acc ^ UInt64(byte)) &* 1099511628211
         }
@@ -109,7 +123,6 @@ struct NearbySearchSheet: View {
             bytes[i] = UInt8(hash & 0xFF)
             hash >>= 8
         }
-        // Second half from reversed seed
         var hash2 = seed.reversed().description.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
             (acc ^ UInt64(byte)) &* 1099511628211
         }
@@ -150,6 +163,13 @@ struct NearbySearchSheet: View {
     }
 
     func load() async {
+        // Bug 2 fix: guard against an invalid coordinate before firing the search.
+        guard CLLocationCoordinate2DIsValid(coordinate),
+              coordinate.latitude != 0 || coordinate.longitude != 0 else {
+            hasInvalidCoordinate = true
+            return
+        }
+        hasInvalidCoordinate = false
         isLoading = true
         results = (try? await POISearchService.shared.search(query: selectedCategory, near: coordinate)) ?? []
         isLoading = false
@@ -157,7 +177,7 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Café":       return .cafe
+        case "Caf\u00e9":       return .cafe
         case "Water":      return .water
         case "Bike Shop":  return .bikeRepair
         case "Restaurant": return .restaurant
@@ -189,7 +209,6 @@ private struct NearbyResultCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Category icon circle
             ZStack {
                 Circle()
                     .fill(Color.blue.opacity(0.12))

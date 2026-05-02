@@ -49,6 +49,15 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Breadcrumb trail
     private var breadcrumbs: [CLLocationCoordinate2D] = []
 
+    // Bug 3 fix: rolling altitude buffer for smoothing barometric/GPS jitter.
+    // We average the last 3 altitude readings before computing delta.
+    private var altitudeBuffer: [Double] = []
+    private let altitudeBufferSize = 3
+    private var smoothedAltitude: Double? {
+        guard !altitudeBuffer.isEmpty else { return nil }
+        return altitudeBuffer.reduce(0, +) / Double(altitudeBuffer.count)
+    }
+
     override init() {
         super.init()
         manager = CLLocationManager()
@@ -88,6 +97,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.progressPercent = 0
         self.reroutePolyline = []
         self.breadcrumbs = []
+        self.altitudeBuffer = []  // Bug 3: reset altitude smoother on new ride
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
         // Enable continuous background GPS only for the duration of the ride.
@@ -176,14 +186,34 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 rideState.totalDistance += delta
                 breadcrumbs.append(location.coordinate)
             }
-            let elevationDelta = location.altitude - lastLocation.altitude
-            if elevationDelta > 0 {
-                rideState.elevationGain += elevationDelta
-            } else {
-                rideState.elevationLoss += abs(elevationDelta)
+
+            // Bug 3 fix: smooth altitude with a rolling average, then only
+            // accumulate gain/loss when the delta exceeds 1.5 m to suppress
+            // barometric/GPS jitter on flat sections.
+            altitudeBuffer.append(location.altitude)
+            if altitudeBuffer.count > altitudeBufferSize {
+                altitudeBuffer.removeFirst()
+            }
+            if let currentSmoothed = smoothedAltitude {
+                let prevSmoothed: Double
+                if altitudeBuffer.count > 1 {
+                    let prevBuf = Array(altitudeBuffer.dropLast())
+                    prevSmoothed = prevBuf.reduce(0, +) / Double(prevBuf.count)
+                } else {
+                    prevSmoothed = lastLocation.altitude
+                }
+                let elevationDelta = currentSmoothed - prevSmoothed
+                if abs(elevationDelta) > 1.5 {
+                    if elevationDelta > 0 {
+                        rideState.elevationGain += elevationDelta
+                    } else {
+                        rideState.elevationLoss += abs(elevationDelta)
+                    }
+                }
             }
         } else {
             breadcrumbs.append(location.coordinate)
+            altitudeBuffer.append(location.altitude)
         }
         self.lastLocation = location
 
@@ -243,7 +273,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
                 }.filter { !$0.instructions.isEmpty }
             } catch {
-                showError("Couldn't find a route back. Keep riding — retrying shortly.")
+                showError("Couldn't find a route back. Keep riding \u{2014} retrying shortly.")
             }
             rideState.isRerouting = false
         }

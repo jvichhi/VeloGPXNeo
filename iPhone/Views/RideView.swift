@@ -26,6 +26,9 @@ struct RideView: View {
     @State private var hudHeight: CGFloat = 0
     @State private var showNearbySheet    = false
     @State private var showDiscoverySheet = false
+    // Bug 4 fix: holds the summary produced by stopAndBuildSummary() and
+    // drives the RideSummaryView sheet.
+    @State private var completedSummary: RideSummary? = nil
 
     @Environment(\.scenePhase) private var envScenePhase
 
@@ -71,6 +74,12 @@ struct RideView: View {
         }
         .onChange(of: rideStore.rideState.nextPOI?.id) { _, _ in
             Task { poiSpurs = await rideStore.computeSpurs() }
+        }
+        // Bug 4 fix: present RideSummaryView when completedSummary is set.
+        .sheet(item: $completedSummary) { summary in
+            RideSummaryView(summary: summary) {
+                completedSummary = nil
+            }
         }
     }
 
@@ -142,7 +151,7 @@ struct RideView: View {
                         }
 
                         if rideStore.rideState.currentCoordinate == nil {
-                            Label("Waiting for GPS…", systemImage: "location.circle")
+                            Label("Waiting for GPS\u{2026}", systemImage: "location.circle")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -200,12 +209,12 @@ struct RideView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
+        // Bug 2 fix: only open sheet when we have a valid live coordinate.
         .sheet(isPresented: $showNearbySheet) {
-            NearbySearchSheet(
-                coordinate: rideStore.rideState.currentCoordinate?.clCoordinate
-                    ?? CLLocationCoordinate2D()
-            )
-            .environmentObject(routeStore)
+            if let loc = rideStore.currentLocation {
+                NearbySearchSheet(coordinate: loc.coordinate)
+                    .environmentObject(routeStore)
+            }
         }
     }
 
@@ -216,7 +225,10 @@ struct RideView: View {
             offRouteChip
             nextPOIChip
             Spacer()
+            // Bug 2 fix: disable nearby button when GPS location is unavailable.
             nearbyButton
+                .disabled(rideStore.currentLocation == nil)
+                .opacity(rideStore.currentLocation == nil ? 0.4 : 1)
             endRideButton
         }
     }
@@ -287,7 +299,9 @@ struct RideView: View {
 
     private var endRideButton: some View {
         Button {
-            rideStore.stop()
+            // Bug 4 fix: call stopAndBuildSummary() so the summary is built,
+            // persisted to RideHistoryStore, and returned for sheet presentation.
+            completedSummary = rideStore.stopAndBuildSummary()
         } label: {
             Text("End")
                 .font(.system(size: 12, weight: .bold))
@@ -324,14 +338,34 @@ struct RideView: View {
 
     private func metricsHUD(route: RouteModel) -> some View {
         let s = rideStore.rideState
-        return HStack(spacing: 0) {
-            metricCell(value: formatDistance(s.totalDistance),          label: "Distance")
-            Divider().frame(height: 32)
-            metricCell(value: formatSpeed(s.speed),                     label: "Speed")
-            Divider().frame(height: 32)
-            metricCell(value: formatDuration(s.elapsedTime),            label: "Time")
-            Divider().frame(height: 32)
-            metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
+        let pct = rideStore.progressPercent
+        return VStack(spacing: 6) {
+            // Bug 5 fix: progress bar + percentage label.
+            VStack(spacing: 2) {
+                ProgressView(value: pct)
+                    .tint(.blue)
+                    .animation(.linear(duration: 1), value: pct)
+                HStack {
+                    Text("Route Progress")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(String(format: "%.0f%%", pct * 100))
+                        .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 2)
+
+            HStack(spacing: 0) {
+                metricCell(value: formatDistance(s.totalDistance),              label: "Distance")
+                Divider().frame(height: 32)
+                metricCell(value: formatSpeed(s.speed),                         label: "Speed")
+                Divider().frame(height: 32)
+                metricCell(value: formatDuration(s.elapsedTime),                label: "Time")
+                Divider().frame(height: 32)
+                metricCell(value: formatDistance(remainingDistance(route: route)), label: "Remain")
+            }
         }
     }
 
