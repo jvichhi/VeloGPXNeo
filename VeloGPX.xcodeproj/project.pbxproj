@@ -10,7 +10,6 @@
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
-		9789152A2F9C9B090047D8F7 /* RouteStore+POI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915282F9C9B090047D8F7 /* RouteStore+POI.swift */; };
 		9789152C2F9D20410047D8F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9789152B2F9D20410047D8F7 /* Assets.xcassets */; };
 		9789154C2F9D64890047D8F7 /* RideSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154B2F9D64890047D8F7 /* RideSummary.swift */; };
 		9789154D2F9D64890047D8F7 /* RideSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9789154B2F9D64890047D8F7 /* RideSummary.swift */; };
@@ -96,7 +95,6 @@
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
-		978915282F9C9B090047D8F7 /* RouteStore+POI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RouteStore+POI.swift"; sourceTree = "<group>"; };
 		9789152B2F9D20410047D8F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9789154B2F9D64890047D8F7 /* RideSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSummary.swift; sourceTree = "<group>"; };
 		9789154E2F9D64A40047D8F7 /* GPXExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPXExporter.swift; sourceTree = "<group>"; };
@@ -248,7 +246,6 @@
 			children = (
 				978915B32F9F15560047D8F7 /* RideSessionStore+Spurs.swift */,
 				978915532F9DC7180047D8F7 /* RideHistoryStore.swift */,
-				978915282F9C9B090047D8F7 /* RouteStore+POI.swift */,
 				97F8126B2F9468CE0068A42A /* RideSessionStore.swift */,
 				97F8126C2F9468CE0068A42A /* RouteStore.swift */,
 			);
@@ -499,7 +496,6 @@
 				9789155A2F9DC8710047D8F7 /* RideHistoryView.swift in Sources */,
 				9789155B2F9DC8710047D8F7 /* ShareableRideCard.swift in Sources */,
 				9789155C2F9DC8710047D8F7 /* RideHistoryDetailView.swift in Sources */,
-				9789152A2F9C9B090047D8F7 /* RouteStore+POI.swift in Sources */,
 				978915A82F9EF2610047D8F7 /* PlanView.swift in Sources */,
 				97F812922F9468CE0068A42A /* RouteDetailView.swift in Sources */,
 				978915B62F9F15960047D8F7 /* POISpur.swift in Sources */,
