@@ -7,7 +7,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-private let kDrawerPeek:   CGFloat = 72
+private let kDrawerPeek:   CGFloat = 88   // handle(15) + header(~58) + buffer(15)
 private let kDrawerMedium: CGFloat = 320
 
 struct PlanView: View {
@@ -19,8 +19,6 @@ struct PlanView: View {
 
     var switchToRide: () -> Void = {}
     var switchToRoutes: () -> Void = {}
-    // preloadRoute is kept for direct instantiation (e.g. tests, previews).
-    // In production the tab flow uses routeStore.routeToEditInPlan instead.
     var preloadRoute: RouteModel? = nil
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -35,7 +33,7 @@ struct PlanView: View {
                 // .ignoresSafeArea() is on the map layer only so the ZStack
                 // still respects the tab bar safe area; the drawer therefore
                 // stops naturally above the tab bar without extra math.
-                mapLayer
+                mapLayer(geo: geo)
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -48,7 +46,7 @@ struct PlanView: View {
                         .zIndex(20)
                 }
 
-                // Floating drawer — .regularMaterial = semi-transparent
+                // Floating drawer
                 drawerCard(geo: geo)
                     .zIndex(10)
             }
@@ -56,21 +54,15 @@ struct PlanView: View {
             // Removing it is what keeps the drawer above the tab bar.
         }
         .task {
-            // Prefer the store-driven deep-link route; fall back to the
-            // direct preloadRoute param (tests / previews).
             let routeToLoad = routeStore.routeToEditInPlan ?? preloadRoute
             if let route = routeToLoad {
                 await plan.loadFrom(route: route)
-                // Clear the pending edit request so re-appearing the tab
-                // later doesn't reload the same route unexpectedly.
                 routeStore.routeToEditInPlan = nil
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
                 }
             }
         }
-        // Respond to a new routeToEditInPlan set while PlanView is already
-        // on screen (tab was already active, user swipes Plan on a second route).
         .onChange(of: routeStore.routeToEditInPlan) { _, route in
             guard let route else { return }
             Task {
@@ -96,14 +88,9 @@ struct PlanView: View {
     // MARK: - Drawer
 
     private func drawerCard(geo: GeometryProxy) -> some View {
-        // After removing .ignoresSafeArea from the ZStack, geo.size.height
-        // is the safe-area height (tab bar excluded), so maxDrawer no longer
-        // needs a safeBottom offset — just subtract 60 to leave a map peek.
         let maxDrawer = geo.size.height - 60
-
-        // safeBottom is now 0 inside the safe area; the existing conditional
-        // falls through to the 16pt content margin automatically.
         let safeBottom = geo.safeAreaInsets.bottom
+        let isCollapsed = drawerHeight <= kDrawerPeek
 
         return VStack(spacing: 0) {
             Capsule()
@@ -115,6 +102,7 @@ struct PlanView: View {
             WaypointListSheet(
                 plan: plan,
                 engine: engine,
+                isCollapsed: isCollapsed,
                 onRideNow: {
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerPeek }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { switchToRide() }
@@ -162,8 +150,10 @@ struct PlanView: View {
     }
 
     // MARK: - Map
+    // Promoted to func so geo.safeAreaInsets.top is accessible for
+    // pushing map controls below the status bar.
 
-    private var mapLayer: some View {
+    private func mapLayer(geo: GeometryProxy) -> some View {
         MapReader { proxy in
             Map(position: $position) {
                 if !plan.routePolyline.isEmpty {
@@ -176,9 +166,6 @@ struct PlanView: View {
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [8, 6]))
                 }
 
-                // Once the route line is computed, suppress intermediate waypoint pins.
-                // Only keep Start (index 0) and End (last) so the map stays uncluttered.
-                // When no route exists yet (just dropped pins), show all pins to aid placement.
                 let routeExists = !plan.routePolyline.isEmpty
                 ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
                     let isStartOrEnd = index == 0 || index == plan.waypoints.count - 1
@@ -198,6 +185,10 @@ struct PlanView: View {
                 MapCompass()
                 MapPitchToggle()
             }
+            // Push MapKit's built-in controls below the status bar.
+            // The map canvas itself still bleeds full-screen via .ignoresSafeArea()
+            // on the caller — this only affects the control widget positions.
+            .safeAreaPadding(.top, geo.safeAreaInsets.top)
             .onTapGesture { screenPoint in
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
                 let before = plan.waypoints.count
