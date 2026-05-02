@@ -34,6 +34,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     /// spanning at least 20 m of horizontal distance. Zero when insufficient data.
     @Published var currentGrade: Double = 0
 
+    // MARK: - Planned nav (see RideSessionStore+PlannedNav.swift)
+    /// Steps loaded from MKDirections at ride start for planned routes.
+    /// Empty for GPX/GeoJSON routes — those never populate this array.
+    @Published var plannedNavSteps: [PlannedNavStep] = []
+    /// Index into plannedNavSteps for the step currently being navigated toward.
+    @Published var currentStepIndex: Int = 0
+
     private var manager: CLLocationManager!
 
     // internal (not private) so that file-separated extensions (e.g. RideSessionStore+Spurs)
@@ -120,6 +127,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.eta = nil
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
+        clearPlannedNav()
+        loadNavSteps(route: route)
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -247,6 +256,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         currentGrade = 0
         eta = nil
         reroutePolyline = []
+        clearPlannedNav()
         sendWatchUpdate()
     }
 
@@ -310,6 +320,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             handleOffRoute(from: location.coordinate, route: route)
         }
 
+        advanceStepIfNeeded(location: location)
         updateNextPOI(from: location.coordinate)
         updateSpeedBuffer(speed: newSpeed)
         updateETA()

@@ -82,6 +82,22 @@ struct RideView: View {
         }
     }
 
+    // MARK: - Nav banner data source
+    //
+    // Priority: reroute steps (off-route, orange) > planned nav steps (on-route, blue).
+    // RideView reads from this single computed var so the banner never shows both.
+
+    private var activeNavSteps: (steps: [any NavStep], isReroute: Bool)? {
+        if !rideStore.rideState.rerouteSteps.isEmpty {
+            return (rideStore.rideState.rerouteSteps.map { $0 as any NavStep }, true)
+        }
+        guard !rideStore.plannedNavSteps.isEmpty else { return nil }
+        let from = rideStore.currentStepIndex
+        let slice = Array(rideStore.plannedNavSteps[from...])
+        guard !slice.isEmpty else { return nil }
+        return (slice.map { $0 as any NavStep }, false)
+    }
+
     // MARK: - No Route State
 
     private var noRouteState: some View {
@@ -150,7 +166,7 @@ struct RideView: View {
                         }
 
                         if rideStore.rideState.currentCoordinate == nil {
-                            Label("Waiting for GPS…", systemImage: "location.circle")
+                            Label("Waiting for GPS\u{2026}", systemImage: "location.circle")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -180,8 +196,8 @@ struct RideView: View {
             mapLayer(route: route, topControlInset: 62)
                 .ignoresSafeArea()
 
-            if !rideStore.rideState.rerouteSteps.isEmpty {
-                floatingNavBanner
+            if let nav = activeNavSteps {
+                floatingNavBanner(steps: nav.steps, isReroute: nav.isReroute)
                     .padding(.top, 56)
                     .padding(.horizontal, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -219,7 +235,7 @@ struct RideView: View {
                 .padding(.bottom, 12)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeNavSteps == nil)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
         .sheet(isPresented: $showNearbySheet) {
             if let loc = rideStore.currentLocation {
@@ -249,18 +265,23 @@ struct RideView: View {
     }
 
     // MARK: - Floating Nav Banner
+    //
+    // Shared by both reroute (orange, off-route) and planned nav (blue, on-route).
+    // isReroute = true  → orange icon background, "Return to route" fallback text
+    // isReroute = false → blue icon background, "Continue on route" fallback text
 
-    private var floatingNavBanner: some View {
-        let steps = rideStore.rideState.rerouteSteps
+    private func floatingNavBanner(steps: [any NavStep], isReroute: Bool) -> some View {
         let first  = steps.first
         let second = steps.dropFirst().first
+        let accentColor: Color = isReroute ? .orange : .blue
+        let fallback = isReroute ? "Return to route" : "Continue on route"
 
         return HStack(spacing: 14) {
             Image(systemName: turnArrowSymbol(for: first?.instructions))
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
-                .background(Color.orange, in: RoundedRectangle(cornerRadius: 14))
+                .background(accentColor, in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 3) {
                 if let dist = first?.distanceMeters, dist > 0 {
@@ -268,7 +289,7 @@ struct RideView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
-                Text(first?.instructions ?? "Return to route")
+                Text(first?.instructions ?? fallback)
                     .font(.system(size: 17, weight: .bold))
                     .lineLimit(2)
 
@@ -516,7 +537,7 @@ struct RideView: View {
             return grade > 0 ? "arrow.up.right" : "arrow.down.right"
         }()
         let valueText = abs < 0.5
-            ? "—"
+            ? "\u{2014}"
             : String(format: "%+.1f%%", grade)
 
         return VStack(spacing: 2) {
