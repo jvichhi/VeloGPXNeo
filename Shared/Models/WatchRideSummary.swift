@@ -2,9 +2,11 @@ import Foundation
 
 struct WatchRideSummary: Codable, Sendable {
     let isActive: Bool
+    let isPaused: Bool
     let speedKmh: Double
     let distanceKm: Double
     let elapsedTime: TimeInterval
+    let movingTime: TimeInterval
     let avgSpeedKmh: Double
     let elevationGain: Double
     let elevationLoss: Double
@@ -18,9 +20,11 @@ struct WatchRideSummary: Codable, Sendable {
 
     nonisolated init(state: RideState) {
         self.isActive         = state.isActive
+        self.isPaused         = state.isPaused
         self.speedKmh         = state.speedKmh
         self.distanceKm       = state.distanceKm
         self.elapsedTime      = state.elapsedTime
+        self.movingTime       = state.movingTime
         self.avgSpeedKmh      = state.avgSpeedKmh
         self.elevationGain    = state.elevationGain
         self.elevationLoss    = state.elevationLoss
