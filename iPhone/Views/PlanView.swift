@@ -31,9 +31,12 @@ struct PlanView: View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
 
-                // Map fills entire tab area
+                // Map fills entire screen — bleeds behind status bar AND tab bar.
+                // .ignoresSafeArea() is on the map layer only so the ZStack
+                // still respects the tab bar safe area; the drawer therefore
+                // stops naturally above the tab bar without extra math.
                 mapLayer
-                    .ignoresSafeArea(edges: .top)
+                    .ignoresSafeArea()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Floating error banner
@@ -49,8 +52,9 @@ struct PlanView: View {
                 drawerCard(geo: geo)
                     .zIndex(10)
             }
+            // ZStack intentionally does NOT have .ignoresSafeArea(edges: .bottom).
+            // Removing it is what keeps the drawer above the tab bar.
         }
-        .ignoresSafeArea(edges: .bottom)
         .task {
             // Prefer the store-driven deep-link route; fall back to the
             // direct preloadRoute param (tests / previews).
@@ -92,8 +96,14 @@ struct PlanView: View {
     // MARK: - Drawer
 
     private func drawerCard(geo: GeometryProxy) -> some View {
+        // After removing .ignoresSafeArea from the ZStack, geo.size.height
+        // is the safe-area height (tab bar excluded), so maxDrawer no longer
+        // needs a safeBottom offset — just subtract 60 to leave a map peek.
+        let maxDrawer = geo.size.height - 60
+
+        // safeBottom is now 0 inside the safe area; the existing conditional
+        // falls through to the 16pt content margin automatically.
         let safeBottom = geo.safeAreaInsets.bottom
-        let maxDrawer  = geo.size.height - safeBottom - 60
 
         return VStack(spacing: 0) {
             Capsule()
