@@ -31,6 +31,8 @@ public struct RerouteStep: Codable, Hashable, Sendable, Equatable {
 
 public struct RideState: Codable, Sendable {
     public var isActive: Bool
+    public var isPaused: Bool
+    public var pausedDuration: TimeInterval
     public var speed: Double
     public var maxSpeed: Double
     public var totalDistance: Double
@@ -50,6 +52,8 @@ public struct RideState: Codable, Sendable {
 
     public init(
         isActive: Bool = false,
+        isPaused: Bool = false,
+        pausedDuration: TimeInterval = 0,
         speed: Double = 0,
         maxSpeed: Double = 0,
         totalDistance: Double = 0,
@@ -68,6 +72,8 @@ public struct RideState: Codable, Sendable {
         isRerouting: Bool = false
     ) {
         self.isActive = isActive
+        self.isPaused = isPaused
+        self.pausedDuration = pausedDuration
         self.speed = speed
         self.maxSpeed = maxSpeed
         self.totalDistance = totalDistance
@@ -88,8 +94,12 @@ public struct RideState: Codable, Sendable {
 
     nonisolated public var speedKmh: Double { speed * 3.6 }
     nonisolated public var distanceKm: Double { totalDistance / 1000 }
+
+    /// Moving time excludes all paused segments — use this for avg speed.
+    nonisolated public var movingTime: TimeInterval { max(elapsedTime - pausedDuration, 0) }
+
     nonisolated public var avgSpeedKmh: Double {
-        guard elapsedTime > 0 else { return 0 }
-        return (totalDistance / elapsedTime) * 3.6
+        guard movingTime > 0 else { return 0 }
+        return (totalDistance / movingTime) * 3.6
     }
 }
