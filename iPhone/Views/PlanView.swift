@@ -170,7 +170,7 @@ struct PlanView: View {
                 ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
                     let isStartOrEnd = index == 0 || index == plan.waypoints.count - 1
                     if !routeExists || isStartOrEnd {
-                        Annotation("", coordinate: wp.coordinate, anchor: .bottom) {
+                        Annotation("", coordinate: wp.coordinate, anchor: .center) {
                             WaypointPin(index: index, total: plan.waypoints.count,
                                         isLoopClosed: plan.isLoopClosed, name: wp.name)
                         }
