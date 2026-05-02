@@ -37,6 +37,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private var lastLocation: CLLocation?
     private var startTime: Date?
+    private var pauseStartTime: Date?       // non-nil only while paused
     private var lastAlertedPOIID: UUID?
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
@@ -90,6 +91,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.pois = pois
         self.rideState = RideState(isActive: true)
         self.startTime = Date()
+        self.pauseStartTime = nil
         self.lastLocation = nil
         self.lastAlertedPOIID = nil
         self.nearestTrackIndex = 0
@@ -97,7 +99,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.progressPercent = 0
         self.reroutePolyline = []
         self.breadcrumbs = []
-        self.altitudeBuffer = []  // Bug 3: reset altitude smoother on new ride
+        self.altitudeBuffer = []
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
         // Enable continuous background GPS only for the duration of the ride.
@@ -107,6 +109,42 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.pausesLocationUpdatesAutomatically = false
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
+    }
+
+    // MARK: - Pause / Resume
+
+    func pause() {
+        guard rideState.isActive, !rideState.isPaused else { return }
+        pauseStartTime = Date()
+        rideState.isPaused = true
+        // Stop GPS to save battery — same as endLocationUpdates() but without
+        // clearing isActive or resetting state.
+        manager.stopUpdatingLocation()
+        manager.stopUpdatingHeading()
+        #if !targetEnvironment(simulator)
+        manager.allowsBackgroundLocationUpdates = false
+        #endif
+        manager.pausesLocationUpdatesAutomatically = true
+        // Clear stale speed so the HUD doesn't show a frozen value.
+        rideState.speed = 0
+        sendWatchUpdate()
+    }
+
+    func resume() {
+        guard rideState.isActive, rideState.isPaused else { return }
+        if let ps = pauseStartTime {
+            rideState.pausedDuration += Date().timeIntervalSince(ps)
+        }
+        pauseStartTime = nil
+        rideState.isPaused = false
+        lastLocation = nil   // discard stale last location so distance delta doesn't spike
+        #if !targetEnvironment(simulator)
+        manager.allowsBackgroundLocationUpdates = true
+        #endif
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.startUpdatingLocation()
+        manager.startUpdatingHeading()
+        sendWatchUpdate()
     }
 
     func updatePOIs(_ newPOIs: [POIModel]) {
@@ -126,6 +164,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     @discardableResult
     func stopAndBuildSummary() -> RideSummary? {
+        // If the rider taps End while paused, flush the current pause segment
+        // so pausedDuration is complete before we compute movingTime.
+        if rideState.isPaused { resume() }
+
         endLocationUpdates()
 
         guard let route, let startTime else { return nil }
@@ -138,6 +180,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             elevationLoss: rideState.elevationLoss,
             maxSpeed: rideState.maxSpeed,
             elapsedTime: rideState.elapsedTime,
+            movingTime: rideState.movingTime,
             actualTrack: breadcrumbs,
             plannedTrack: route.trackPoints.map { $0.coordinate.clCoordinate },
             pois: pois
@@ -166,6 +209,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         #endif
         manager.pausesLocationUpdatesAutomatically = true
         rideState.isActive = false
+        rideState.isPaused = false
         reroutePolyline = []
         sendWatchUpdate()
     }
@@ -174,6 +218,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        // Safety: ignore location callbacks that fire while paused (can happen
+        // briefly after stopUpdatingLocation is called).
+        guard !rideState.isPaused else { return }
+
         currentLocation = location
         rideState.currentCoordinate = location.coordinate.asCoordinate
         let newSpeed = max(location.speed, 0)
@@ -273,7 +321,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
                 }.filter { !$0.instructions.isEmpty }
             } catch {
-                showError("Couldn't find a route back. Keep riding \u{2014} retrying shortly.")
+                showError("Couldn't find a route back. Keep riding — retrying shortly.")
             }
             rideState.isRerouting = false
         }
