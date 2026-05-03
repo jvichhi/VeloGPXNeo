@@ -56,7 +56,7 @@ struct POIDiscoverySheet: View {
 
                 Group {
                     if isLoading {
-                        ProgressView("Searching along route…")
+                        ProgressView("Searching near route start\u{2026}")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty && selectedCategory != nil {
                         VStack(spacing: 14) {
@@ -78,7 +78,7 @@ struct POIDiscoverySheet: View {
                                 .foregroundStyle(.blue.opacity(0.6))
                             Text("Pick a category above")
                                 .font(.subheadline.weight(.medium))
-                            Text("We'll search along the full route.")
+                            Text("We\u{2019}ll search near the route start.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -102,7 +102,7 @@ struct POIDiscoverySheet: View {
             }
             .navigationTitle("Discover POIs")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchQuery, prompt: "Search nearby…")
+            .searchable(text: $searchQuery, prompt: "Search near route start\u{2026}")
             .onSubmit(of: .search) {
                 selectedCategory = nil
                 Task { await search() }
@@ -111,10 +111,13 @@ struct POIDiscoverySheet: View {
     }
 
     private func search() async {
-        guard !route.trackPoints.isEmpty else { return }
-        let mid = route.trackPoints[route.trackPoints.count / 2].coordinate.clCoordinate
+        // Issue 3a fix: search from route start (trackPoints.first), not the
+        // midpoint. On a long route the midpoint can be 20+ km from where the
+        // rider is planning, making results irrelevant.
+        guard let startPoint = route.trackPoints.first else { return }
+        let origin = startPoint.coordinate.clCoordinate
         isLoading = true
-        results = (try? await POISearchService.shared.search(query: searchQuery, near: mid)) ?? []
+        results = (try? await POISearchService.shared.search(query: searchQuery, near: origin)) ?? []
         isLoading = false
     }
 
@@ -134,7 +137,7 @@ struct POIDiscoverySheet: View {
 
     private func categoryFromMapItem(_ item: MKMapItem) -> POICategory {
         let name = item.name?.lowercased() ?? ""
-        if name.contains("café") || name.contains("cafe") || name.contains("coffee") { return .cafe }
+        if name.contains("caf\u{00e9}") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
         if name.contains("restaurant") || name.contains("food") || name.contains("pizza") { return .restaurant }
         if name.contains("pharmacy") || name.contains("drug") { return .pharmacy }

@@ -4,21 +4,32 @@
 //
 //  Pre-ride POI management sheet.
 //  Opened by the 📍 button in birdsEyeLayout.
-//  Two sections:
-//   - On this route: list of saved POIs + swipe-to-delete
-//   - Add nearby: navigates into POIDiscoverySheet
 //
-//  Issue 5 fix: .sheet(isPresented: $showSearch) moved outside the
-//  NavigationStack body to avoid double-navigation-bar edge cases on iPad.
+//  Sections:
+//   - On this route: POIs sorted by along-route order (snap index),
+//     each row showing along-route distance from route start.
+//   - Add nearby: opens POIDiscoverySheet.
+//
+//  Snap indices are computed once on appear and cached in snapIndexCache
+//  to avoid O(n²) work on every List redraw.
 //
 
 import SwiftUI
+import CoreLocation
 
 struct PreRidePOISheet: View {
     let route: RouteModel
     @EnvironmentObject private var routeStore: RouteStore
     @State private var showSearch = false
+    @State private var snapIndexCache: [UUID: Int] = [:]   // poiID → track snap index
     @Environment(\.dismiss) private var dismiss
+
+    // POIs sorted by snap index (along-route order).
+    private var sortedPOIs: [POIModel] {
+        routeStore.selectedPOIs.sorted {
+            (snapIndexCache[$0.id] ?? Int.max) < (snapIndexCache[$1.id] ?? Int.max)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -30,16 +41,28 @@ struct PreRidePOISheet: View {
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
-                        ForEach(routeStore.selectedPOIs) { poi in
-                            Label {
-                                Text(poi.name)
-                            } icon: {
-                                Image(systemName: poi.category.systemImage)
-                                    .foregroundStyle(.orange)
+                        ForEach(sortedPOIs) { poi in
+                            HStack {
+                                Label {
+                                    Text(poi.name)
+                                } icon: {
+                                    Image(systemName: poi.category.systemImage)
+                                        .foregroundStyle(.orange)
+                                }
+                                Spacer()
+                                if let dist = alongRouteDistance(for: poi) {
+                                    Text(formatDistance(dist))
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .onDelete { indexSet in
-                            routeStore.selectedPOIs.remove(atOffsets: indexSet)
+                            // Map sorted indices back to routeStore indices before removing.
+                            let poisToRemove = indexSet.map { sortedPOIs[$0] }
+                            routeStore.selectedPOIs.removeAll {
+                                poisToRemove.contains(where: { $0.id == $1.id })
+                            }
                             routeStore.savePOIs()
                         }
                     }
@@ -50,7 +73,7 @@ struct PreRidePOISheet: View {
                     Button {
                         showSearch = true
                     } label: {
-                        Label("Search nearby…", systemImage: "magnifyingglass")
+                        Label("Search nearby\u{2026}", systemImage: "magnifyingglass")
                     }
                 }
             }
@@ -62,10 +85,49 @@ struct PreRidePOISheet: View {
                 }
             }
         }
-        // Issue 5 fix: sheet attached to NavigationStack, not inside its body.
         .sheet(isPresented: $showSearch) {
             POIDiscoverySheet(route: route)
                 .environmentObject(routeStore)
         }
+        .onAppear { buildSnapIndexCache() }
+        .onChange(of: routeStore.selectedPOIs) { _, _ in buildSnapIndexCache() }
+    }
+
+    // MARK: - Snap index cache
+
+    /// Computes the nearest track-point index for every POI and caches it.
+    /// Called once on appear and whenever the POI list changes.
+    private func buildSnapIndexCache() {
+        let trackPoints = route.trackPoints
+        guard !trackPoints.isEmpty else { return }
+        var cache: [UUID: Int] = [:]
+        for poi in routeStore.selectedPOIs {
+            let poiCoord = poi.coordinate.clCoordinate
+            var bestIdx = 0
+            var bestDist = poiCoord.distance(to: trackPoints[0].coordinate.clCoordinate)
+            for i in 1..<trackPoints.count {
+                let d = poiCoord.distance(to: trackPoints[i].coordinate.clCoordinate)
+                if d < bestDist { bestDist = d; bestIdx = i }
+            }
+            cache[poi.id] = bestIdx
+        }
+        snapIndexCache = cache
+    }
+
+    /// Along-route distance from the route start to the POI's snap point (metres).
+    private func alongRouteDistance(for poi: POIModel) -> Double? {
+        guard let snapIdx = snapIndexCache[poi.id] else { return nil }
+        let pts = route.trackPoints
+        guard snapIdx > 0, snapIdx < pts.count else { return 0 }
+        return zip(pts[0..<snapIdx], pts[1...snapIdx])
+            .reduce(0.0) { acc, pair in
+                acc + pair.0.coordinate.clCoordinate.distance(to: pair.1.coordinate.clCoordinate)
+            }
+    }
+
+    private func formatDistance(_ metres: Double) -> String {
+        metres < 1000
+            ? String(format: "%.0f m", metres)
+            : String(format: "%.1f km", metres / 1000)
     }
 }
