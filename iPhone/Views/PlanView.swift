@@ -38,9 +38,6 @@ struct PlanView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Map control buttons — plain SwiftUI overlay, safe-area-aware.
-                // Native MapKit controls (MapUserLocationButton etc.) are NOT used
-                // outside .mapControls{} — they are undocumented in that position
-                // and may be inert on device. Plain buttons are fully reliable.
                 mapControlsOverlay(geo: geo)
                     .zIndex(5)
 
@@ -53,8 +50,9 @@ struct PlanView: View {
                         .zIndex(20)
                 }
 
-                // Floating drawer
+                // Floating drawer — floats 8 pt above tab bar, fully rounded
                 drawerCard(geo: geo)
+                    .padding(.bottom, 8)
                     .zIndex(10)
             }
         }
@@ -94,7 +92,6 @@ struct PlanView: View {
 
     private func mapControlsOverlay(geo: GeometryProxy) -> some View {
         VStack(spacing: 10) {
-            // Re-centre on user location
             Button {
                 withAnimation(.easeInOut(duration: 0.4)) {
                     position = .userLocation(fallback: .automatic)
@@ -108,7 +105,6 @@ struct PlanView: View {
             }
             .accessibilityLabel("Re-centre map on my location")
 
-            // 3D / Flat pitch toggle
             Button {
                 isPitchEnabled.toggle()
             } label: {
@@ -123,7 +119,6 @@ struct PlanView: View {
         .padding(.top, geo.safeAreaInsets.top + 8)
         .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        // Allow taps on buttons but pass map taps through transparent areas
         .allowsHitTesting(true)
     }
 
@@ -159,9 +154,6 @@ struct PlanView: View {
                 ? .standard(elevation: .realistic)
                 : .standard(elevation: .flat)
             )
-            // Hide all native MapKit controls — replaced by mapControlsOverlay.
-            // Do NOT add .safeAreaPadding or any inset here: any viewport inset
-            // corrupts proxy.convert() and shifts waypoint drop coordinates.
             .mapControlVisibility(.hidden)
             .onTapGesture { screenPoint in
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
@@ -182,6 +174,7 @@ struct PlanView: View {
         let isCollapsed = drawerHeight <= kDrawerPeek
 
         return VStack(spacing: 0) {
+            // Grab handle
             Capsule()
                 .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
@@ -209,7 +202,8 @@ struct PlanView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: min(drawerHeight, maxDrawer))
-        .background(.regularMaterial, in: RoundedCorners(tl: 20, tr: 20, bl: 0, br: 0))
+        // All four corners rounded — drawer floats above tab bar via .padding(.bottom, 8) in body
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: .black.opacity(0.14), radius: 16, y: -3)
         .gesture(
             DragGesture()
@@ -281,27 +275,5 @@ private struct WaypointPin: View {
         if index == 0 { return isLoopClosed && total > 1 ? "S/E" : "S" }
         if index == total - 1 && !isLoopClosed { return "E" }
         return "\(index + 1)"
-    }
-}
-
-// MARK: - Top-only rounded corners
-
-private struct RoundedCorners: Shape {
-    var tl: CGFloat; var tr: CGFloat; var bl: CGFloat; var br: CGFloat
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
-        p.addQuadCurve(to: CGPoint(x: rect.minX + tl, y: rect.minY),
-                       control: CGPoint(x: rect.minX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
-        p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + tr),
-                       control: CGPoint(x: rect.maxX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
-        p.addQuadCurve(to: CGPoint(x: rect.maxX - br, y: rect.maxY),
-                       control: CGPoint(x: rect.maxX, y: rect.maxY))
-        p.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        p.closeSubpath()
-        return p
     }
 }

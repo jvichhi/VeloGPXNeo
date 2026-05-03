@@ -15,8 +15,6 @@ struct WaypointListSheet: View {
     @ObservedObject var plan: PlanState
     let engine: PlanRouteEngine
     /// True when the drawer is at peek (collapsed) height.
-    /// Hides the waypoint list, Close Loop row, and action buttons so
-    /// nothing gets clipped inside the short drawer frame.
     var isCollapsed: Bool = false
     let onRideNow: () -> Void
     let onGoToRoutes: () -> Void
@@ -27,6 +25,8 @@ struct WaypointListSheet: View {
     @State private var showSaveAlert = false
     @State private var routeName = ""
     @State private var savedRouteName: String? = nil
+    // editMode drives drag-reorder only; delete is via swipeActions so
+    // the leading swipe is never eaten by the edit-mode selection chrome.
     @State private var editMode: EditMode = .active
 
     var body: some View {
@@ -49,7 +49,9 @@ struct WaypointListSheet: View {
     // MARK: - Planning Content
 
     private var planningContent: some View {
-        VStack(spacing: 0) {
+        // alignment: .top ensures the header is always pinned to the top of
+        // the drawer frame regardless of how much content is below it.
+        VStack(alignment: .leading, spacing: 0) {
 
             // ── Header row: always visible at every drawer height ──
             HStack(alignment: .center, spacing: 0) {
@@ -129,15 +131,20 @@ struct WaypointListSheet: View {
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
                 .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
-            }
-            .onDelete { offsets in
-                let sortedOffsets = offsets.sorted()
-                let ids = sortedOffsets.map { plan.waypoints[$0].id }
-                let bridgeIndex = sortedOffsets.first.map { max(0, $0 - 1) }
-                ids.forEach { plan.removeWaypoint(id: $0) }
-                Task {
-                    if plan.waypoints.count >= 2, let idx = bridgeIndex {
-                        await engine.refreshSegments(in: plan, affectedWaypointIndices: [idx])
+                // Swipe-to-delete via swipeActions so the gesture is never
+                // swallowed by editMode's reorder chrome.
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        let id = wp.id
+                        let bridgeIndex = max(0, index - 1)
+                        plan.removeWaypoint(id: id)
+                        Task {
+                            if plan.waypoints.count >= 2 {
+                                await engine.refreshSegments(in: plan, affectedWaypointIndices: [bridgeIndex])
+                            }
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
             }
