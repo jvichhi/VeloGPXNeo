@@ -29,7 +29,10 @@ struct RideView: View {
     @State private var showDiscoverySheet = false
     @State private var completedSummary: RideSummary? = nil
 
-    // F-2b: Long-press delete state
+    // F-2b: Long-press delete state.
+    // cameraPauseTask is non-nil while the 3s interaction window is open;
+    // used as a guard in updateRidingCamera to prevent the map panning
+    // away while the rider is mid-confirm.
     @State private var pendingDeletePOI: POIModel? = nil
     @State private var cameraPauseTask: Task<Void, Never>? = nil
 
@@ -67,6 +70,7 @@ struct RideView: View {
                 // Ride ended — cancel any pending delete
                 pendingDeletePOI = nil
                 cameraPauseTask?.cancel()
+                cameraPauseTask = nil
             }
         }
         .onChange(of: envScenePhase) { _, newPhase in
@@ -78,7 +82,11 @@ struct RideView: View {
             guard rideStore.rideState.isActive,
                   !rideStore.rideState.isPaused,
                   let coord = newValue?.clCoordinate else { return }
-            updateRidingCamera(to: coord)
+            // Issue 2 fix: do not pan the camera while the rider is
+            // interacting with a long-pressed annotation.
+            if pendingDeletePOI == nil {
+                updateRidingCamera(to: coord)
+            }
             Task { poiSpurs = await rideStore.computeSpurs() }
         }
         .onChange(of: rideStore.rideState.nextPOI?.id) { _, _ in
@@ -136,7 +144,7 @@ struct RideView: View {
                             .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        // F-2d: 📍 button now opens PreRidePOISheet
+                        // F-2d: 📍 button opens PreRidePOISheet
                         Button {
                             showPOISheet = true
                         } label: {
@@ -177,12 +185,12 @@ struct RideView: View {
         .onAppear {
             fitCameraToRoute(route)
         }
-        // F-2d: PreRidePOISheet replaces direct POIDiscoverySheet
+        // F-2d: PreRidePOISheet
         .sheet(isPresented: $showPOISheet) {
             PreRidePOISheet(route: route)
                 .environmentObject(routeStore)
         }
-        // Legacy sheet kept for any other callers; showDiscoverySheet unused in birdsEye now
+        // Legacy sheet kept for any other callers
         .sheet(isPresented: $showDiscoverySheet) {
             POIDiscoverySheet(route: route)
                 .environmentObject(routeStore)
@@ -478,8 +486,6 @@ struct RideView: View {
     }
 
     // MARK: - ETA Tile
-    // Shows estimated arrival time once 10 s of speed data is available.
-    // Falls back to remaining distance while ETA is warming up or rider is stopped.
 
     private var etaTile: some View {
         VStack(spacing: 2) {
@@ -488,7 +494,6 @@ struct RideView: View {
                     .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
                     .transition(.opacity)
             } else {
-                // Fallback: show remaining distance
                 let remaining = remainingDistance(route: routeStore.selectedRoute)
                 Text(formatDistance(remaining))
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -503,7 +508,6 @@ struct RideView: View {
         .animation(.easeInOut(duration: 0.4), value: rideStore.eta != nil)
     }
 
-    /// Colour-coded gradient tile.
     private func gradeTile(grade: Double) -> some View {
         let abs = abs(grade)
         let color: Color = {
@@ -607,7 +611,9 @@ struct RideView: View {
                 }
             }
 
-            // F-2a + F-2b: annotations from activePOIs, 56pt target, long-press delete
+            // F-2a + F-2b: annotations from activePOIs, 56pt target, long-press delete.
+            // Issue 3 fix: long-press handler guards on rideState.isActive —
+            // pre-ride birds-eye annotations are read-only.
             ForEach(activePOIs) { poi in
                 let isNext    = poi.id == rideStore.rideState.nextPOI?.id
                 let isPending = pendingDeletePOI?.id == poi.id
@@ -625,9 +631,13 @@ struct RideView: View {
                     }
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            // Issue 3: no-op during pre-ride birds-eye
+                            guard rideStore.rideState.isActive else { return }
+
                             if pendingDeletePOI?.id == poi.id {
                                 // Second long-press — confirm delete
                                 cameraPauseTask?.cancel()
+                                cameraPauseTask = nil
                                 let filtered = rideStore.pois.filter { $0.id != poi.id }
                                 rideStore.updatePOIs(filtered)
                                 routeStore.selectedPOIs = routeStore.selectedPOIs.filter { $0.id != poi.id }
@@ -636,7 +646,7 @@ struct RideView: View {
                             } else {
                                 // First long-press — highlight red, pause camera 3s
                                 pendingDeletePOI = poi
-                                pauseCameraTracking()
+                                pauseCameraTracking(for: poi.id)
                             }
                         }
                     )
@@ -690,15 +700,25 @@ struct RideView: View {
         }
     }
 
-    // F-2b: Pause camera tracking for 3 s after a long-press to let the
-    // rider interact with the annotation without the map panning away.
-    // Auto-cancels the pending delete if no second press arrives.
-    private func pauseCameraTracking() {
+    // F-2b / Issue 1 fix: Capture the triggering POI's id at task-creation time.
+    // The auto-cancel only clears pendingDeletePOI if it still refers to the
+    // same POI — prevents a rapid double-long-press on two different annotations
+    // from wiping the second POI's pending state prematurely.
+    //
+    // Issue 2 fix: pendingDeletePOI being non-nil also gates updateRidingCamera
+    // in .onChange(of: currentCoordinate) so the map does not pan away during
+    // the 3s interaction window.
+    private func pauseCameraTracking(for poiID: UUID) {
         cameraPauseTask?.cancel()
         cameraPauseTask = Task {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
-            await MainActor.run { pendingDeletePOI = nil }
+            await MainActor.run {
+                if pendingDeletePOI?.id == poiID {
+                    pendingDeletePOI = nil
+                }
+                cameraPauseTask = nil
+            }
         }
     }
 

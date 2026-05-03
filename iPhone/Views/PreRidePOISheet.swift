@@ -8,6 +8,9 @@
 //   - On this route: list of saved POIs + swipe-to-delete
 //   - Add nearby: navigates into POIDiscoverySheet
 //
+//  Issue 5 fix: .sheet(isPresented: $showSearch) moved outside the
+//  NavigationStack body to avoid double-navigation-bar edge cases on iPad.
+//
 
 import SwiftUI
 
@@ -58,10 +61,11 @@ struct PreRidePOISheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showSearch) {
-                POIDiscoverySheet(route: route)
-                    .environmentObject(routeStore)
-            }
+        }
+        // Issue 5 fix: sheet attached to NavigationStack, not inside its body.
+        .sheet(isPresented: $showSearch) {
+            POIDiscoverySheet(route: route)
+                .environmentObject(routeStore)
         }
     }
 }
