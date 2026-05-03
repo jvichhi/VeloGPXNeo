@@ -35,34 +35,36 @@ struct PreRidePOISheet: View {
         NavigationStack {
             List {
                 // MARK: On this route
-                Section("On this route") {
+                let sectionTitle = "On this route"
+                Section(sectionTitle) {
                     if routeStore.selectedPOIs.isEmpty {
                         Text("No pinned POIs yet")
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
                         ForEach(sortedPOIs) { poi in
+                            let name: String = poi.name
+                            let icon: String = poi.category.systemImage
+                            let dist: Double? = alongRouteDistance(for: poi)
                             HStack {
                                 Label {
-                                    Text(poi.name)
+                                    Text(name)
                                 } icon: {
-                                    Image(systemName: poi.category.systemImage)
+                                    Image(systemName: icon)
                                         .foregroundStyle(.orange)
                                 }
                                 Spacer()
-                                if let dist = alongRouteDistance(for: poi) {
-                                    Text(formatDistance(dist))
+                                if let d = dist {
+                                    Text(formatDistance(d))
                                         .font(.caption.monospacedDigit())
                                         .foregroundStyle(.secondary)
                                 }
                             }
                         }
-                        .onDelete { indexSet in
-                            // Map sorted indices back to routeStore indices before removing.
-                            let poisToRemove = indexSet.map { sortedPOIs[$0] }
-                            routeStore.selectedPOIs.removeAll {
-                                poisToRemove.contains(where: { $0.id == $1.id })
-                            }
+                        .onDelete { (indexSet: IndexSet) in
+                            let poisToRemove: [POIModel] = indexSet.map { sortedPOIs[$0] }
+                            let idsToRemove: Set<UUID> = Set(poisToRemove.map { $0.id })
+                            routeStore.selectedPOIs.removeAll { idsToRemove.contains($0.id) }
                             routeStore.savePOIs()
                         }
                     }
