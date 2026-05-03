@@ -54,18 +54,31 @@ extension RideSessionStore {
     // MARK: - Step advancement
 
     /// Called from locationManager(_:didUpdateLocations:) on every GPS ping.
-    /// Advances currentStepIndex when the rider is within 30 m of the next
-    /// maneuver point. No-op when there are no planned nav steps.
+    ///
+    /// Checks whether the rider is within 30 m of the *current* step's maneuver
+    /// coordinate. If so, advances to the next step. If the current step was the
+    /// last one (destination reached), clears planned nav so the banner dismisses.
+    ///
+    /// Previous bug: was checking plannedNavSteps[nextIndex] instead of
+    /// plannedNavSteps[currentStepIndex], causing step 0 to never be shown
+    /// and advancement to start from step 1.
     func advanceStepIfNeeded(location: CLLocation) {
-        guard !plannedNavSteps.isEmpty else { return }
-        let nextIndex = currentStepIndex + 1
-        guard nextIndex < plannedNavSteps.count else { return }
-        let maneuver = plannedNavSteps[nextIndex].maneuverCoordinate
+        guard !plannedNavSteps.isEmpty,
+              plannedNavSteps.indices.contains(currentStepIndex) else { return }
+
+        let maneuver = plannedNavSteps[currentStepIndex].maneuverCoordinate
         let dist = location.distance(from: CLLocation(
-            latitude: maneuver.latitude,
+            latitude:  maneuver.latitude,
             longitude: maneuver.longitude
         ))
-        if dist <= 30 {
+
+        guard dist <= 30 else { return }
+
+        let nextIndex = currentStepIndex + 1
+        if nextIndex >= plannedNavSteps.count {
+            // Destination reached — dismiss the banner.
+            clearPlannedNav()
+        } else {
             currentStepIndex = nextIndex
         }
     }
@@ -109,7 +122,7 @@ extension RideSessionStore {
                     }
                 } catch {
                     // Network or routing failure — skip this segment silently.
-                    // The rider can still ride; they just won’t get turn prompts
+                    // The rider can still ride; they just won't get turn prompts
                     // for the failed leg.
                 }
             }
@@ -124,7 +137,9 @@ extension RideSessionStore {
 
     // MARK: - Clear
 
-    /// Called from endLocationUpdates() to reset nav state between rides.
+    /// Resets planned nav state. Called from start() (fresh ride) and
+    /// endLocationUpdates() (ride ended), and automatically from
+    /// advanceStepIfNeeded() when the destination is reached.
     func clearPlannedNav() {
         plannedNavSteps = []
         currentStepIndex = 0
@@ -139,7 +154,7 @@ extension RideSessionStore {
         return plannedNavSteps[currentStepIndex]
     }
 
-    /// The step after the current one, for the “Then: …” preview line in the banner.
+    /// The step after the current one, for the "Then: …" preview line in the banner.
     var nextPlannedStep: PlannedNavStep? {
         let next = currentStepIndex + 1
         guard plannedNavSteps.indices.contains(next) else { return nil }
