@@ -36,23 +36,20 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private var manager: CLLocationManager!
 
-    // internal (not private) so that file-separated extensions (e.g. RideSessionStore+Spurs)
-    // can read these without duplicating state.
+    // internal so file-separated extensions (RideSessionStore+Spurs) can read these.
     var route: RouteModel?
     var pois: [POIModel] = []
     var nearestTrackIndex: Int = 0
 
     private var lastLocation: CLLocation?
     private var startTime: Date?
-    private var pauseStartTime: Date?       // non-nil only while paused
+    private var pauseStartTime: Date?
     private var lastAlertedPOIID: UUID?
     private var lastRerouteTime: Date?
     private var historyStore: RideHistoryStore?
     private var errorClearTask: Task<Void, Never>?
 
     // MARK: - Elapsed-time timer
-    // Fires every second so the HUD clock keeps ticking even when GPS
-    // distanceFilter suppresses location events (e.g. rider is stationary).
     private var elapsedTimer: Timer?
 
     // MARK: - Watch throttle
@@ -60,11 +57,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private let watchUpdateInterval: TimeInterval = 1.0
 
     // MARK: - Breadcrumb trail
-    // Stored as CLLocation (not just coordinate) so we retain altitude at each point.
     private var breadcrumbLocations: [CLLocation] = []
 
-    // MARK: - Altitude smoothing (Bug 3 fix)
-    // Rolling average over last 3 altitude readings suppresses barometric/GPS jitter.
+    // MARK: - Altitude smoothing
     private var altitudeBuffer: [Double] = []
     private let altitudeBufferSize = 3
     private var smoothedAltitude: Double? {
@@ -73,9 +68,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - ETA speed buffer
-    // Rolling window of (timestamp, speed) pairs over the last 30 seconds.
-    // Used to compute a smoothed average speed for ETA rather than relying
-    // on the noisy instantaneous speed reading.
     private var speedBuffer: [(date: Date, speed: Double)] = []
     private let speedBufferWindow: TimeInterval = 30
 
@@ -176,8 +168,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         pauseStartTime = nil
         rideState.isPaused = false
-        lastLocation = nil   // discard stale last location so distance delta doesn't spike
-        speedBuffer = []     // discard stale speed readings from before the pause
+        lastLocation = nil
+        speedBuffer = []
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -269,8 +261,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 breadcrumbLocations.append(location)
             }
 
-            // Altitude smoothing: rolling average over last 3 readings,
-            // 1.5 m threshold to suppress barometric/GPS jitter.
             altitudeBuffer.append(location.altitude)
             if altitudeBuffer.count > altitudeBufferSize {
                 altitudeBuffer.removeFirst()
@@ -295,8 +285,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         self.lastLocation = location
 
-        // GPS ping syncs elapsedTime for accuracy; the 1 Hz Timer is the
-        // primary clock source so the HUD ticks even when stationary.
         if let startTime {
             rideState.elapsedTime = Date().timeIntervalSince(startTime) - rideState.pausedDuration
         }
@@ -353,42 +341,29 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // MARK: - ETA
 
-    /// Appends current speed to the rolling 30-second buffer, evicting stale entries.
     private func updateSpeedBuffer(speed: Double) {
         let now = Date()
         speedBuffer.append((date: now, speed: speed))
-        // Evict readings older than the window
         speedBuffer = speedBuffer.filter {
             now.timeIntervalSince($0.date) <= speedBufferWindow
         }
     }
 
-    /// Recomputes ETA from the rolling average speed and remaining route distance.
-    /// Requires at least 10 seconds of speed data and a minimum avg speed of 1 km/h
-    /// to avoid nonsensical ETAs when the rider is stopped at a light.
     private func updateETA() {
         guard let route else { eta = nil; return }
-
-        // Need at least 10 s of data in the buffer before showing ETA
         guard let oldest = speedBuffer.first,
               Date().timeIntervalSince(oldest.date) >= 10 else {
             eta = nil
             return
         }
-
         let avgSpeed = speedBuffer.map { $0.speed }.reduce(0, +) / Double(speedBuffer.count)
-
-        // Suppress ETA if avg speed is below 1 km/h — rider is stopped
         guard avgSpeed > (1.0 / 3.6) else { eta = nil; return }
-
         let remainingDistance = remainingRouteDistance(route: route)
         guard remainingDistance > 0 else { eta = nil; return }
-
         let secondsRemaining = remainingDistance / avgSpeed
         eta = Date().addingTimeInterval(secondsRemaining)
     }
 
-    /// Returns the arc-length of the remaining route polyline from the current track position.
     private func remainingRouteDistance(route: RouteModel) -> CLLocationDistance {
         guard let progress = routeProgress, progress.remaining.count > 1 else {
             return route.totalDistance
@@ -406,9 +381,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             reroutePolyline = []
             return
         }
-
         let nearestPoint = route.trackPoints[nearestTrackIndex].coordinate.clCoordinate
-
         if rideState.offRouteDistance <= 200 {
             rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
             rideState.rerouteSteps = []
@@ -463,11 +436,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - Route progress
-    //
-    // progressPercent is now distance-based: totalDistance / route.totalDistance.
-    // This is monotonically increasing, proportional to actual metres ridden, and
-    // immune to the index-based jump that occurred when the rider started mid-route
-    // or the GPX had unevenly spaced track points.
 
     private func updateRouteProgress(from coordinate: CLLocationCoordinate2D, route: RouteModel) {
         let points = route.trackPoints
@@ -489,8 +457,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         let remaining = Array(points[bestIndex...].map { $0.coordinate.clCoordinate })
         routeProgress = RouteProgress(ridden: ridden, remaining: remaining)
 
-        // Distance-based progress: clamp to [0, 1] so it never exceeds 100%
-        // if the rider overshoots the route end slightly.
         let routeTotal = route.totalDistance
         progressPercent = routeTotal > 0
             ? min(rideState.totalDistance / routeTotal, 1.0)
@@ -511,9 +477,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return minDistance
     }
 
-    // MARK: - Track arc distance helper (F-2f)
-    // Returns the along-route distance (metres) between two track point indices.
-    // Used by computeSpurs() to enforce the 500 m proximity gate.
+    // MARK: - Track arc distance helper
     func trackArcDistance(from startIdx: Int, to endIdx: Int, points: [TrackPoint]) -> Double {
         guard startIdx < endIdx, endIdx < points.count else { return 0 }
         return zip(points[startIdx..<endIdx], points[(startIdx + 1)...endIdx])
@@ -564,9 +528,19 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         let sorted = candidatesAhead.sorted { $0.trackIndex < $1.trackIndex }
 
         if let first = sorted.first {
-            rideState.nextPOI = first.poi
-            rideState.nextPOIDistance = first.straightLineDistance
-            // Approach alert stays at 200 m straight-line (unchanged)
+            // Issue 1b fix: if the rider has already passed the current nextPOI's
+            // snap index, advance immediately without waiting for the next GPS tick.
+            // This closes the 1-2 tick gap where nextPOI was stale after passing a POI.
+            if let current = rideState.nextPOI,
+               let currentCandidate = sorted.first(where: { $0.poi.id == current.id }),
+               currentCandidate.trackIndex < searchStart {
+                // current nextPOI is now behind us — pick the new first candidate
+                rideState.nextPOI = first.poi
+                rideState.nextPOIDistance = first.straightLineDistance
+            } else {
+                rideState.nextPOI = first.poi
+                rideState.nextPOIDistance = first.straightLineDistance
+            }
             if first.straightLineDistance < 200 {
                 triggerApproachAlert(for: first.poi)
             }

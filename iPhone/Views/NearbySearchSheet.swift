@@ -8,8 +8,6 @@ struct NearbySearchSheet: View {
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
     @State private var selectedCategory = "Café"
-    // Bug 2 fix: shown when coordinate is invalid so the user isn't
-    // silently served results from (0, 0).
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
@@ -23,7 +21,6 @@ struct NearbySearchSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
 
-                // Category chip bar
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.query) { cat in
@@ -54,10 +51,8 @@ struct NearbySearchSheet: View {
 
                 Divider()
 
-                // Content
                 Group {
                     if hasInvalidCoordinate {
-                        // Bug 2 fix: show a clear error instead of searching (0,0).
                         VStack(spacing: 14) {
                             Image(systemName: "location.slash.fill")
                                 .font(.system(size: 32))
@@ -71,7 +66,7 @@ struct NearbySearchSheet: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if isLoading {
-                        ProgressView("Searching…")
+                        ProgressView("Searching\u{2026}")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty {
                         VStack(spacing: 14) {
@@ -107,9 +102,7 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
-    // MARK: - ID-based POI matching
-    // MKMapItem has no stable ID, so we derive a deterministic UUID from
-    // the coordinate rounded to 6 decimal places.
+    // MARK: - Deterministic ID (coordinate-based)
 
     private func deterministicID(for item: MKMapItem) -> UUID {
         let lat = (item.placemark.coordinate.latitude * 1_000_000).rounded() / 1_000_000
@@ -163,7 +156,6 @@ struct NearbySearchSheet: View {
     }
 
     func load() async {
-        // Bug 2 fix: guard against an invalid coordinate before firing the search.
         guard CLLocationCoordinate2DIsValid(coordinate),
               coordinate.latitude != 0 || coordinate.longitude != 0 else {
             hasInvalidCoordinate = true
@@ -171,7 +163,14 @@ struct NearbySearchSheet: View {
         }
         hasInvalidCoordinate = false
         isLoading = true
-        results = (try? await POISearchService.shared.search(query: selectedCategory, near: coordinate)) ?? []
+        // Issue 3b fix: cap radius at 1000 m for mid-ride nearby search.
+        // The previous default of 5000 m returned results up to 4 km off-route,
+        // most of which are unreachable or irrelevant while riding.
+        results = (try? await POISearchService.shared.search(
+            query: selectedCategory,
+            near: coordinate,
+            radius: 1000
+        )) ?? []
         isLoading = false
     }
 
