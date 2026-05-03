@@ -1,5 +1,5 @@
 # VeloGPXNeo — Tech Debt Checkpoint
-> Last reviewed: April 26, 2026 (full AI-assisted audit)
+> Last reviewed: May 2, 2026 (POI overhaul + route line session)
 
 ---
 
@@ -10,6 +10,13 @@
   Will cause a compiler error or silent shadowing. Delete the root-level copy and verify `.pbxproj`
   Build Phases contain only the `Services/` version.
 
+- [ ] **POI `×` button in `nextPOIChip` is broken / unreachable**
+  The `×` on the next-POI chip only shows when a POI is the *next* one AND within 2000 m.
+  Any POI further away or already passed has no removal path.
+  Additionally the tap target is too small to reliably hit mid-ride.
+  **Fix (planned this session):** replace chip `×` with long-press on the map annotation to delete.
+  See POI Overhaul plan below.
+
 - [ ] **POI toggle uses name-matching instead of ID**
   `NearbySearchSheet.toggle()` and `isAdded()` match POIs by `name` string.
   Breaks when two POIs share a name (e.g., two "Café" locations).
@@ -19,6 +26,44 @@
 ---
 
 ## 🟡 P1 — Next Sprint
+
+### POI Overhaul (planned May 2, 2026)
+
+Full breakdown of issues found and the agreed fix approach:
+
+**Problems identified:**
+1. **Two-copy split at ride start** — `start(route:pois:)` copies `routeStore.selectedPOIs` into
+   `rideStore.pois`. Map annotations render from `routeStore.selectedPOIs`; tracking runs off
+   `rideStore.pois`. These can diverge, making removal unreliable.
+2. **No pre-ride POI management** — pre-ride screen has no way to view or remove already-saved POIs.
+   The 📍 button only opens search with no inventory of what's pinned.
+3. **Spur lines anchor to rider position, not route** — `computeSpurs()` draws from
+   `currentCoord → poiCoord`. This creates a live rubber-band line that wiggles as the rider moves,
+   rather than showing the static detour geometry from the route to the POI.
+4. **Spurs and nextPOI activate too early** — spurs show for any POI within 2 km regardless of
+   route position. `nextPOI` fires for POIs up to 5 km away. Both should be proximity-gated
+   relative to the *route snap point*, not straight-line distance from rider.
+5. **No mid-ride removal path** — only the `nextPOI` chip within 2000 m had an `×`; it was
+   too small to tap reliably and permanently deleted from the persisted sidecar (destructive with no undo).
+6. **`×` tap broken** — the chip's `.buttonStyle(.plain)` inside a `Capsule` background swallows
+   the touch for the inner button; the gesture never reaches the `×`.
+
+**Agreed fix plan:**
+- **Single source of truth during ride:** map annotations render from `rideStore.pois` (not `routeStore.selectedPOIs`) once a ride is active.
+- **Long-press annotation to delete:** 56 pt tap target on POI annotation. Long-press (0.5 s) shows
+  a confirmation overlay anchored to a fixed screen position (not MapKit popover — immune to camera
+  panning). Two-step confirm: first press highlights red, second press removes. Camera pauses tracking
+  for 3 s on annotation interaction then resumes.
+- **Remove chip `×`:** `nextPOIChip` becomes display-only (icon + distance). Deletion is annotation-only.
+- **Pre-ride POI sheet:** 📍 button opens sheet with two sections:
+  - *On this route* — list of saved POIs with swipe-to-delete
+  - *Add nearby* — existing `POIDiscoverySheet` search experience
+- **Spur anchor fix:** spur `inbound` line originates from the nearest route track point to the POI,
+  not from the rider's live coordinate. Outbound leg unchanged (POI → route snap).
+- **Proximity gating:**
+  - Spurs only rendered when rider is ≤500 m along-route from the POI's track snap point.
+  - `nextPOI` chip only shown when POI is ≤500 m straight-line.
+  - Approach alert (haptic + notification) unchanged at 200 m.
 
 - [x] **Replace `.walking`/`.automobile` routing with `.cycling` (WWDC25)**
   All `MKDirections` calls now route through `CyclingRouteService.shared`.
@@ -49,6 +94,33 @@
 - [x] **`hudHeight` uses `DispatchQueue.asyncAfter` timing hack**
   Replaced with `HUDHeightKey: PreferenceKey`. Height reported via `.preference` in
   `ridingHUDPanel`, consumed via `.onPreferenceChange` in `ridingLayout`.
+
+---
+
+### Route Line Visibility (planned May 2, 2026)
+
+**Problem:** Route polylines are too thin to read at a glance while riding.
+
+**Current values in `RideView.mapLayer`:**
+
+| Polyline | Outline | Fill |
+|---|---|---|
+| Remaining route | white 9 pt | blue 6 pt |
+| Ridden route | white 7 pt | blue/0.45 4 pt |
+| Reroute | white 8 pt | orange 5 pt |
+| POI spur inbound (next) | — | green 4 pt dashed |
+| POI spur outbound (next) | — | red 3.5 pt dashed |
+
+**Fix:** Double all stroke widths:
+
+| Polyline | Outline | Fill |
+|---|---|---|
+| Remaining route | white 18 pt | blue 12 pt |
+| Ridden route | white 14 pt | blue/0.45 8 pt |
+| Reroute | white 16 pt | orange 10 pt |
+| POI spur inbound (next) | — | green 8 pt dashed |
+| POI spur outbound (next) | — | red 7 pt dashed |
+| Non-next spurs scale proportionally |
 
 ---
 
@@ -134,3 +206,4 @@
 | Error surfacing via `lastError` + dismissible HUD banner | Apr 26, 2026 |
 | `MapCameraAnimation` for smooth camera transitions | Apr 26, 2026 |
 | `NextPOIBanner.swift` stub deleted | Apr 26, 2026 |
+| POI overhaul + route line plan documented | May 2, 2026 |
