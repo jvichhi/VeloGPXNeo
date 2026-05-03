@@ -1,5 +1,5 @@
 # VeloGPXNeo — Tech Debt Checkpoint
-> Last reviewed: May 2, 2026 (F-1 route line + F-2 POI overhaul + P0 duplicate resolved)
+> Last reviewed: May 3, 2026 (code review — new bugs, perf, error-handling findings added)
 
 ---
 
@@ -15,9 +15,26 @@
 
 - [ ] **POI toggle uses name-matching instead of ID**
   `NearbySearchSheet.toggle()` and `isAdded()` match POIs by `name` string.
-  Breaks when two POIs share a name (e.g., two “Café” locations).
+  Breaks when two POIs share a name (e.g., two "Café" locations).
   Fix: use `deterministicID(for:)` based on coordinate (6 d.p.) or assign a stable `UUID` at creation.
-  *(Note: a previous entry marked this “already fixed” — re-verify in current build)*
+  *(Note: a previous entry marked this "already fixed" — re-verify in current build)*
+  **May 3 review**: Confirmed still present. `POIDiscoverySheet.swift:133` also deduplicates by
+  `$0.name == poi.name`. Two different "Starbucks" along a route silently collide.
+
+- [ ] **GPX export produces invalid files on non-US locales**
+  `GPXExporter.swift` builds XML via raw string interpolation of `Double` values.
+  `poi.coordinate.latitude` uses default locale formatting — on German/French/etc. devices
+  `46.5` becomes `46,5` (comma decimal separator), producing invalid GPX.
+  Fix: force `en_US_POSIX` locale on the number formatter, or use `String(format: "%f", ...)`.
+  Same risk in the `escape()` function — single quotes, carriage returns not handled.
+
+- [ ] **Duplicate `LocalizationManager.swift` — will break builds if both compiled**
+  Two independent implementations exist:
+  - `Shared/Managers/LocalizationManager.swift` (full-featured, calls deprecated `synchronize()`)
+  - `Shared/Localization/LocalizationManager.swift` (cleaner refactor, missing some features)
+  Both define `AppLanguage`, `LocalizationManager`, and the `localized` extension on `String`.
+  If both are included in the same target the compiler emits "invalid redeclaration" errors.
+  Fix: consolidate into one file, pick the best of both, remove the deprecated `synchronize()` call.
 
 ---
 
@@ -85,6 +102,31 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
   Replaced with `HUDHeightKey: PreferenceKey`. Height reported via `.preference` in
   `ridingHUDPanel`, consumed via `.onPreferenceChange` in `ridingLayout`.
 
+- [ ] **`.constant()` binding breaks alert dismissal** — `RouteLibraryView.swift:44`
+  ```swift
+  .alert("VeloGPX", isPresented: .constant(routeStore.lastImportMessage != nil), ...)
+  ```
+  `.constant()` ignores writes. If the system dismisses the alert (tap outside on iPad, etc.),
+  the binding write to `false` is lost and `lastImportMessage` remains non-nil, re-presenting
+  the alert immediately. Fix: use a proper `@State` Bool synced bidirectionally.
+
+- [ ] **Watch haptic fires every second while off-route** — `WatchRideStore.swift:26`
+  `WKInterfaceDevice.current().play(.notification)` fires on every watch update (up to 1 Hz)
+  while `isOffRoute == true`. No guard against repeated alerts — once off-route the watch
+  vibrates continuously until the rider returns. Fix: track a `didAlertOffRoute` flag and
+  reset it on `isOffRoute → false` transition.
+
+- [ ] **`errorClearTask` not cancelled on deinit** — `RideSessionStore.swift:421`
+  The `Task` closure captures `self` strongly via `lastError`. If the store were deallocated
+  during the 6-second sleep, the task wakes and accesses a dangling `self`.
+  Fix: add `deinit { errorClearTask?.cancel() }`. Same for `elapsedTimer`:
+  `deinit { elapsedTimer?.invalidate() }`.
+
+- [ ] **Off-route bearing uses potentially invalid heading** — `RideView.swift:369`
+  `rideState.currentHeading` defaults to `0` when heading data is unavailable (device stationary).
+  Combined with a non-zero bearing, this produces a misleading direction arrow.
+  Fix: guard on heading validity before computing the relative bearing.
+
 ---
 
 ## 🟢 P2 — Backlog
@@ -112,12 +154,51 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
   Add a user setting to toggle between `.standard`, `.hybrid(elevation: .realistic)`,
   and a cycling-focused style with lane overlays.
 
-- [ ] **Two `.onAppear` blocks in `RideView`**
+- [ ] **Two `.onAppear` blocks in `RideView`** *(note: marked completed below but still present — re-verify)*
   ```swift
   .onAppear { rideStore.prepare() ... }
   .onAppear { rideStore.setHistoryStore(historyStore) }
   ```
   Both fire but ordering is fragile. Merge into one `.onAppear` block.
+
+- [ ] **`buildSnapIndexCache` O(N×M) on main thread** — `PreRidePOISheet.swift:102-117`
+  For every POI, scans the entire track point array to find the nearest index. With 50 POIs
+  and 10,000 track points, that's 500K iterations on the main thread on every appearance.
+  Fix: offload scan to a background task, or build a spatial index (k-d tree / grid).
+
+- [ ] **`updateNextPOI` scans all POIs on every location update** — `RideSessionStore.swift:491-551`
+  Called from `locationManager(_:didUpdateLocations:)` (~5m granularity). For each POI it
+  iterates a range of track points. With 5,000 track points and 20 POIs, each update does up
+  to 100K distance calculations on the main actor.
+  Fix: pre-compute POI snap indices once when POIs change, then only do indexed lookup.
+
+- [ ] **`elevationSamples` recomputed on every body evaluation** — `RouteDetailView.swift:236-252`
+  Computed property iterates all track points every render, including during text field editing
+  for renaming. Fix: lazily cache the result, invalidating only when `route.trackPoints` changes.
+
+- [ ] **Empty `catch` blocks swallow errors silently**
+  `RideSummaryView.swift:296`, `RideHistoryView.swift:231`, `RideHistoryDetailView.swift:266,346`
+  all use `} catch {}` — suppressing failures from `MKMapSnapshotter`, GPX file writing, and
+  image rendering. User gets no feedback when export or snapshot fails.
+  Fix: at minimum `print()` the error; ideally surface via a published error string / toast.
+
+- [ ] **Notification auth result silently ignored** — `RideSessionStore.swift:92`
+  ```swift
+  UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+  ```
+  If denied, `triggerApproachAlert()` still attempts to add notification requests which silently
+  fail. Fix: check `granted` and skip notification attempts when denied.
+
+- [ ] **`FileManager` URL force-unwrap** — `RouteStore.swift:150,161`
+  ```swift
+  let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+  ```
+  In sandboxed, test, or unusual configurations this could return `[]` → crash.
+  Fix: provide a fallback directory or use optional binding with a clear error.
+
+- [ ] **Generic "Import failed" message** — `RouteStore.swift:79`
+  Invalid file content and I/O failures both produce the same string. User can't tell whether
+  their file is corrupt or the device is out of storage. Fix: differentiate error messages.
 
 ---
 
@@ -144,6 +225,33 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
   Zero test coverage for: `minimumDistance`, `updateNextPOI` ordering,
   elevation accumulation noise, `bearing()` function.
   Add `XCTestCase` tests for these as highest-risk logic paths.
+
+- [ ] **Dead views add maintenance overhead**
+  - `CyclingRouteOverlay.swift` — commented as "retained for potential future reuse." Either use or delete.
+  - `RouteNoticeView.swift` — defined but never instantiated (already tracked in P2 for wiring).
+  Remove or wire up before 1.0.
+
+- [ ] **`RideSessionStore+Spurs.swift` accesses internal properties loosened from `private`**
+  `route`, `pois`, `nearestTrackIndex`, `rideState` were explicitly made `internal` (not `private`)
+  so the file-separated extension could read them. Comment says "internal so file-separated
+  extensions can read these." Fix: use `private(set)` or extract spur logic into a dedicated service.
+
+- [ ] **`AppleLanguages` UserDefaults key is fragile / not documented public API**
+  `Shared/Managers/LocalizationManager.swift:126` writes to `UserDefaults.standard.set(..., forKey: "AppleLanguages")`.
+  This is a system-internal key, not documented for app use on iOS 17+. May break in future iOS releases.
+  Also calls the deprecated `UserDefaults.standard.synchronize()` (deprecated since iOS 13).
+  Fix: use the Bundle-based `.lproj` loading approach (already present in the `Shared/Localization/` copy).
+
+- [ ] **Implicitly unwrapped optional `CLLocationManager`** — `RideSessionStore.swift:37`
+  ```swift
+  private var manager: CLLocationManager!
+  ```
+  Set in `init()`. Safe in practice but a code smell. Fix: `private let manager = CLLocationManager()`.
+
+- [ ] **Force-unwrap of `min()`/`max()` on coordinate arrays** — multiple files
+  `RideSummaryView.swift:256-259`, `RideHistoryView.swift:203-208`, `RideHistoryDetailView.swift:288-297`
+  all use `coords.map(\.latitude).min()!` guarded by `count > 1`. Safe today but fragile —
+  a refactor that changes the guard could introduce a crash. Use optional binding instead.
 
 ---
 
