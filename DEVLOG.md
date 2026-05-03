@@ -17,52 +17,26 @@
 | fix(Routes) | Distinct Routes tab icon (`list.bullet.below.rectangle`); Plan swipe/context-menu actions GPX-only |
 | fix(PlanView) | SwiftUI overlay buttons replace unreliable native MapKit controls |
 | fix(PlanView) | Rounded drawer corners (20 pt), header pinned top, waypoint swipe-delete via `.swipeActions` |
+| feat(RideView) | **F-1** All MapPolyline stroke widths doubled across all 5 pairs |
+| feat(POI) | **F-2a** Single source of truth — map annotations render from `rideStore.pois` during active ride |
+| feat(POI) | **F-2b** Long-press delete on POI annotations: 56pt target, 0.5s, two-step red-highlight → trash, camera pauses 3s |
+| feat(POI) | **F-2c** `×` removed from `nextPOIChip` — chip is display-only (icon + distance) |
+| feat(POI) | **F-2d** `PreRidePOISheet.swift` added; 📍 button opens *On this route* + *Add nearby* sections |
+| feat(POI) | **F-2e** Spur inbound anchor fixed: nearest route track point → POI (not rider position → POI) |
+| feat(POI) | **F-2f** Proximity gate: spurs + chip only active ≤500m along-route; approach alert stays at 200m |
+| fix(P0) | Duplicate `POISearchService.swift` (root-level copy) removed from project + Build Phases |
 
 ---
 
 ## In Progress — Next to Code
 
-### 1. Route Line Visibility
-**Status:** Planned. Not yet coded.
-
-All `MapPolyline` stroke widths in `RideView.mapLayer` to be doubled:
-
-| Polyline | Current outline / fill | Target outline / fill |
-|---|---|---|
-| Remaining route | white 9 / blue 6 | white 18 / blue 12 |
-| Ridden route | white 7 / blue 4 | white 14 / blue 8 |
-| Reroute | white 8 / orange 5 | white 16 / orange 10 |
-| Spur inbound (next) | green 4 dashed | green 8 dashed |
-| Spur outbound (next) | red 3.5 dashed | red 7 dashed |
-
----
-
-### 2. POI Overhaul
-**Status:** Planned. Not yet coded. Full detail in `TECH_DEBT.md` P1.
-
-**Root causes identified:**
-- Two-copy split at ride start: `routeStore.selectedPOIs` → `rideStore.pois`. Map annotations render from `routeStore`, tracking runs off `rideStore`. They can diverge, making mid-ride removal unreliable.
-- `×` chip button broken: `.buttonStyle(.plain)` inside `Capsule` swallows the inner button touch — gesture never fires.
-- No removal path for POIs that aren’t the next one within 2000 m.
-- Spur lines draw from rider’s live GPS position to POI (rubber-band), not from the route track point. Looks wrong and wiggles constantly.
-- Spurs + `nextPOI` activate too early — up to 5 km away.
-- No pre-ride POI inventory — user can’t see or remove already-saved POIs before starting.
-
-**Agreed implementation plan:**
-1. **Single source of truth:** map annotations render from `rideStore.pois` once ride is active.
-2. **Long-press to delete:** 56 pt annotation tap target. Long-press (0.5 s) shows fixed-position confirmation overlay (not a MapKit popover — immune to camera pan). Two-step: highlights red on first press, deletes on second. Camera pauses tracking 3 s then resumes.
-3. **Chip display-only:** remove `×` from `nextPOIChip`. Chip shows icon + distance only.
-4. **Pre-ride POI sheet:** 📍 button opens sheet with two sections — *On this route* (list + swipe-to-delete) and *Add nearby* (existing search).
-5. **Spur anchor fix:** spur `inbound` line originates from nearest route track point to POI, not rider position.
-6. **Proximity gating:** spurs + chip only activate when rider is ≤500 m (along-route) from POI snap point. Approach alert stays at 200 m straight-line.
+Nothing currently in flight. Build is clean, all planned session work landed.
 
 ---
 
 ## Open Bugs
 
-| # | Where | Description |
-|---|---|---|
-| B-1 | `RideView` | `×` on `nextPOIChip` never fires — `.buttonStyle(.plain)` inside `Capsule` swallows touch. **Fix:** remove `×`, use long-press on annotation instead (POI Overhaul item 2). |
+*None blocking build.*
 
 ---
 
@@ -70,14 +44,13 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` to be doubled:
 
 | # | Feature | Notes |
 |---|---|---|
-| F-1 | Route line visibility | Double all stroke widths in `RideView.mapLayer` |
-| F-2 | POI overhaul | Full plan above. Touches `RideView`, `RideSessionStore`, `RideSessionStore+Spurs`, `RouteStore` |
+| F-3 | `RideView` God View split | Extract `RideMapLayer`, `RideHUDPanel`, `RideBirdsEyePanel` — see TECH_DEBT P1 |
+| F-4 | `RideSessionStore` God Object split | `RideLocationEngine` + `POITrackingEngine` + `WatchSyncManager` — see TECH_DEBT P1 |
 
 ---
 
 ## Notes / Watch-outs
 
-- `TECH_DEBT.md` P0: **Duplicate `POISearchService.swift`** — root-level copy vs `iPhone/Services/` copy. Remove root-level, verify Build Phases before next TestFlight build.
-- `TECH_DEBT.md` P0: `×` chip broken — do not attempt a patch fix; the whole POI removal pattern is being replaced (see F-2).
 - `RideSessionStore.swift` is ~23 KB. P1 God Object split (`RideLocationEngine` + `POITrackingEngine` + `WatchSyncManager`) is overdue — do before adding more features.
 - `POIDiscoverySheet` vs `NearbySearchSheet` overlap — no blocker now; worth consolidating before 1.0.
+- `RouteStore+POI.swift` is suspiciously thin (866 B) — POI persistence still scattered across call sites in `RideView`. Consolidate before 1.0.
