@@ -67,6 +67,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return altitudeBuffer.reduce(0, +) / Double(altitudeBuffer.count)
     }
 
+    // MARK: - Speed smoothing
+    private var smoothedSpeed: Double = 0
+    private let speedSmoothingFactor: Double = 0.35
+
     // MARK: - ETA speed buffer
     private var speedBuffer: [(date: Date, speed: Double)] = []
     private let speedBufferWindow: TimeInterval = 30
@@ -108,6 +112,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.breadcrumbLocations = []
         self.altitudeBuffer = []
         self.speedBuffer = []
+        self.smoothedSpeed = 0
         self.currentGrade = 0
         self.eta = nil
         self.lastWatchUpdateTime = .distantPast
@@ -170,6 +175,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         rideState.isPaused = false
         lastLocation = nil
         speedBuffer = []
+        smoothedSpeed = 0
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -250,7 +256,20 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
         currentLocation = location
         rideState.currentCoordinate = location.coordinate.asCoordinate
-        let newSpeed = max(location.speed, 0)
+
+        let rawGPSSpeed = location.speed >= 0 ? location.speed : 0
+        var computedSpeed: Double? = nil
+        if let lastLocation {
+            let deltaDist = location.distance(from: lastLocation)
+            let deltaTime = location.timestamp.timeIntervalSince(lastLocation.timestamp)
+            if deltaTime > 0.1, deltaDist < 200 {
+                computedSpeed = deltaDist / deltaTime
+            }
+        }
+
+        let bestRaw = computedSpeed.map { max(rawGPSSpeed, $0) } ?? rawGPSSpeed
+        smoothedSpeed = speedSmoothingFactor * bestRaw + (1 - speedSmoothingFactor) * smoothedSpeed
+        let newSpeed = smoothedSpeed
         rideState.speed = newSpeed
         if newSpeed > rideState.maxSpeed { rideState.maxSpeed = newSpeed }
 
