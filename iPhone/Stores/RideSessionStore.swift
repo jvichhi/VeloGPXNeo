@@ -511,6 +511,17 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         return minDistance
     }
 
+    // MARK: - Track arc distance helper (F-2f)
+    // Returns the along-route distance (metres) between two track point indices.
+    // Used by computeSpurs() to enforce the 500 m proximity gate.
+    func trackArcDistance(from startIdx: Int, to endIdx: Int, points: [TrackPoint]) -> Double {
+        guard startIdx < endIdx, endIdx < points.count else { return 0 }
+        return zip(points[startIdx..<endIdx], points[(startIdx + 1)...endIdx])
+            .reduce(0.0) { acc, pair in
+                acc + pair.0.coordinate.clCoordinate.distance(to: pair.1.coordinate.clCoordinate)
+            }
+    }
+
     // MARK: - POI tracking
 
     private func updateNextPOI(from coordinate: CLLocationCoordinate2D) {
@@ -555,6 +566,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         if let first = sorted.first {
             rideState.nextPOI = first.poi
             rideState.nextPOIDistance = first.straightLineDistance
+            // Approach alert stays at 200 m straight-line (unchanged)
             if first.straightLineDistance < 200 {
                 triggerApproachAlert(for: first.poi)
             }

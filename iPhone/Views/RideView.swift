@@ -25,8 +25,13 @@ struct RideView: View {
     @State private var suppressNextCameraChange = false
     @State private var hudHeight: CGFloat = 0
     @State private var showNearbySheet    = false
+    @State private var showPOISheet       = false
     @State private var showDiscoverySheet = false
     @State private var completedSummary: RideSummary? = nil
+
+    // F-2b: Long-press delete state
+    @State private var pendingDeletePOI: POIModel? = nil
+    @State private var cameraPauseTask: Task<Void, Never>? = nil
 
     @Environment(\.scenePhase) private var envScenePhase
 
@@ -58,6 +63,10 @@ struct RideView: View {
                         ))
                     }
                 }
+            } else {
+                // Ride ended — cancel any pending delete
+                pendingDeletePOI = nil
+                cameraPauseTask?.cancel()
             }
         }
         .onChange(of: envScenePhase) { _, newPhase in
@@ -127,8 +136,9 @@ struct RideView: View {
                             .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        // F-2d: 📍 button now opens PreRidePOISheet
                         Button {
-                            showDiscoverySheet = true
+                            showPOISheet = true
                         } label: {
                             Image(systemName: "mappin.and.ellipse")
                                 .font(.system(size: 16, weight: .semibold))
@@ -167,6 +177,12 @@ struct RideView: View {
         .onAppear {
             fitCameraToRoute(route)
         }
+        // F-2d: PreRidePOISheet replaces direct POIDiscoverySheet
+        .sheet(isPresented: $showPOISheet) {
+            PreRidePOISheet(route: route)
+                .environmentObject(routeStore)
+        }
+        // Legacy sheet kept for any other callers; showDiscoverySheet unused in birdsEye now
         .sheet(isPresented: $showDiscoverySheet) {
             POIDiscoverySheet(route: route)
                 .environmentObject(routeStore)
@@ -361,11 +377,13 @@ struct RideView: View {
         }
     }
 
+    // F-2c: chip is display-only — no × button.
+    // F-2f: visibility gate tightened to 500m (was 2000m).
     private var nextPOIChip: some View {
         Group {
             if let poi = rideStore.rideState.nextPOI,
                let dist = rideStore.rideState.nextPOIDistance,
-               dist < 2000 {
+               dist < 500 {
                 HStack(spacing: 4) {
                     Image(systemName: poi.category.systemImage)
                         .font(.system(size: 11))
@@ -374,23 +392,8 @@ struct RideView: View {
                          ? "\(Int(dist))m"
                          : String(format: "%.1fkm", dist / 1000))
                         .font(.system(size: 11, weight: .semibold))
-                    // Dismiss button — removes POI from the active ride list,
-                    // the map annotation, and persists the change to the sidecar
-                    // so it doesn't ghost back on the next ride.
-                    Button {
-                        let filtered = rideStore.pois.filter { $0.id != poi.id }
-                        rideStore.updatePOIs(filtered)
-                        routeStore.selectedPOIs = routeStore.selectedPOIs.filter { $0.id != poi.id }
-                        routeStore.savePOIs()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
                 }
-                .padding(.leading, 10)
-                .padding(.trailing, 6)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(.regularMaterial, in: Capsule())
                 .transition(.scale.combined(with: .opacity))
@@ -552,41 +555,46 @@ struct RideView: View {
 
     @ViewBuilder
     private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
+        // F-2a: single source of truth — render from rideStore.pois during active ride
+        let activePOIs = rideStore.rideState.isActive ? rideStore.pois : routeStore.selectedPOIs
+
         Map(position: $position) {
+            // F-1: ALL polyline stroke widths doubled
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
-                    .stroke(.white, lineWidth: 7)
+                    .stroke(.white, lineWidth: 14)
                 MapPolyline(coordinates: progress.ridden)
-                    .stroke(.blue.opacity(0.45), lineWidth: 4)
+                    .stroke(.blue.opacity(0.45), lineWidth: 8)
 
                 MapPolyline(coordinates: progress.remaining)
-                    .stroke(.white, lineWidth: 9)
+                    .stroke(.white, lineWidth: 18)
                 MapPolyline(coordinates: progress.remaining)
-                    .stroke(.blue, lineWidth: 6)
+                    .stroke(.blue, lineWidth: 12)
             } else {
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
-                    .stroke(.white, lineWidth: 9)
+                    .stroke(.white, lineWidth: 18)
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
-                    .stroke(.blue, lineWidth: 6)
+                    .stroke(.blue, lineWidth: 12)
             }
 
             if !rideStore.reroutePolyline.isEmpty {
                 MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.white, lineWidth: 8)
+                    .stroke(.white, lineWidth: 16)
                 MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.orange, lineWidth: 5)
+                    .stroke(.orange, lineWidth: 10)
             }
 
+            // F-1: spur widths doubled; non-next scaled proportionally
             ForEach(poiSpurs) { spur in
                 MapPolyline(coordinates: spur.inbound)
                     .stroke(
                         spur.isNext ? Color.green : Color.green.opacity(0.65),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 4 : 2.5, dash: [7, 5])
+                        style: StrokeStyle(lineWidth: spur.isNext ? 8 : 5, dash: [7, 5])
                     )
                 MapPolyline(coordinates: spur.outbound)
                     .stroke(
                         spur.isNext ? Color.red : Color.red.opacity(0.5),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 3.5 : 2, dash: [7, 5])
+                        style: StrokeStyle(lineWidth: spur.isNext ? 7 : 4, dash: [7, 5])
                     )
             }
 
@@ -599,18 +607,39 @@ struct RideView: View {
                 }
             }
 
-            ForEach(routeStore.selectedPOIs) { poi in
-                let isNext = poi.id == rideStore.rideState.nextPOI?.id
+            // F-2a + F-2b: annotations from activePOIs, 56pt target, long-press delete
+            ForEach(activePOIs) { poi in
+                let isNext    = poi.id == rideStore.rideState.nextPOI?.id
+                let isPending = pendingDeletePOI?.id == poi.id
                 Annotation(poi.name, coordinate: poi.coordinate.clCoordinate) {
                     ZStack {
                         Circle()
-                            .fill(isNext ? Color.green : Color.white)
-                            .frame(width: 32, height: 32)
+                            .fill(isPending ? Color.red : (isNext ? Color.green : Color.white))
+                            .frame(width: 56, height: 56)
                             .shadow(radius: isNext ? 4 : 2)
-                        Image(systemName: poi.category.systemImage)
+                            .animation(.easeInOut(duration: 0.2), value: isPending)
+                        Image(systemName: isPending ? "trash.fill" : poi.category.systemImage)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(isNext ? .white : .orange)
+                            .foregroundStyle(isPending ? .white : (isNext ? .white : .orange))
+                            .animation(.easeInOut(duration: 0.15), value: isPending)
                     }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            if pendingDeletePOI?.id == poi.id {
+                                // Second long-press — confirm delete
+                                cameraPauseTask?.cancel()
+                                let filtered = rideStore.pois.filter { $0.id != poi.id }
+                                rideStore.updatePOIs(filtered)
+                                routeStore.selectedPOIs = routeStore.selectedPOIs.filter { $0.id != poi.id }
+                                routeStore.savePOIs()
+                                pendingDeletePOI = nil
+                            } else {
+                                // First long-press — highlight red, pause camera 3s
+                                pendingDeletePOI = poi
+                                pauseCameraTracking()
+                            }
+                        }
+                    )
                 }
             }
 
@@ -658,6 +687,18 @@ struct RideView: View {
                 heading: rideStore.rideState.currentHeading,
                 pitch: 60
             ))
+        }
+    }
+
+    // F-2b: Pause camera tracking for 3 s after a long-press to let the
+    // rider interact with the annotation without the map panning away.
+    // Auto-cancels the pending delete if no second press arrives.
+    private func pauseCameraTracking() {
+        cameraPauseTask?.cancel()
+        cameraPauseTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { pendingDeletePOI = nil }
         }
     }
 
