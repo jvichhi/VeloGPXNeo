@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		972D58E92FA6F99D00B5BD63 /* PreRidePOISheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -92,6 +93,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreRidePOISheet.swift; sourceTree = "<group>"; };
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 		97F812732F9468CE0068A42A /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */,
 				978915A92F9EF2730047D8F7 /* WaypointListSheet.swift */,
 				978915A72F9EF2610047D8F7 /* PlanView.swift */,
 				978915812F9DF8A70047D8F7 /* CyclingRouteOverlay.swift */,
@@ -499,6 +502,7 @@
 				978915A82F9EF2610047D8F7 /* PlanView.swift in Sources */,
 				97F812922F9468CE0068A42A /* RouteDetailView.swift in Sources */,
 				978915B62F9F15960047D8F7 /* POISpur.swift in Sources */,
+				972D58E92FA6F99D00B5BD63 /* PreRidePOISheet.swift in Sources */,
 				978915AA2F9EF2730047D8F7 /* WaypointListSheet.swift in Sources */,
 				9789155E2F9DD0080047D8F7 /* TimeInterval+Formatting.swift in Sources */,
 				978915832F9DF8A70047D8F7 /* CyclingRouteOverlay.swift in Sources */,
