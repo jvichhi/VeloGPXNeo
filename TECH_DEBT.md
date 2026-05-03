@@ -28,13 +28,13 @@
   Fix: force `en_US_POSIX` locale on the number formatter, or use `String(format: "%f", ...)`.
   Same risk in the `escape()` function — single quotes, carriage returns not handled.
 
-- [ ] **Duplicate `LocalizationManager.swift` — will break builds if both compiled**
-  Two independent implementations exist:
-  - `Shared/Managers/LocalizationManager.swift` (full-featured, calls deprecated `synchronize()`)
-  - `Shared/Localization/LocalizationManager.swift` (cleaner refactor, missing some features)
-  Both define `AppLanguage`, `LocalizationManager`, and the `localized` extension on `String`.
-  If both are included in the same target the compiler emits "invalid redeclaration" errors.
-  Fix: consolidate into one file, pick the best of both, remove the deprecated `synchronize()` call.
+- [x] **Orphan `Shared/Localization/` directory deleted** — ✅ Resolved May 3, 2026
+  Code review flagged a "duplicate" `LocalizationManager.swift` — actually the second copy at
+  `Shared/Localization/LocalizationManager.swift` was never in any Xcode target. Further
+  inspection showed the entire `Shared/Localization/` directory was dead: the `.swift` file
+  wasn't compiled, and the 15 `.lproj` bundles used structured keys (`"tab.ride"`) that don't
+  match the code's direct-English key pattern (`"Routes".localized`), so they never resolved
+  at runtime. Removed 16 dead files. Real localization lives in `Resources/*.lproj/`.
 
 ---
 
@@ -274,3 +274,4 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
 | **F-2a–f** Full POI overhaul landed | May 2, 2026 |
 | **P0** Duplicate `POISearchService.swift` root copy removed | May 2, 2026 |
 | **P0** `nextPOIChip` `×` removed; long-press annotation delete replaces it | May 2, 2026 |
+| Orphan `Shared/Localization/` directory (17 dead files) removed | May 3, 2026 |
