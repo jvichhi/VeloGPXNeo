@@ -508,12 +508,13 @@ struct RideView: View {
         .animation(.easeInOut(duration: 0.4), value: rideStore.eta != nil)
     }
 
-    @ViewBuilder
     private func gradeTile(grade: Double, climb: ClimbSegment?, climbRemaining: Double?) -> some View {
-        if let climb, let remain = climbRemaining {
-            return climbMode(climb: climb, remaining: remain)
-        } else {
-            return liveGrade(grade: grade)
+        Group {
+            if let climb = climb, let remain = climbRemaining {
+                climbMode(climb: climb, remaining: remain)
+            } else {
+                liveGrade(grade: grade)
+            }
         }
     }
 
