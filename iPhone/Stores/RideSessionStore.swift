@@ -34,12 +34,18 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     /// spanning at least 20 m of horizontal distance. Zero when insufficient data.
     @Published var currentGrade: Double = 0
 
+    // MARK: - Cue sheet tracking
+    @Published var nextCue: CueSheetEntry?
+    @Published var thenCue: CueSheetEntry?
+
     private var manager: CLLocationManager!
 
     // internal so file-separated extensions (RideSessionStore+Spurs) can read these.
     var route: RouteModel?
     var pois: [POIModel] = []
     var nearestTrackIndex: Int = 0
+    private var cueEntries: [CueSheetEntry] = []
+    private var nextCueIndex: Int = 0
 
     private var lastLocation: CLLocation?
     private var startTime: Date?
@@ -101,7 +107,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    func start(route: RouteModel, pois: [POIModel] = []) {
+    func start(route: RouteModel, pois: [POIModel] = [], cues: [CueSheetEntry] = []) {
         UIApplication.shared.isIdleTimerDisabled = true
         self.route = route
         self.pois = pois
@@ -120,6 +126,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.smoothedSpeed = 0
         self.smoothedGrade = 0
         self.climbSegments = route.detectClimbs()
+        self.cueEntries = cues
+        self.nextCueIndex = 0
+        self.nextCue = nil
+        self.thenCue = nil
         self.currentGrade = 0
         self.eta = nil
         self.lastWatchUpdateTime = .distantPast
@@ -322,6 +332,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             rideState.offRouteDistance = minimumDistance(from: location.coordinate, to: route)
             rideState.isOffRoute = rideState.offRouteDistance > 50
             updateRouteProgress(from: location.coordinate, route: route)
+            updateNextCue()
             handleOffRoute(from: location.coordinate, route: route)
         }
 
@@ -522,6 +533,25 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Track arc distance helper
     func trackArcDistance(from startIdx: Int, to endIdx: Int, points: [TrackPoint]) -> Double {
         RouteModel.trackArcDistance(from: startIdx, to: endIdx, points: points)
+    }
+
+    // MARK: - Cue tracking
+
+    private func updateNextCue() {
+        guard !cueEntries.isEmpty, let route else {
+            nextCue = nil; thenCue = nil; return
+        }
+        let progressDist = trackArcDistance(from: 0, to: nearestTrackIndex, points: route.trackPoints)
+        let lookahead = progressDist + 50
+
+        if let idx = cueEntries.firstIndex(where: { $0.cumulativeDistance > lookahead }) {
+            nextCueIndex = idx
+            nextCue = cueEntries[idx]
+            thenCue = idx + 1 < cueEntries.count ? cueEntries[idx + 1] : nil
+        } else {
+            nextCue = nil
+            thenCue = nil
+        }
     }
 
     // MARK: - POI tracking

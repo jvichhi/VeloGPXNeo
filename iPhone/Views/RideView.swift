@@ -199,7 +199,7 @@ struct RideView: View {
 
                     VStack(spacing: 6) {
                         Button {
-                            rideStore.start(route: route, pois: routeStore.selectedPOIs)
+                            rideStore.start(route: route, pois: routeStore.selectedPOIs, cues: preRideCues)
                         } label: {
                             Text("Start Ride")
                                 .font(.subheadline.weight(.semibold))
@@ -252,7 +252,7 @@ struct RideView: View {
             mapLayer(route: route, topControlInset: 62)
                 .ignoresSafeArea()
 
-            if !rideStore.rideState.rerouteSteps.isEmpty {
+            if rideStore.nextCue != nil || !rideStore.rideState.rerouteSteps.isEmpty {
                 floatingNavBanner
                     .padding(.top, 56)
                     .padding(.horizontal, 12)
@@ -292,6 +292,7 @@ struct RideView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.nextCue?.id)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
         .sheet(isPresented: $showNearbySheet) {
             if let loc = rideStore.currentLocation {
@@ -323,6 +324,65 @@ struct RideView: View {
     // MARK: - Floating Nav Banner
 
     private var floatingNavBanner: some View {
+        if let cue = rideStore.nextCue {
+            cueBanner(cue: cue)
+        } else {
+            rerouteBanner
+        }
+    }
+
+    private func cueBanner(cue: CueSheetEntry) -> some View {
+        let distanceAhead = cue.cumulativeDistance - progressDistance
+        let distText: String? = distanceAhead > 10
+            ? "in " + formatDistance(distanceAhead)
+            : nil
+
+        return HStack(spacing: 14) {
+            Image(systemName: cue.icon.systemImage)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(Color.blue, in: RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 3) {
+                if let dist = distText {
+                    Text(dist)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(cue.instruction)
+                    .font(.system(size: 17, weight: .bold))
+                    .lineLimit(2)
+
+                if let then = rideStore.thenCue {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Then: \(then.instruction)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 4)
+    }
+
+    private var progressDistance: Double {
+        guard let route = routeStore.selectedRoute else { return 0 }
+        return RouteModel.trackArcDistance(
+            from: 0, to: rideStore.nearestTrackIndex, points: route.trackPoints
+        )
+    }
+
+    private var rerouteBanner: some View {
         let steps = rideStore.rideState.rerouteSteps
         let first  = steps.first
         let second = steps.dropFirst().first
