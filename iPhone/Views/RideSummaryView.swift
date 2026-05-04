@@ -10,8 +10,7 @@ struct RideSummaryView: View {
 
     @State private var mapSnapshot: UIImage?
     @State private var exportPOIs = true
-    @State private var showShareSheet = false
-    @State private var gpxFileURL: URL?
+    @State private var gpxFileURL: ShareableURL?
 
     var body: some View {
         NavigationStack {
@@ -35,10 +34,8 @@ struct RideSummaryView: View {
                         .fontWeight(.semibold)
                 }
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = gpxFileURL {
-                    ShareSheet(items: [url])
-                }
+            .sheet(item: $gpxFileURL) { item in
+                ShareSheet(items: [item.url])
             }
             .task { await generateMapSnapshot() }
         }
@@ -241,8 +238,7 @@ struct RideSummaryView: View {
             .appendingPathComponent("\(filename)_ride.gpx")
         do {
             try gpxString.write(to: url, atomically: true, encoding: .utf8)
-            gpxFileURL = url
-            showShareSheet = true
+            gpxFileURL = ShareableURL(url: url)
         } catch {
             print("GPX export failed: \(error)")
         }
@@ -305,4 +301,16 @@ struct ShareSheet: UIViewControllerRepresentable {
         UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Identifiable wrappers for .sheet(item:)
+
+struct ShareableImage: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+struct ShareableURL: Identifiable {
+    let id = UUID()
+    let url: URL
 }

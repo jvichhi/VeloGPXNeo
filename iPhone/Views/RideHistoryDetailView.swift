@@ -13,9 +13,8 @@ struct RideHistoryDetailView: View {
     @State private var showPlannedOverlay = false
     @State private var exportPOIs = true
     @State private var showShareGPX = false
-    @State private var showShareCard = false
     @State private var gpxFileURL: URL?
-    @State private var shareCardImage: UIImage?
+    @State private var shareCardImage: ShareableImage?
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
@@ -58,8 +57,8 @@ struct RideHistoryDetailView: View {
         .sheet(isPresented: $showShareGPX) {
             if let url = gpxFileURL { ShareSheet(items: [url]) }
         }
-        .sheet(isPresented: $showShareCard) {
-            if let img = shareCardImage { ShareSheet(items: [img]) }
+        .sheet(item: $shareCardImage) { item in
+            ShareSheet(items: [item.image])
         }
         .task { await generateSnapshot() }
     }
@@ -273,8 +272,7 @@ struct RideHistoryDetailView: View {
         let renderer = ImageRenderer(content: cardView)
         renderer.scale = UIScreen.main.scale
         if let img = renderer.uiImage {
-            shareCardImage = img
-            showShareCard = true
+            shareCardImage = ShareableImage(image: img)
         }
     }
 
