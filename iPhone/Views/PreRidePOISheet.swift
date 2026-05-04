@@ -19,9 +19,11 @@ import CoreLocation
 
 struct PreRidePOISheet: View {
     let route: RouteModel
+    var cueEntries: [CueSheetEntry] = []
     @EnvironmentObject private var routeStore: RouteStore
     @State private var showSearch = false
-    @State private var snapIndexCache: [UUID: Int] = [:]   // poiID → track snap index
+    @State private var snapIndexCache: [UUID: Int] = [:]
+    @State private var selectedTab = 0
     @Environment(\.dismiss) private var dismiss
 
     // POIs sorted by snap index (along-route order).
@@ -33,53 +35,22 @@ struct PreRidePOISheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                // MARK: On this route
-                let sectionTitle = "On this route"
-                Section(sectionTitle) {
-                    if routeStore.selectedPOIs.isEmpty {
-                        Text("No pinned POIs yet")
-                            .foregroundStyle(.secondary)
-                            .font(.subheadline)
-                    } else {
-                        ForEach(sortedPOIs) { poi in
-                            let name: String = poi.name
-                            let icon: String = poi.category.systemImage
-                            let dist: Double? = alongRouteDistance(for: poi)
-                            HStack {
-                                Label {
-                                    Text(name)
-                                } icon: {
-                                    Image(systemName: icon)
-                                        .foregroundStyle(.orange)
-                                }
-                                Spacer()
-                                if let d = dist {
-                                    Text(formatDistance(d))
-                                        .font(.caption.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .onDelete { (indexSet: IndexSet) in
-                            let poisToRemove: [POIModel] = indexSet.map { sortedPOIs[$0] }
-                            let idsToRemove: Set<UUID> = Set(poisToRemove.map { $0.id })
-                            routeStore.selectedPOIs.removeAll { idsToRemove.contains($0.id) }
-                            routeStore.savePOIs()
-                        }
-                    }
+            VStack(spacing: 0) {
+                Picker("View", selection: $selectedTab) {
+                    Text("POIs").tag(0)
+                    Text("Cues").tag(1)
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
 
-                // MARK: Add nearby
-                Section("Add nearby") {
-                    Button {
-                        showSearch = true
-                    } label: {
-                        Label("Search nearby\u{2026}", systemImage: "magnifyingglass")
-                    }
+                if selectedTab == 0 {
+                    poiList
+                } else {
+                    cueList
                 }
             }
-            .navigationTitle("POIs")
+            .navigationTitle(selectedTab == 0 ? "POIs" : "Turn-by-Turn")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -93,6 +64,105 @@ struct PreRidePOISheet: View {
         }
         .onAppear { buildSnapIndexCache() }
         .onChange(of: routeStore.selectedPOIs) { _, _ in buildSnapIndexCache() }
+    }
+
+    // MARK: - POI list
+
+    private var poiList: some View {
+        List {
+            Section("On this route") {
+                if routeStore.selectedPOIs.isEmpty {
+                    Text("No pinned POIs yet")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                } else {
+                    ForEach(sortedPOIs) { poi in
+                        HStack {
+                            Label {
+                                Text(poi.name)
+                            } icon: {
+                                Image(systemName: poi.category.systemImage)
+                                    .foregroundStyle(.orange)
+                            }
+                            Spacer()
+                            if let d = alongRouteDistance(for: poi) {
+                                Text(formatDistance(d))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .onDelete { indexSet in
+                        let poisToRemove = indexSet.map { sortedPOIs[$0] }
+                        let idsToRemove = Set(poisToRemove.map { $0.id })
+                        routeStore.selectedPOIs.removeAll { idsToRemove.contains($0.id) }
+                        routeStore.savePOIs()
+                    }
+                }
+            }
+
+            Section("Add nearby") {
+                Button {
+                    showSearch = true
+                } label: {
+                    Label("Search nearby\u{2026}", systemImage: "magnifyingglass")
+                }
+            }
+        }
+    }
+
+    // MARK: - Cue list
+
+    private var cueList: some View {
+        Group {
+            if cueEntries.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                    Text("No turn-by-turn cues")
+                        .font(.headline)
+                    Text("This route doesn't have enough turns to generate cues, or routing is unavailable.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(cueEntries) { cue in
+                        HStack(spacing: 12) {
+                            Image(systemName: cue.icon.systemImage)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(cueIconColor(cue.icon))
+                                .frame(width: 24)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(cue.instruction)
+                                    .font(.subheadline)
+                                Text(formatDistance(cue.cumulativeDistance))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cueIconColor(_ icon: CueIcon) -> Color {
+        switch icon {
+        case .arrive: return .green
+        case .left, .right, .sharpLeft, .sharpRight: return .orange
+        case .slightLeft, .slightRight: return .blue
+        case .roundabout: return .purple
+        case .uTurn: return .red
+        case .merge: return .cyan
+        case .straight: return .secondary
+        }
     }
 
     // MARK: - Snap index cache

@@ -28,6 +28,7 @@ struct RideView: View {
     @State private var showPOISheet       = false
     @State private var showDiscoverySheet = false
     @State private var preRideClimbs: [ClimbSegment] = []
+    @State private var preRideCues: [CueSheetEntry] = []
     @State private var completedSummary: RideSummary? = nil
 
     // F-2b: Long-press delete state.
@@ -226,13 +227,15 @@ struct RideView: View {
         .onAppear {
             fitCameraToRoute(route)
             preRideClimbs = route.detectClimbs()
+            Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
         .onChange(of: route.id) { _ in
             preRideClimbs = route.detectClimbs()
+            Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
         // F-2d: PreRidePOISheet
         .sheet(isPresented: $showPOISheet) {
-            PreRidePOISheet(route: route)
+            PreRidePOISheet(route: route, cueEntries: preRideCues)
                 .environmentObject(routeStore)
         }
         // Legacy sheet kept for any other callers

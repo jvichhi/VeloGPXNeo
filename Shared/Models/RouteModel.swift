@@ -92,6 +92,57 @@ public enum RouteFormat: String, Codable, Hashable, Sendable {
     case planned
 }
 
+// MARK: - Cue Sheet
+
+public enum CueIcon: String, Codable, Sendable {
+    case straight, slightLeft, left, slightRight, right
+    case sharpLeft, sharpRight, roundabout, uTurn, merge, arrive
+
+    public var systemImage: String {
+        switch self {
+        case .straight:    return "arrow.up"
+        case .slightLeft:  return "arrow.turn.up.left"
+        case .left:        return "arrow.turn.left"
+        case .slightRight: return "arrow.turn.up.right"
+        case .right:       return "arrow.turn.right"
+        case .sharpLeft:   return "arrow.uturn.left"
+        case .sharpRight:  return "arrow.uturn.right"
+        case .roundabout:  return "arrow.triangle.turn.up.right.circle"
+        case .uTurn:       return "arrow.uturn.backward"
+        case .merge:       return "arrow.merge"
+        case .arrive:      return "flag.checkered"
+        }
+    }
+}
+
+public struct CueSheetEntry: Identifiable, Codable, Sendable {
+    public let id: UUID
+    public let cumulativeDistance: Double
+    public let instruction: String
+    public let latitude: Double
+    public let longitude: Double
+    public let icon: CueIcon
+
+    public var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    public init(
+        id: UUID = UUID(),
+        cumulativeDistance: Double,
+        instruction: String,
+        coordinate: CLLocationCoordinate2D,
+        icon: CueIcon
+    ) {
+        self.id = id
+        self.cumulativeDistance = cumulativeDistance
+        self.instruction = instruction
+        self.latitude = coordinate.latitude
+        self.longitude = coordinate.longitude
+        self.icon = icon
+    }
+}
+
 // MARK: - Route Difficulty
 
 public enum RouteDifficulty: String, Codable, Comparable, Sendable {
