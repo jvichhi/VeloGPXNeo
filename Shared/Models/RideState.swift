@@ -1,9 +1,91 @@
 import Foundation
 import CoreLocation
 import MapKit
+import SwiftUI
 
-// Coordinate is Hashable so TrackPoint/WaypointPoint can synthesize Hashable,
-// which is required for navigationDestination(item:) on RouteModel.
+// MARK: - Climb Category
+
+public enum ClimbCategory: Int, Codable, Comparable, Sendable {
+    case four = 4
+    case three = 3
+    case two = 2
+    case one = 1
+    case hc = 0
+
+    public static func < (lhs: ClimbCategory, rhs: ClimbCategory) -> Bool {
+        lhs.rawValue > rhs.rawValue
+    }
+
+    public var displayName: String {
+        switch self {
+        case .four:  return "Cat 4"
+        case .three: return "Cat 3"
+        case .two:   return "Cat 2"
+        case .one:   return "Cat 1"
+        case .hc:    return "HC"
+        }
+    }
+
+    public var color: Color {
+        switch self {
+        case .four:  return .green
+        case .three: return .blue
+        case .two:   return .orange
+        case .one:   return .red
+        case .hc:    return .purple
+        }
+    }
+
+    public var minGrade: Double {
+        switch self {
+        case .four:  return 2.0
+        case .three: return 3.0
+        case .two:   return 4.0
+        case .one:   return 6.0
+        case .hc:    return 8.0
+        }
+    }
+
+    public var minDistance: Double {
+        switch self {
+        case .four:  return 800
+        case .three: return 1500
+        case .two:   return 3000
+        case .one:   return 5000
+        case .hc:    return 8000
+        }
+    }
+
+    public var minElevation: Double {
+        switch self {
+        case .four:  return 50
+        case .three: return 100
+        case .two:   return 200
+        case .one:   return 400
+        case .hc:    return 600
+        }
+    }
+}
+
+public struct ClimbSegment: Codable, Equatable, Sendable {
+    public let startIndex: Int
+    public let endIndex: Int
+    public let totalDistance: Double
+    public let elevationGain: Double
+    public let avgGrade: Double
+    public let category: ClimbCategory
+
+    public init(startIndex: Int, endIndex: Int, totalDistance: Double, elevationGain: Double, avgGrade: Double, category: ClimbCategory) {
+        self.startIndex = startIndex
+        self.endIndex = endIndex
+        self.totalDistance = totalDistance
+        self.elevationGain = elevationGain
+        self.avgGrade = avgGrade
+        self.category = category
+    }
+}
+
+// MARK: - Coordinate
 public struct Coordinate: Codable, Hashable, Sendable, Equatable {
     public var latitude: Double
     public var longitude: Double
@@ -49,6 +131,8 @@ public struct RideState: Codable, Sendable {
     public var bearingToRoute: Double?
     public var rerouteSteps: [RerouteStep]
     public var isRerouting: Bool
+    public var activeClimb: ClimbSegment?
+    public var activeClimbRemaining: Double?
 
     public init(
         isActive: Bool = false,
@@ -69,7 +153,9 @@ public struct RideState: Codable, Sendable {
         elevationLoss: Double = 0,
         bearingToRoute: Double? = nil,
         rerouteSteps: [RerouteStep] = [],
-        isRerouting: Bool = false
+        isRerouting: Bool = false,
+        activeClimb: ClimbSegment? = nil,
+        activeClimbRemaining: Double? = nil
     ) {
         self.isActive = isActive
         self.isPaused = isPaused
@@ -90,6 +176,8 @@ public struct RideState: Codable, Sendable {
         self.bearingToRoute = bearingToRoute
         self.rerouteSteps = rerouteSteps
         self.isRerouting = isRerouting
+        self.activeClimb = activeClimb
+        self.activeClimbRemaining = activeClimbRemaining
     }
 
     nonisolated public var speedKmh: Double { speed * 3.6 }

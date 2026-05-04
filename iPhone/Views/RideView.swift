@@ -480,7 +480,7 @@ struct RideView: View {
                 Divider().frame(height: 32)
                 etaTile
                 Divider().frame(height: 32)
-                gradeTile(grade: grade)
+                gradeTile(grade: grade, climb: s.activeClimb, climbRemaining: s.activeClimbRemaining)
             }
         }
     }
@@ -508,10 +508,18 @@ struct RideView: View {
         .animation(.easeInOut(duration: 0.4), value: rideStore.eta != nil)
     }
 
-    private func gradeTile(grade: Double) -> some View {
-        let abs = abs(grade)
+    private func gradeTile(grade: Double, climb: ClimbSegment?, climbRemaining: Double?) -> some View {
+        if let climb, let remain = climbRemaining {
+            return climbMode(climb: climb, remaining: remain)
+        } else {
+            return liveGrade(grade: grade)
+        }
+    }
+
+    private func liveGrade(grade: Double) -> some View {
+        let absVal = abs(grade)
         let color: Color = {
-            switch abs {
+            switch absVal {
             case 0..<2:  return .secondary
             case 2..<5:  return .green
             case 5..<8:  return .orange
@@ -519,10 +527,10 @@ struct RideView: View {
             }
         }()
         let arrow: String = {
-            if abs < 0.5 { return "minus" }
+            if absVal < 0.5 { return "minus" }
             return grade > 0 ? "arrow.up.right" : "arrow.down.right"
         }()
-        let valueText = abs < 0.5
+        let valueText = absVal < 0.5
             ? "—"
             : String(format: "%+.1f%%", grade)
 
@@ -541,6 +549,33 @@ struct RideView: View {
         }
         .frame(maxWidth: .infinity)
         .animation(.easeInOut(duration: 0.4), value: grade)
+    }
+
+    private func climbMode(climb: ClimbSegment, remaining: Double) -> some View {
+        let color = climb.category.color
+        let remainKm = remaining >= 1000
+            ? String(format: "%.1f km", remaining / 1000)
+            : String(format: "%.0f m", remaining)
+        let gradeText = String(format: "%.1f%% avg", climb.avgGrade)
+
+        return VStack(spacing: 2) {
+            HStack(spacing: 3) {
+                Image(systemName: "mountain.2.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(color)
+                Text(climb.category.displayName)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(color)
+                Text(gradeText)
+                    .font(.system(size: 11, weight: .medium, design: .rounded).monospacedDigit())
+                    .foregroundStyle(color.opacity(0.8))
+            }
+            Text(remainKm + " to summit")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.4), value: climb.startIndex)
     }
 
     private func metricCell(value: String, label: String) -> some View {
