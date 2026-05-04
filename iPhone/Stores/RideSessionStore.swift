@@ -119,7 +119,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.speedBuffer = []
         self.smoothedSpeed = 0
         self.smoothedGrade = 0
-        self.climbSegments = detectClimbs(in: route)
+        self.climbSegments = route.detectClimbs()
         self.currentGrade = 0
         self.eta = nil
         self.lastWatchUpdateTime = .distantPast
@@ -369,100 +369,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // MARK: - Climb detection
 
-    private func detectClimbs(in route: RouteModel) -> [ClimbSegment] {
-        let points = route.trackPoints
-        guard points.count > 50 else { return [] }
-
-        let withElevation = points.enumerated().compactMap { (i, pt) -> (Int, Double)? in
-            guard let ele = pt.elevation else { return nil }
-            return (i, ele)
-        }
-        guard withElevation.count > 10 else { return [] }
-
-        let windowMeters: Double = 100
-        var candidateRuns: [(start: Int, end: Int)] = []
-        var runStart: Int?
-
-        for i in 1..<withElevation.count {
-            let (prevIdx, prevEle) = withElevation[i - 1]
-            let (currIdx, currEle) = withElevation[i]
-            let dist = points[prevIdx].coordinate.clCoordinate.distance(
-                to: points[currIdx].coordinate.clCoordinate
-            )
-            guard dist > 0.1 else { continue }
-
-            let grade = ((currEle - prevEle) / dist) * 100
-
-            if grade > 2.0 {
-                if runStart == nil { runStart = prevIdx }
-            } else {
-                if let start = runStart {
-                    candidateRuns.append((start, prevIdx))
-                    runStart = nil
-                }
-            }
-        }
-        if let start = runStart {
-            candidateRuns.append((start, withElevation.last!.0))
-        }
-
-        let merged = mergeNearby(candidateRuns, points: points)
-
-        return merged.compactMap { segment in
-            classifyClimb(start: segment.start, end: segment.end, points: points)
-        }
-    }
-
-    private func mergeNearby(_ runs: [(start: Int, end: Int)], points: [TrackPoint]) -> [(start: Int, end: Int)] {
-        guard runs.count > 1 else { return runs }
-        var merged: [(start: Int, end: Int)] = []
-        var current = runs[0]
-        for next in runs.dropFirst() {
-            let gapDist = trackArcDistance(from: current.end, to: next.start, points: points)
-            if gapDist < 200 {
-                current.end = next.end
-            } else {
-                merged.append(current)
-                current = next
-            }
-        }
-        merged.append(current)
-        return merged
-    }
-
-    private func classifyClimb(start: Int, end: Int, points: [TrackPoint]) -> ClimbSegment? {
-        let totalDist = trackArcDistance(from: start, to: end, points: points)
-        guard totalDist >= 800 else { return nil }
-
-        let elev = points[start..<end].compactMap { $0.elevation }
-        guard elev.count >= 2 else { return nil }
-
-        let gain = zip(elev, elev.dropFirst()).reduce(0.0) { acc, pair in
-            let d = pair.1 - pair.0
-            return acc + (d > 0 ? d : 0)
-        }
-        guard gain >= 50 else { return nil }
-
-        let avgGrade = (gain / totalDist) * 100
-
-        let category: ClimbCategory = {
-            if avgGrade >= 8, totalDist >= 8000, gain >= 600 { return .hc }
-            if avgGrade >= 6, totalDist >= 5000, gain >= 400 { return .one }
-            if avgGrade >= 4, totalDist >= 3000, gain >= 200 { return .two }
-            if avgGrade >= 3, totalDist >= 1500, gain >= 100 { return .three }
-            return .four
-        }()
-
-        return ClimbSegment(
-            startIndex: start,
-            endIndex: end,
-            totalDistance: totalDist,
-            elevationGain: gain,
-            avgGrade: avgGrade,
-            category: category
-        )
-    }
-
     private func activeClimb(for trackIndex: Int) -> ClimbSegment? {
         climbSegments.first { $0.startIndex <= trackIndex && trackIndex < $0.endIndex }
     }
@@ -615,11 +521,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // MARK: - Track arc distance helper
     func trackArcDistance(from startIdx: Int, to endIdx: Int, points: [TrackPoint]) -> Double {
-        guard startIdx < endIdx, endIdx < points.count else { return 0 }
-        return zip(points[startIdx..<endIdx], points[(startIdx + 1)...endIdx])
-            .reduce(0.0) { acc, pair in
-                acc + pair.0.coordinate.clCoordinate.distance(to: pair.1.coordinate.clCoordinate)
-            }
+        RouteModel.trackArcDistance(from: startIdx, to: endIdx, points: points)
     }
 
     // MARK: - POI tracking

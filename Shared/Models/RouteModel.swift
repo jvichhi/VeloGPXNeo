@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import SwiftUI
 
 public struct RouteModel: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let id: UUID
@@ -89,4 +90,143 @@ public enum RouteFormat: String, Codable, Hashable, Sendable {
     case geojson
     /// Route created interactively in the Plan tab.
     case planned
+}
+
+// MARK: - Route Difficulty
+
+public enum RouteDifficulty: String, Codable, Comparable, Sendable {
+    case easy = "Easy"
+    case moderate = "Moderate"
+    case hard = "Hard"
+    case epic = "Epic"
+
+    public static func < (lhs: RouteDifficulty, rhs: RouteDifficulty) -> Bool {
+        let order: [RouteDifficulty] = [.easy, .moderate, .hard, .epic]
+        return (order.firstIndex(of: lhs) ?? 0) < (order.firstIndex(of: rhs) ?? 0)
+    }
+
+    public var color: Color {
+        switch self {
+        case .easy:     return .green
+        case .moderate: return .blue
+        case .hard:     return .orange
+        case .epic:     return .red
+        }
+    }
+}
+
+public extension RouteModel {
+    var difficulty: RouteDifficulty {
+        let km = totalDistance / 1000
+        let gain = elevationGain
+        if km >= 150 || gain >= 2000 { return .epic }
+        if km >= 100 || gain >= 1000 { return .hard }
+        if km >= 50  || gain >= 500  { return .moderate }
+        return .easy
+    }
+
+    // MARK: - Climb detection
+
+    func detectClimbs() -> [ClimbSegment] {
+        guard trackPoints.count > 50 else { return [] }
+
+        let withElevation = trackPoints.enumerated().compactMap { (i, pt) -> (Int, Double)? in
+            guard let ele = pt.elevation else { return nil }
+            return (i, ele)
+        }
+        guard withElevation.count > 10 else { return [] }
+
+        let windowMeters: Double = 100
+        var candidateRuns: [(start: Int, end: Int)] = []
+        var runStart: Int?
+
+        for i in 1..<withElevation.count {
+            let (prevIdx, prevEle) = withElevation[i - 1]
+            let (currIdx, currEle) = withElevation[i]
+            let dist = trackPoints[prevIdx].coordinate.clCoordinate.distance(
+                to: trackPoints[currIdx].coordinate.clCoordinate
+            )
+            guard dist > 0.1 else { continue }
+
+            let grade = ((currEle - prevEle) / dist) * 100
+
+            if grade > 2.0 {
+                if runStart == nil { runStart = prevIdx }
+            } else {
+                if let start = runStart {
+                    candidateRuns.append((start, prevIdx))
+                    runStart = nil
+                }
+            }
+        }
+        if let start = runStart {
+            candidateRuns.append((start, withElevation.last!.0))
+        }
+
+        let merged = mergeClimbRuns(candidateRuns)
+
+        return merged.compactMap { segment in
+            classifyClimb(start: segment.start, end: segment.end)
+        }
+    }
+
+    static func trackArcDistance(from startIdx: Int, to endIdx: Int, points: [TrackPoint]) -> Double {
+        guard startIdx < endIdx, endIdx < points.count else { return 0 }
+        return zip(points[startIdx..<endIdx], points[(startIdx + 1)...endIdx])
+            .reduce(0.0) { acc, pair in
+                acc + pair.0.coordinate.clCoordinate.distance(to: pair.1.coordinate.clCoordinate)
+            }
+    }
+
+    // MARK: - Private helpers
+
+    private func mergeClimbRuns(_ runs: [(start: Int, end: Int)]) -> [(start: Int, end: Int)] {
+        guard runs.count > 1 else { return runs }
+        var merged: [(start: Int, end: Int)] = []
+        var current = runs[0]
+        for next in runs.dropFirst() {
+            let gapDist = Self.trackArcDistance(from: current.end, to: next.start, points: trackPoints)
+            if gapDist < 200 {
+                current.end = next.end
+            } else {
+                merged.append(current)
+                current = next
+            }
+        }
+        merged.append(current)
+        return merged
+    }
+
+    private func classifyClimb(start: Int, end: Int) -> ClimbSegment? {
+        let totalDist = Self.trackArcDistance(from: start, to: end, points: trackPoints)
+        guard totalDist >= 800 else { return nil }
+
+        let elev = trackPoints[start..<end].compactMap { $0.elevation }
+        guard elev.count >= 2 else { return nil }
+
+        let gain = zip(elev, elev.dropFirst()).reduce(0.0) { acc, pair in
+            let d = pair.1 - pair.0
+            return acc + (d > 0 ? d : 0)
+        }
+        guard gain >= 50 else { return nil }
+
+        let avgGrade = (gain / totalDist) * 100
+
+        let category: ClimbCategory = {
+            if avgGrade >= 8, totalDist >= 8000, gain >= 600 { return .hc }
+            if avgGrade >= 6, totalDist >= 5000, gain >= 400 { return .one }
+            if avgGrade >= 4, totalDist >= 3000, gain >= 200 { return .two }
+            if avgGrade >= 3, totalDist >= 1500, gain >= 100 { return .three }
+            return .four
+        }()
+
+        return ClimbSegment(
+            startIndex: start,
+            endIndex: end,
+            totalDistance: totalDist,
+            elevationGain: gain,
+            avgGrade: avgGrade,
+            category: category
+        )
+    }
 }

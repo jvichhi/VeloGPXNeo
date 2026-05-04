@@ -27,6 +27,7 @@ struct RideView: View {
     @State private var showNearbySheet    = false
     @State private var showPOISheet       = false
     @State private var showDiscoverySheet = false
+    @State private var preRideClimbs: [ClimbSegment] = []
     @State private var completedSummary: RideSummary? = nil
 
     // F-2b: Long-press delete state.
@@ -134,17 +135,24 @@ struct RideView: View {
                             Text(route.name)
                                 .font(.headline)
                                 .lineLimit(1)
-                            HStack(spacing: 10) {
+                            HStack(spacing: 8) {
                                 Label(String(format: "%.1f km", route.totalDistance / 1000),
                                       systemImage: "arrow.left.and.right")
-                                Label(String(format: "%.0f m", route.elevationGain),
-                                      systemImage: "mountain.2")
+                                if route.elevationGain > 0 {
+                                    Label(String(format: "%.0f m", route.elevationGain),
+                                          systemImage: "mountain.2")
+                                }
+                                Text(route.difficulty.rawValue)
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(route.difficulty.color)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(route.difficulty.color.opacity(0.12), in: Capsule())
                             }
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        // F-2d: 📍 button opens PreRidePOISheet
                         Button {
                             showPOISheet = true
                         } label: {
@@ -153,6 +161,39 @@ struct RideView: View {
                                 .frame(width: 36, height: 36)
                                 .background(.tint.opacity(0.12), in: Circle())
                         }
+                    }
+
+                    if !preRideClimbs.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Climbs (\(preRideClimbs.count))", systemImage: "mountain.2.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            ForEach(preRideClimbs, id: \.startIndex) { climb in
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(climb.category.color)
+                                        .frame(width: 6, height: 6)
+                                    Text(climb.category.displayName)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(climb.category.color)
+                                    Text("\(String(format: "%.1f", climb.totalDistance / 1000)) km")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("·")
+                                        .foregroundStyle(.secondary)
+                                    Text("\(String(format: "%.1f", climb.avgGrade))% avg")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(String(format: "%.0f", climb.elevationGain)) m")
+                                        .font(.caption.weight(.medium).monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10))
                     }
 
                     VStack(spacing: 6) {
@@ -184,6 +225,10 @@ struct RideView: View {
         }
         .onAppear {
             fitCameraToRoute(route)
+            preRideClimbs = route.detectClimbs()
+        }
+        .onChange(of: route.id) { _ in
+            preRideClimbs = route.detectClimbs()
         }
         // F-2d: PreRidePOISheet
         .sheet(isPresented: $showPOISheet) {
