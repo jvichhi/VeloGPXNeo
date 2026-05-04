@@ -292,7 +292,7 @@ actor GPXCueEngine {
         return .straight
     }
 
-    private func bearingToIcon(_ bearing: Double) -> CueIcon {
+    nonisolated private func bearingToIcon(_ bearing: Double) -> CueIcon {
         switch bearing {
         case 330...360, 0..<30:  return .straight
         case 30..<60:            return .slightRight
@@ -306,7 +306,7 @@ actor GPXCueEngine {
         }
     }
 
-    private func geometryInstruction(for icon: CueIcon) -> String {
+    nonisolated private func geometryInstruction(for icon: CueIcon) -> String {
         switch icon {
         case .sharpLeft:   return "Sharp left ahead"
         case .sharpRight:  return "Sharp right ahead"
@@ -321,7 +321,7 @@ actor GPXCueEngine {
 
     // MARK: - Math
 
-    private func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+    nonisolated private func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
         let lat1 = from.latitude * .pi / 180
         let lat2 = to.latitude * .pi / 180
         let dLon = (to.longitude - from.longitude) * .pi / 180

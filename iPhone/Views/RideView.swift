@@ -323,6 +323,7 @@ struct RideView: View {
 
     // MARK: - Floating Nav Banner
 
+    @ViewBuilder
     private var floatingNavBanner: some View {
         if let cue = rideStore.nextCue {
             cueBanner(cue: cue)
