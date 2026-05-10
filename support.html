@@ -15,6 +15,7 @@
     }
     h1 { font-size: 2rem; margin-bottom: 4px; }
     h2 { font-size: 1.15rem; margin-top: 2rem; }
+    h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 4px; }
     p, li { font-size: 0.97rem; }
     ul { padding-left: 1.4rem; }
     a { color: #0071e3; }
@@ -23,67 +24,53 @@
       background: #f5f5f7;
       border-radius: 12px;
       padding: 20px 24px;
-      margin-top: 1.5rem;
+      margin-top: 1rem;
     }
     footer { margin-top: 3rem; color: #6e6e73; font-size: 0.85rem; }
   </style>
 </head>
 <body>
 
-  <h1>🚴 VeloGPX</h1>
-  <p class="meta">Support &mdash; We&rsquo;re happy to help</p>
+  <h1>VeloGPX Support</h1>
+  <p class="meta">Got a problem or a question? Start here.</p>
 
-  <p>
-    Having trouble with VeloGPX or have a feature request? Check the FAQ below or reach out directly — we typically respond within a few business days.
-  </p>
-
-  <h2>Contact Us</h2>
+  <h2>Report a bug or ask a question</h2>
   <div class="card">
-    <p>
-      📧 Open an issue on GitHub:<br />
-      <a href="https://github.com/jvichhi/VeloGPXNeo/issues" target="_blank" rel="noopener">github.com/jvichhi/VeloGPXNeo/issues</a>
-    </p>
-    <p style="margin-bottom:0">
-      Please include your iPhone model, iOS version, and a short description of the issue. Screenshots are always helpful!
-    </p>
+    <p>Open an issue on GitHub &mdash; it&rsquo;s the fastest way to get a response:</p>
+    <p><a href="https://github.com/jvichhi/VeloGPXNeo/issues" target="_blank" rel="noopener">github.com/jvichhi/VeloGPXNeo/issues</a></p>
+    <p style="margin-bottom:0">Include your iPhone model, iOS version, and what you were doing when the problem happened. A screenshot helps a lot.</p>
   </div>
 
-  <h2>Frequently Asked Questions</h2>
+  <h2>Common issues</h2>
 
-  <h3>📂 What file types does VeloGPX support?</h3>
-  <p>VeloGPX supports <strong>.gpx</strong>, <strong>.geojson</strong>, and <strong>.json</strong> route files. You can open them directly from the Files app, Safari, Mail, or any share sheet.</p>
+  <h3>What file types work?</h3>
+  <p><strong>.gpx</strong>, <strong>.geojson</strong>, and <strong>.json</strong>. Open them from Files, Safari, Mail, or any share sheet and VeloGPX will pick them up.</p>
 
-  <h3>🗺️ My route isn’t showing on the map. What should I check?</h3>
+  <h3>My route isn&rsquo;t showing on the map</h3>
   <ul>
-    <li>Make sure the file is a valid GPX or GeoJSON with track points or coordinates.</li>
-    <li>Try re-importing the file via the Files app share sheet.</li>
-    <li>Check that Location permission is set to <strong>While Using</strong> or <strong>Always</strong> in Settings &rarr; Privacy &rarr; Location Services &rarr; VeloGPX.</li>
+    <li>Check the file has actual track points or coordinates &mdash; some GPX exports are waypoints-only.</li>
+    <li>Try sharing the file again from Files using the share sheet.</li>
+    <li>Go to Settings &rarr; Privacy &amp; Security &rarr; Location Services &rarr; VeloGPX and make sure it&rsquo;s set to <strong>While Using</strong> or <strong>Always</strong>.</li>
   </ul>
 
-  <h3>⌚ Apple Watch isn’t showing ride data</h3>
+  <h3>Apple Watch isn&rsquo;t updating</h3>
   <ul>
-    <li>Ensure Bluetooth is enabled on both your iPhone and Apple Watch.</li>
-    <li>Open the VeloGPX Watch app manually once to establish the WatchConnectivity session.</li>
-    <li>Start a ride on your iPhone first — Watch data syncs after ride start.</li>
+    <li>Bluetooth needs to be on for both devices.</li>
+    <li>Open the VeloGPX Watch app once manually before starting a ride.</li>
+    <li>Watch data only syncs after you start a ride on the iPhone.</li>
   </ul>
 
-  <h3>📍 POIs aren’t appearing along my route</h3>
-  <p>POIs are fetched for the corridor around your loaded route. Make sure you have an active internet connection when the route is first loaded, as nearby POI data is pulled at that time.</p>
+  <h3>No POIs showing up</h3>
+  <p>POI data is fetched when the route loads. You need a live internet connection at that point. If you loaded the route offline, pull it up again with Wi-Fi or cellular on.</p>
 
-  <h3>🔋 Does VeloGPX drain my battery?</h3>
-  <p>GPS apps use more battery than average. We recommend keeping your iPhone in Low Power Mode off during rides for best GPS accuracy, and using a bike mount or power bank for long rides.</p>
+  <h3>Battery draining fast</h3>
+  <p>GPS apps are heavy on battery by nature. For longer rides, a handlebar mount and a small power bank go a long way. Turning off background app refresh for apps you&rsquo;re not using also helps.</p>
 
-  <h3>🔒 Does VeloGPX collect my personal data?</h3>
-  <p>No. VeloGPX does not collect, transmit, or store any personal data on external servers. See our full <a href="privacy.html">Privacy Policy</a> for details.</p>
-
-  <h2>Feature Requests</h2>
-  <p>
-    We love hearing ideas from riders. Submit your feature request as a GitHub issue with the <strong>[Feature Request]</strong> tag:
-    <a href="https://github.com/jvichhi/VeloGPXNeo/issues/new" target="_blank" rel="noopener">Submit a request</a>.
-  </p>
+  <h2>Feature requests</h2>
+  <p>File a GitHub issue with <strong>[Feature Request]</strong> in the title: <a href="https://github.com/jvichhi/VeloGPXNeo/issues/new" target="_blank" rel="noopener">Submit one here</a>.</p>
 
   <footer>
-    &copy; 2026 J Vichhi. VeloGPX. All rights reserved. &mdash; <a href="privacy.html">Privacy Policy</a>
+    &copy; 2026 J Vichhi &mdash; VeloGPX &mdash; <a href="privacy.html">Privacy Policy</a>
   </footer>
 
 </body>
