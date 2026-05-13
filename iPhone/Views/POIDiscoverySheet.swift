@@ -176,7 +176,7 @@ struct POIDiscoverySheet: View {
             switch poiCat {
             case .cafe:                             return .cafe
             case .restaurant, .foodMarket:         return .restaurant
-            case .bicycle:                          return .bikeRepair
+            //case .bicycle:                          return .bikeRepair
             case .pharmacy:                         return .pharmacy
             case .hotel:                            return .accommodation
             case .campground:                       return .campsite
