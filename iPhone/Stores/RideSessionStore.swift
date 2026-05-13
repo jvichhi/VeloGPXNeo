@@ -75,13 +75,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var breadcrumbLocations: [CLLocation] = []
 
     // MARK: - Barometric altimeter (elevation gain/loss)
-    // CMAltimeter must be a stored property — creating it inline causes a known iOS bug
-    // where relativeAltitude updates are never delivered.
     private let altimeter = CMAltimeter()
-    /// Last relativeAltitude reading from the barometer. Reset on start and resume so
-    /// post-pause pressure drift doesn't corrupt the accumulated totals.
     private var lastRelativeAltitude: Double? = nil
-    /// Minimum barometric delta (metres) to count as real elevation change.
     private let minElevationThreshold: Double = 0.5
 
     // MARK: - Speed smoothing
@@ -113,9 +108,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    // FIX (memory leak): cancel the errorClearTask and invalidate the
-    // elapsedTimer on deinit so the 6 s sleep Task doesn't hold self alive
-    // after the store is released.
     deinit {
         errorClearTask?.cancel()
         elapsedTimer?.invalidate()
@@ -203,7 +195,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         rideState.speed = 0
         currentGrade = 0
         eta = nil
-        // Immediately reflect paused state in Live Activity
         pushLiveActivityUpdate(force: true)
         sendWatchUpdate()
     }
@@ -216,7 +207,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         pauseStartTime = nil
         rideState.isPaused = false
         lastLocation = nil
-        lastRelativeAltitude = nil  // Reset so resumed baseline doesn't carry pause-time pressure drift
+        lastRelativeAltitude = nil
         speedBuffer = []
         smoothedSpeed = 0
         smoothedGrade = 0
@@ -228,7 +219,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingHeading()
         startElapsedTimer()
         startAltimeter()
-        // Immediately reflect resumed state in Live Activity
         pushLiveActivityUpdate(force: true)
         sendWatchUpdate()
     }
@@ -314,8 +304,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                     } else {
                         self.rideState.elevationLoss += abs(delta)
                     }
-                    // Advance the baseline only when a real change is committed,
-                    // so sub-threshold noise doesn't quietly accumulate.
                     self.lastRelativeAltitude = current
                 }
             } else {
@@ -479,13 +467,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        // FIX (heading guard): only accept a heading that has been properly calibrated.
-        // trueHeading is -1 when the device hasn't acquired a true-north fix yet;
-        // magneticHeading is always available but should be preferred only as a fallback.
         let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
-        // Guard against the 0° default that fires at startup before any real heading
-        // data arrives — prevents the off-route bearing arrow from pointing north
-        // incorrectly while the device is stationary.
         guard heading.isFinite, heading != 0 || newHeading.trueHeading >= 0 else { return }
         rideState.currentHeading = heading
     }
@@ -587,10 +569,17 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Reroute
 
     private func requestReroute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
+        // Extract raw doubles — CLLocationCoordinate2D.init is @MainActor on iOS 26+,
+        // so we pass Doubles across the actor boundary into CyclingRouteService.
+        let fLat = from.latitude, fLon = from.longitude
+        let tLat = to.latitude,   tLon = to.longitude
         rideState.isRerouting = true
         Task {
             do {
-                let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
+                let result = try await CyclingRouteService.shared.calculateRoute(
+                    from: fLat, fLon,
+                    to:   tLat, tLon
+                )
                 reroutePolyline = result.route.polyline.coordinates
                 rideState.rerouteSteps = result.route.steps.map {
                     RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance)
