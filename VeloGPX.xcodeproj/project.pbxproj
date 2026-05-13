@@ -14,7 +14,6 @@
 		972D59152FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
 		972D59162FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
 		972D59272FB40F5000B5BD63 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D59252FB40F4800B5BD63 /* CoreMotion.framework */; };
-		972D59282FB40F5000B5BD63 /* CoreMotion.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 972D59252FB40F4800B5BD63 /* CoreMotion.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -102,17 +101,6 @@
 				972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		972D59292FB40F5000B5BD63 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				972D59282FB40F5000B5BD63 /* CoreMotion.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		97F812AA2F9469480068A42A /* Embed Watch Content */ = {
@@ -471,7 +459,6 @@
 				97F812592F9468570068A42A /* Resources */,
 				97F812AA2F9469480068A42A /* Embed Watch Content */,
 				972D59052FB3F98300B5BD63 /* Embed Foundation Extensions */,
-				972D59292FB40F5000B5BD63 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
