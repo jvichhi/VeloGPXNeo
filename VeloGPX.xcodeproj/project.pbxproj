@@ -45,6 +45,7 @@
 		978915B22F9EF7540047D8F7 /* PlanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915B02F9EF7540047D8F7 /* PlanState.swift */; };
 		978915B42F9F15560047D8F7 /* RideSessionStore+Spurs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915B32F9F15560047D8F7 /* RideSessionStore+Spurs.swift */; };
 		978915B62F9F15960047D8F7 /* POISpur.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915B52F9F15960047D8F7 /* POISpur.swift */; };
+		97974C1D2FB43A5C007E330B /* MKMapItem+POI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97974C1C2FB43A5C007E330B /* MKMapItem+POI.swift */; };
 		97F812862F9468CE0068A42A /* GeoJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127D2F9468CE0068A42A /* GeoJSONParser.swift */; };
 		97F812872F9468CE0068A42A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8126F2F9468CE0068A42A /* RootView.swift */; };
 		97F812882F9468CE0068A42A /* RouteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127A2F9468CE0068A42A /* RouteModel.swift */; };
@@ -163,6 +164,7 @@
 		978915B02F9EF7540047D8F7 /* PlanState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanState.swift; sourceTree = "<group>"; };
 		978915B32F9F15560047D8F7 /* RideSessionStore+Spurs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RideSessionStore+Spurs.swift"; sourceTree = "<group>"; };
 		978915B52F9F15960047D8F7 /* POISpur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POISpur.swift; sourceTree = "<group>"; };
+		97974C1C2FB43A5C007E330B /* MKMapItem+POI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MKMapItem+POI.swift"; sourceTree = "<group>"; };
 		97F8125B2F9468570068A42A /* VeloGPX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VeloGPX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97F8126B2F9468CE0068A42A /* RideSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSessionStore.swift; sourceTree = "<group>"; };
 		97F8126C2F9468CE0068A42A /* RouteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteStore.swift; sourceTree = "<group>"; };
@@ -262,6 +264,7 @@
 		9789157C2F9DF86B0047D8F7 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				97974C1C2FB43A5C007E330B /* MKMapItem+POI.swift */,
 				978915A52F9EF24F0047D8F7 /* PlanRouteEngine.swift */,
 				978915782F9DF86B0047D8F7 /* CyclingRouteService.swift */,
 				978915792F9DF86B0047D8F7 /* PlaceDescriptorService.swift */,
@@ -622,6 +625,7 @@
 				978915842F9DF8A70047D8F7 /* RouteNoticeView.swift in Sources */,
 				97F812932F9468CE0068A42A /* RideView.swift in Sources */,
 				97F812942F9468CE0068A42A /* RideState.swift in Sources */,
+				97974C1D2FB43A5C007E330B /* MKMapItem+POI.swift in Sources */,
 				97F812952F9468CE0068A42A /* RouteStore.swift in Sources */,
 				9789157D2F9DF86B0047D8F7 /* ReverseGeocodingService.swift in Sources */,
 				9789157E2F9DF86B0047D8F7 /* PlaceDescriptorService.swift in Sources */,
