@@ -87,7 +87,7 @@ struct POIDiscoverySheet: View {
                                 ForEach(results, id: \.self) { item in
                                     POIDiscoveryResultCard(
                                         item: item,
-                                        isAdded: routeStore.selectedPOIs.contains(where: { $0.id == deterministicID(for: item) }),
+                                        isAdded: routeStore.selectedPOIs.contains { $0.id == item.deterministicPOIID },
                                         categoryIcon: categories.first(where: { $0.label == selectedCategory })?.icon ?? "mappin",
                                         onTap: { addPOI(from: item) }
                                     )
@@ -108,52 +108,12 @@ struct POIDiscoverySheet: View {
         }
     }
 
-    // MARK: - Coordinate helper (handles iOS 26 non-optional CLLocation)
-
-    private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
-        if #available(iOS 26.0, *) {
-            return item.location.coordinate
-        } else {
-            return item.placemark.coordinate
-        }
-    }
-
-    // MARK: - Deterministic coordinate-based ID
-
-    private func deterministicID(for item: MKMapItem) -> UUID {
-        let coord = itemCoordinate(item)
-        let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000
-        let lon = (coord.longitude * 1_000_000).rounded() / 1_000_000
-        let seed = "\(lat),\(lon)"
-        var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
-            (acc ^ UInt64(byte)) &* 1099511628211
-        }
-        var bytes = [UInt8](repeating: 0, count: 16)
-        for i in 0..<8 {
-            bytes[i] = UInt8(hash & 0xFF)
-            hash >>= 8
-        }
-        var hash2 = seed.reversed().description.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
-            (acc ^ UInt64(byte)) &* 1099511628211
-        }
-        for i in 8..<16 {
-            bytes[i] = UInt8(hash2 & 0xFF)
-            hash2 >>= 8
-        }
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
-            bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
-    }
-
     // MARK: - Search
 
     private func search() async {
         guard let startPoint = route.trackPoints.first else { return }
         let origin = CLLocationCoordinate2D(
-            latitude: startPoint.coordinate.latitude,
+            latitude:  startPoint.coordinate.latitude,
             longitude: startPoint.coordinate.longitude
         )
         isLoading = true
@@ -164,23 +124,15 @@ struct POIDiscoverySheet: View {
     // MARK: - Add POI
 
     private func addPOI(from item: MKMapItem) {
-        let itemID = deterministicID(for: item)
-        guard !routeStore.selectedPOIs.contains(where: { $0.id == itemID }) else { return }
-        let coord = itemCoordinate(item)
-        let address: String? = {
-            if #available(iOS 26.0, *) {
-                return item.address?.shortAddress
-            } else {
-                return item.placemark.title
-            }
-        }()
+        let id = item.deterministicPOIID
+        guard !routeStore.selectedPOIs.contains(where: { $0.id == id }) else { return }
         let poi = POIModel(
-            id: itemID,
+            id: id,
             name: item.name ?? "Unknown",
             category: categoryFromMapItem(item),
-            coordinate: coord,
+            coordinate: item.poiCoordinate,
             distanceFromRoute: 0,
-            address: address,
+            address: item.shortAddress,
             phone: item.phoneNumber,
             website: item.url?.absoluteString
         )
@@ -221,14 +173,6 @@ private struct POIDiscoveryResultCard: View {
     let categoryIcon: String
     let onTap: () -> Void
 
-    private var addressLine: String? {
-        if #available(iOS 26.0, *) {
-            return item.address?.shortAddress
-        } else {
-            return item.placemark.title
-        }
-    }
-
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
@@ -246,7 +190,7 @@ private struct POIDiscoveryResultCard: View {
                     Text(item.name ?? "Unknown")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    if let address = addressLine {
+                    if let address = item.shortAddress {
                         Text(address)
                             .font(.caption)
                             .foregroundStyle(.secondary)

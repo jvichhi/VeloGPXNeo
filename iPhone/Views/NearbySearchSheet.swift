@@ -101,77 +101,34 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
-    // MARK: - Coordinate helper (handles iOS 26 non-optional CLLocation)
-
-    private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
-        if #available(iOS 26.0, *) {
-            return item.location.coordinate
-        } else {
-            return item.placemark.coordinate
-        }
-    }
-
-    // MARK: - Deterministic coordinate-based ID
-
-    private func deterministicID(for item: MKMapItem) -> UUID {
-        let coord = itemCoordinate(item)
-        let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000
-        let lon = (coord.longitude * 1_000_000).rounded() / 1_000_000
-        let seed = "\(lat),\(lon)"
-        var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
-            (acc ^ UInt64(byte)) &* 1099511628211
-        }
-        var bytes = [UInt8](repeating: 0, count: 16)
-        for i in 0..<8 {
-            bytes[i] = UInt8(hash & 0xFF)
-            hash >>= 8
-        }
-        var hash2 = seed.reversed().description.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
-            (acc ^ UInt64(byte)) &* 1099511628211
-        }
-        for i in 8..<16 {
-            bytes[i] = UInt8(hash2 & 0xFF)
-            hash2 >>= 8
-        }
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
-            bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
-    }
+    // MARK: - Added state
 
     private func isAdded(_ item: MKMapItem) -> Bool {
-        let itemID = deterministicID(for: item)
-        return routeStore.selectedPOIs.contains { $0.id == itemID }
+        routeStore.selectedPOIs.contains { $0.id == item.deterministicPOIID }
     }
 
+    // MARK: - Toggle
+
     private func toggle(_ item: MKMapItem) {
-        let itemID = deterministicID(for: item)
-        if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.id == itemID }) {
+        let id = item.deterministicPOIID
+        if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.id == id }) {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
-            let coord = itemCoordinate(item)
-            let address: String? = {
-                if #available(iOS 26.0, *) {
-                    return item.address?.shortAddress
-                } else {
-                    return item.placemark.thoroughfare
-                }
-            }()
             let poi = POIModel(
-                id: itemID,
+                id: id,
                 name: item.name ?? "POI",
                 category: category(for: selectedCategory),
-                coordinate: coord,
+                coordinate: item.poiCoordinate,
                 distanceFromRoute: 0,
-                address: address,
+                address: item.shortAddress,
                 phone: item.phoneNumber,
                 website: item.url?.absoluteString
             )
             routeStore.selectedPOIs.append(poi)
         }
     }
+
+    // MARK: - Load
 
     func load() async {
         guard CLLocationCoordinate2DIsValid(coordinate),
@@ -188,6 +145,8 @@ struct NearbySearchSheet: View {
         )) ?? []
         isLoading = false
     }
+
+    // MARK: - Category mapping
 
     private func category(for query: String) -> POICategory {
         switch query {
@@ -209,31 +168,18 @@ private struct NearbyResultCard: View {
     let isAdded: Bool
     let onToggle: () -> Void
 
-    private var itemCoordinate: CLLocationCoordinate2D {
-        if #available(iOS 26.0, *) {
-            return item.location.coordinate
-        } else {
-            return item.placemark.coordinate
-        }
-    }
-
     private var distanceMeters: CLLocationDistance {
         CLLocation(latitude: searchCoordinate.latitude, longitude: searchCoordinate.longitude)
-            .distance(from: CLLocation(latitude: itemCoordinate.latitude, longitude: itemCoordinate.longitude))
+            .distance(from: CLLocation(
+                latitude:  item.poiCoordinate.latitude,
+                longitude: item.poiCoordinate.longitude
+            ))
     }
 
     private var distanceLabel: String {
         distanceMeters < 1000
             ? String(format: "%.0f m away", distanceMeters)
             : String(format: "%.1f km away", distanceMeters / 1000)
-    }
-
-    private var addressLine: String? {
-        if #available(iOS 26.0, *) {
-            return item.address?.shortAddress
-        } else {
-            return item.placemark.thoroughfare
-        }
     }
 
     var body: some View {
@@ -251,7 +197,7 @@ private struct NearbyResultCard: View {
                 Text(item.name ?? "Unknown")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                if let address = addressLine {
+                if let address = item.shortAddress {
                     Text(address)
                         .font(.caption)
                         .foregroundStyle(.secondary)
