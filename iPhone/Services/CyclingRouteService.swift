@@ -3,9 +3,12 @@
 //  VeloGPX
 //
 //  Computes cycling directions between two points using MKDirections.
-//  - iOS 26+: uses .cycling transport type + MKMapItem(location:address:)
-//  - Fallback: uses .walking + MKMapItem(placemark: MKPlacemark(coordinate:))
-//  Both MKMapItem constructors are @MainActor; we hop with MainActor.run.
+//  - iOS 26+: .cycling transport type + MKMapItem(location:address:)
+//  - Fallback: .walking + MKMapItem(placemark: MKPlacemark(coordinate:))
+//
+//  MKMapItem and MKRoute are @MainActor-isolated.
+//  Pattern: MainActor.run to build request → directions.calculate() off-actor
+//           → MainActor.run to read route properties into plain Sendable struct.
 //
 
 import Foundation
@@ -14,9 +17,15 @@ import CoreLocation
 
 // MARK: - Route Result
 
-struct CyclingRouteResult {
+/// Plain-Sendable snapshot of MKRoute data extracted on @MainActor.
+/// Callers (SwiftUI views) are already @MainActor, so using `route` for
+/// MapPolyline / distance / ETA is safe there.
+struct CyclingRouteResult: @unchecked Sendable {
+    let route: MKRoute                                          // @MainActor-isolated; access only from @MainActor
+    let steps: [(instructions: String, distance: Double)]      // pre-extracted Sendable copy
+    let totalDistance: Double
+    let expectedTravelTime: TimeInterval
     let routeName: String?
-    let steps: [(instructions: String, distance: Double)]
     let matchedSource: MKMapItem?
     let matchedDestination: MKMapItem?
     let isCycling: Bool
@@ -33,47 +42,47 @@ actor CyclingRouteService {
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
-        // Construct MKMapItems on @MainActor, then capture route.steps there too
-        // to avoid crossing @MainActor isolation on MKRoute.route property.
-        return try await MainActor.run {
-            let sourceItem: MKMapItem
-            let destinationItem: MKMapItem
-            if #available(iOS 26.0, *) {
-                sourceItem      = MKMapItem(location: CLLocation(latitude: source.latitude, longitude: source.longitude), address: nil)
-                destinationItem = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
-            } else {
-                sourceItem      = MKMapItem(placemark: MKPlacemark(coordinate: source))
-                destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: destination))
-            }
 
-            let request = MKDirections.Request()
-            request.source = sourceItem
-            request.destination = destinationItem
-            request.requestsAlternateRoutes = true
+        // Step 1: build MKMapItems + request on @MainActor
+        let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
+            let src: MKMapItem
+            let dst: MKMapItem
             if #available(iOS 26.0, *) {
-                request.transportType = .cycling
+                src = MKMapItem(location: CLLocation(latitude: source.latitude, longitude: source.longitude), address: nil)
+                dst = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
             } else {
-                request.transportType = .walking
+                src = MKMapItem(placemark: MKPlacemark(coordinate: source))
+                dst = MKMapItem(placemark: MKPlacemark(coordinate: destination))
             }
+            let req = MKDirections.Request()
+            req.source = src
+            req.destination = dst
+            req.requestsAlternateRoutes = true
+            if #available(iOS 26.0, *) {
+                req.transportType = .cycling
+            } else {
+                req.transportType = .walking
+            }
+            return (src, dst, req)
+        }
 
-            // Return items so we can fire directions outside MainActor
-            return (sourceItem, destinationItem, request)
-        } |> { (sourceItem, destinationItem, request) in
-            // Fire directions off MainActor (network call)
-            let directions = MKDirections(request: request)
-            let response = try await directions.calculate()
-            guard let firstRoute = response.routes.first else {
-                throw CyclingRouteError.noRoutesFound
-            }
-            // Capture @MainActor-isolated steps on MainActor
-            let steps: [(String, Double)] = await MainActor.run {
-                firstRoute.steps.map { ($0.instructions, $0.distance) }
-            }
+        // Step 2: fire network call off @MainActor
+        let directions = MKDirections(request: request)
+        let response = try await directions.calculate()
+        guard let firstRoute = response.routes.first else {
+            throw CyclingRouteError.noRoutesFound
+        }
+
+        // Step 3: extract all @MainActor-isolated route properties on @MainActor
+        return await MainActor.run {
             let isCycling: Bool
             if #available(iOS 26.0, *) { isCycling = true } else { isCycling = false }
             return CyclingRouteResult(
+                route: firstRoute,
+                steps: firstRoute.steps.map { ($0.instructions, $0.distance) },
+                totalDistance: firstRoute.distance,
+                expectedTravelTime: firstRoute.expectedTravelTime,
                 routeName: firstRoute.name.isEmpty ? nil : firstRoute.name,
-                steps: steps,
                 matchedSource: sourceItem,
                 matchedDestination: destinationItem,
                 isCycling: isCycling
@@ -85,6 +94,7 @@ actor CyclingRouteService {
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
+
         let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
             let src: MKMapItem
             let dst: MKMapItem
@@ -109,15 +119,17 @@ actor CyclingRouteService {
 
         let directions = MKDirections(request: request)
         let response = try await directions.calculate()
-        let isCycling: Bool
-        if #available(iOS 26.0, *) { isCycling = true } else { isCycling = false }
 
-        // Capture steps for each route on @MainActor
         return await MainActor.run {
-            response.routes.prefix(3).map { route in
+            let isCycling: Bool
+            if #available(iOS 26.0, *) { isCycling = true } else { isCycling = false }
+            return response.routes.prefix(3).map { route in
                 CyclingRouteResult(
-                    routeName: route.name.isEmpty ? nil : route.name,
+                    route: route,
                     steps: route.steps.map { ($0.instructions, $0.distance) },
+                    totalDistance: route.distance,
+                    expectedTravelTime: route.expectedTravelTime,
+                    routeName: route.name.isEmpty ? nil : route.name,
                     matchedSource: sourceItem,
                     matchedDestination: destinationItem,
                     isCycling: isCycling
@@ -241,7 +253,6 @@ actor GPXCueEngine {
                     let to   = CLLocationCoordinate2D(latitude: toLat,   longitude: toLon)
                     do {
                         let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
-                        // steps already extracted from @MainActor inside calculateRoute
                         return (i, fromLat, fromLon, result.steps)
                     } catch {
                         let dist = CLLocation(latitude: fromLat, longitude: fromLon)
@@ -271,7 +282,6 @@ actor GPXCueEngine {
         for seg in segments {
             for (instruction, distance) in seg.steps {
                 let icon = cueIcon(from: instruction)
-                // Use lat/lon init — no @MainActor CLLocationCoordinate2D construction
                 entries.append(CueSheetEntry(
                     cumulativeDistance: cumulative,
                     instruction: instruction,

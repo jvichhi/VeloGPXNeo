@@ -8,6 +8,10 @@
 //  3. Displays the route as a MapPolyline on an inline Map
 //  4. Shows route name, distance, and ETA
 //
+//  CyclingRouteResult.route is MKRoute (@MainActor-isolated).
+//  This view is @MainActor (all SwiftUI views are), so accessing
+//  result.route.distance / .polyline etc. here is safe.
+//
 
 import SwiftUI
 import MapKit
@@ -48,14 +52,14 @@ struct CyclingRouteOverlay: View {
                 HStack(spacing: 0) {
                     routeStat(
                         icon: "arrow.left.and.right",
-                        value: String(format: "%.1f km", result.route.distance / 1000),
+                        value: String(format: "%.1f km", result.totalDistance / 1000),
                         label: "Distance",
                         color: .blue
                     )
                     Divider().frame(height: 44)
                     routeStat(
                         icon: "clock",
-                        value: formattedETA(result.route.expectedTravelTime),
+                        value: formattedETA(result.expectedTravelTime),
                         label: "Est. Time",
                         color: .green
                     )
@@ -169,6 +173,7 @@ struct CyclingRouteOverlay: View {
 
     @ViewBuilder
     private func cyclingMapView(result: CyclingRouteResult) -> some View {
+        // result.route is MKRoute — @MainActor safe here (SwiftUI view is @MainActor)
         let polyline = result.route.polyline
         let region = MKCoordinateRegion(polyline.boundingMapRect)
 
