@@ -125,6 +125,10 @@ public struct CueSheetEntry: Identifiable, Codable, Sendable {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
+    /// Convenience init accepting CLLocationCoordinate2D.
+    /// Note: CLLocationCoordinate2D.init is @MainActor on iOS 26+,
+    /// so call this only from a @MainActor context on iOS 26.
+    /// For actor/background contexts use init(id:cumulativeDistance:instruction:lat:lon:icon:).
     public init(
         id: UUID = UUID(),
         cumulativeDistance: Double,
@@ -137,6 +141,24 @@ public struct CueSheetEntry: Identifiable, Codable, Sendable {
         self.instruction = instruction
         self.latitude = coordinate.latitude
         self.longitude = coordinate.longitude
+        self.icon = icon
+    }
+
+    /// Isolation-safe init for use from actors and background tasks.
+    /// Takes raw lat/lon doubles — no CLLocationCoordinate2D construction.
+    public init(
+        id: UUID = UUID(),
+        cumulativeDistance: Double,
+        instruction: String,
+        lat: Double,
+        lon: Double,
+        icon: CueIcon
+    ) {
+        self.id = id
+        self.cumulativeDistance = cumulativeDistance
+        self.instruction = instruction
+        self.latitude = lat
+        self.longitude = lon
         self.icon = icon
     }
 }
@@ -183,7 +205,6 @@ public extension RouteModel {
         }
         guard withElevation.count > 10 else { return [] }
 
-        // windowMeters intentionally unused — climb detection uses grade threshold only
         var candidateRuns: [(start: Int, end: Int)] = []
         var runStart: Int?
 
