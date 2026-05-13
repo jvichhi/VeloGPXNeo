@@ -4,7 +4,7 @@
 
 ---
 
-## Current State — May 2, 2026 (evening)
+## Current State — May 12, 2026 (late evening)
 
 **Build:** ✅ Clean (iOS 26+, SwiftUI / MapKit / CoreLocation / Supabase / WatchConnectivity)
 
@@ -14,29 +14,27 @@
 
 | Commit | What |
 |---|---|
-| fix(Routes) | Distinct Routes tab icon (`list.bullet.below.rectangle`); Plan swipe/context-menu actions GPX-only |
-| fix(PlanView) | SwiftUI overlay buttons replace unreliable native MapKit controls |
-| fix(PlanView) | Rounded drawer corners (20 pt), header pinned top, waypoint swipe-delete via `.swipeActions` |
-| feat(RideView) | **F-1** All MapPolyline stroke widths doubled across all 5 pairs |
-| feat(POI) | **F-2a** Single source of truth — map annotations render from `rideStore.pois` during active ride |
-| feat(POI) | **F-2b** Long-press delete on POI annotations: 56pt target, 0.5s, two-step red-highlight → trash, camera pauses 3s |
-| feat(POI) | **F-2c** `×` removed from `nextPOIChip` — chip is display-only (icon + distance) |
-| feat(POI) | **F-2d** `PreRidePOISheet.swift` added; 📍 button opens *On this route* + *Add nearby* sections |
-| feat(POI) | **F-2e** Spur inbound anchor fixed: nearest route track point → POI (not rider position → POI) |
-| feat(POI) | **F-2f** Proximity gate: spurs + chip only active ≤500m along-route; approach alert stays at 200m |
-| fix(P0) | Duplicate `POISearchService.swift` (root-level copy) removed from project + Build Phases |
+| `c299bc1` | **P0** GPX locale crash — `String(format: "%f", ...)` for all lat/lon in `GPXExporter.swift` |
+| `c299bc1` | **P1** `RideSessionStore` `deinit` added — cancels `errorClearTask`, invalidates `elapsedTimer` |
+| `c299bc1` | **P1** `[weak self]` in `showError` Task closure — prevents retain cycle |
+| `c299bc1` | **P1** Heading guard — `didUpdateHeading` now guards `heading != 0 \|\| trueHeading >= 0` |
+| `c299bc1` | **P1** `RouteLibraryView` `.constant()` alert replaced with `@State var showImportAlert` + `.onChange` |
+| `c299bc1` | **P1** `RouteStore` force-unwrap crash — `storageDirectory()` + `poisStorageURL()` now throw instead of `first!` |
+| `842fb65` | **MK-5** `POISearchService` — typed `MKPointOfInterestFilter` for category searches (iOS 18+/26) |
+| `842fb65` | **P0** `POIDiscoverySheet` — POI ID collision fixed with `deterministicID(for:)` |
+| `842fb65` | **P0** `POIDiscoverySheet` — category detection upgraded to `item.pointOfInterestCategory` |
 
 ---
 
 ## In Progress — Next to Code
 
-Nothing currently in flight. Build is clean, all planned session work landed.
+Nothing currently in flight. Build is clean.
 
 ---
 
 ## Open Bugs
 
-*None blocking build.*
+- **Watch haptic loop** — `WatchRideStore.swift`: haptic fires every second while off-route. Add `didAlertOffRoute` flag. *(Quick fix, ~15 min)*
 
 ---
 
@@ -51,6 +49,8 @@ Nothing currently in flight. Build is clean, all planned session work landed.
 
 ## Notes / Watch-outs
 
-- `RideSessionStore.swift` is ~23 KB. P1 God Object split (`RideLocationEngine` + `POITrackingEngine` + `WatchSyncManager`) is overdue — do before adding more features.
-- `POIDiscoverySheet` vs `NearbySearchSheet` overlap — no blocker now; worth consolidating before 1.0.
-- `RouteStore+POI.swift` is suspiciously thin (866 B) — POI persistence still scattered across call sites in `RideView`. Consolidate before 1.0.
+- **MK-2 placemark reads** — `NearbySearchSheet`, `POIDiscoverySheet`, `ReverseGeocodingService`, `PlaceDescriptorService` all still read `mapItem.placemark.coordinate` / `.title` (deprecated iOS 26). These are warnings now; will be errors when min deployment target passes iOS 26. Track as MK-2 in TECH_DEBT.
+- **Water fountain POI category** — `POISearchService` maps "Water" to `.nationalPark` as a proxy. No `MKPointOfInterestCategory` constant for drinking fountains exists yet in the iOS 26 SDK. Watch WWDC / SDK release notes.
+- `RideSessionStore.swift` is ~30 KB. F-4 God Object split is overdue — do before adding more ride features.
+- `POIDiscoverySheet` vs `NearbySearchSheet` still overlap in purpose. Worth merging into one sheet with `mode: .preRide | .midRide` before 1.0.
+- `RouteStore+POI.swift` still thin (866 B) — POI persistence scattered. Consolidate before 1.0.
