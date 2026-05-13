@@ -910,6 +910,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "VeloGPX-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPX;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "\"VeloGPX uses your location to track rides in the background\"";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"VeloGPX uses your location to track your ride\"";
@@ -961,6 +962,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "VeloGPX-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPX;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "\"VeloGPX uses your location to track rides in the background\"";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"VeloGPX uses your location to track your ride\"";
