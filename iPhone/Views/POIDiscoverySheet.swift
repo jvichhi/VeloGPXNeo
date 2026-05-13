@@ -11,7 +11,7 @@ struct POIDiscoverySheet: View {
     @State private var selectedCategory: String? = nil
 
     private let categories: [(label: String, icon: String)] = [
-        ("Café",       "cup.and.saucer.fill"),
+        ("Caf\u00e9",       "cup.and.saucer.fill"),
         ("Water",      "drop.fill"),
         ("Bike Shop",  "wrench.and.screwdriver"),
         ("Restaurant", "fork.knife"),
@@ -21,8 +21,6 @@ struct POIDiscoverySheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-
-                // Category chip bar
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.label) { cat in
@@ -110,11 +108,18 @@ struct POIDiscoverySheet: View {
         }
     }
 
-    // MARK: - Deterministic coordinate-based ID (matches NearbySearchSheet)
+    // MARK: - Coordinate helper
+
+    private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
+        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    }
+
+    // MARK: - Deterministic coordinate-based ID
 
     private func deterministicID(for item: MKMapItem) -> UUID {
-        let lat = (item.placemark.coordinate.latitude  * 1_000_000).rounded() / 1_000_000
-        let lon = (item.placemark.coordinate.longitude * 1_000_000).rounded() / 1_000_000
+        let coord = itemCoordinate(item)
+        let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000
+        let lon = (coord.longitude * 1_000_000).rounded() / 1_000_000
         let seed = "\(lat),\(lon)"
         var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
             (acc ^ UInt64(byte)) &* 1099511628211
@@ -143,7 +148,10 @@ struct POIDiscoverySheet: View {
 
     private func search() async {
         guard let startPoint = route.trackPoints.first else { return }
-        let origin = startPoint.coordinate.clCoordinate
+        let origin = CLLocationCoordinate2D(
+            latitude: startPoint.coordinate.latitude,
+            longitude: startPoint.coordinate.longitude
+        )
         isLoading = true
         results = (try? await POISearchService.shared.search(query: searchQuery, near: origin)) ?? []
         isLoading = false
@@ -153,38 +161,42 @@ struct POIDiscoverySheet: View {
 
     private func addPOI(from item: MKMapItem) {
         let itemID = deterministicID(for: item)
-        // P0 fix: use coordinate-based ID, not name string comparison
         guard !routeStore.selectedPOIs.contains(where: { $0.id == itemID }) else { return }
+        let coord = itemCoordinate(item)
+        let address: String? = {
+            if #available(iOS 26.0, *) {
+                return item.addressRepresentations.first?.formattedAddressLine
+            } else {
+                return item.placemark.title
+            }
+        }()
         let poi = POIModel(
             id: itemID,
             name: item.name ?? "Unknown",
             category: categoryFromMapItem(item),
-            coordinate: item.placemark.coordinate,
+            coordinate: coord,
             distanceFromRoute: 0,
-            address: item.placemark.title,
+            address: address,
             phone: item.phoneNumber,
             website: item.url?.absoluteString
         )
         routeStore.selectedPOIs.append(poi)
     }
 
-    // MARK: - Category detection (typed MKPointOfInterestCategory, iOS 18+)
+    // MARK: - Category detection
 
     private func categoryFromMapItem(_ item: MKMapItem) -> POICategory {
-        // Prefer the structured pointOfInterestCategory over name heuristics
         if let poiCat = item.pointOfInterestCategory {
             switch poiCat {
             case .cafe:                             return .cafe
             case .restaurant, .foodMarket:         return .restaurant
-            //case .bicycle:                          return .bikeRepair
             case .pharmacy:                         return .pharmacy
             case .hotel:                            return .accommodation
             case .campground:                       return .campsite
-            case .nationalPark, .park:              return .water  // mapped for water/fountain searches
+            case .nationalPark, .park:              return .water
             default:                                return .custom
             }
         }
-        // Fallback: name heuristics for items without a typed category
         let name = item.name?.lowercased() ?? ""
         if name.contains("caf\u{00e9}") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
@@ -205,6 +217,14 @@ private struct POIDiscoveryResultCard: View {
     let categoryIcon: String
     let onTap: () -> Void
 
+    private var addressLine: String? {
+        if #available(iOS 26.0, *) {
+            return item.addressRepresentations.first?.formattedAddressLine
+        } else {
+            return item.placemark.title
+        }
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
@@ -222,7 +242,7 @@ private struct POIDiscoveryResultCard: View {
                     Text(item.name ?? "Unknown")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    if let address = item.placemark.title {
+                    if let address = addressLine {
                         Text(address)
                             .font(.caption)
                             .foregroundStyle(.secondary)

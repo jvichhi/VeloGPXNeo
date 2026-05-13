@@ -4,7 +4,7 @@
 //
 //  Computes cycling directions between two points using MKDirections.
 //  - iOS 26+: uses .cycling transport type + MKMapItem(coordinate:)
-//  - Fallback: uses .walking
+//  - Fallback: uses .walking + MKPlacemark
 //  Returns the first MKRoute plus metadata (name, ETA).
 //
 
@@ -15,27 +15,16 @@ import CoreLocation
 // MARK: - Route Result
 
 struct CyclingRouteResult {
-    /// The computed MKRoute (polyline, steps, distance, ETA).
     let route: MKRoute
-
-    /// Localized route name provided by MapKit, nil if empty.
     let routeName: String?
-
-    /// The source MapItem used for the request.
     let matchedSource: MKMapItem?
-
-    /// The destination MapItem used for the request.
     let matchedDestination: MKMapItem?
-
-    /// Whether the route was computed using .cycling (true) or .walking fallback (false).
     let isCycling: Bool
 }
 
 // MARK: - Helpers
 
-/// Creates an MKMapItem from a coordinate.
-/// iOS 26+: uses MKMapItem(coordinate:) directly — MKPlacemark is deprecated.
-/// Earlier: wraps in MKPlacemark as before.
+/// iOS 26+: MKMapItem(coordinate:). Earlier: MKPlacemark wrapper.
 private func mapItem(for coordinate: CLLocationCoordinate2D) -> MKMapItem {
     if #available(iOS 26.0, *) {
         return MKMapItem(coordinate: coordinate)
@@ -51,12 +40,10 @@ actor CyclingRouteService {
     static let shared = CyclingRouteService()
     private init() {}
 
-    /// Calculates a cycling route from `source` to `destination`.
     func calculateRoute(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
-
         let sourceItem = mapItem(for: source)
         let destinationItem = mapItem(for: destination)
 
@@ -80,23 +67,19 @@ actor CyclingRouteService {
             throw CyclingRouteError.noRoutesFound
         }
 
-        let routeName = firstRoute.name.isEmpty ? nil : firstRoute.name
-
         return CyclingRouteResult(
             route: firstRoute,
-            routeName: routeName,
+            routeName: firstRoute.name.isEmpty ? nil : firstRoute.name,
             matchedSource: sourceItem,
             matchedDestination: destinationItem,
             isCycling: isCycling
         )
     }
 
-    /// Returns all alternative routes (up to the first 3).
     func calculateAlternativeRoutes(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
-
         let sourceItem = mapItem(for: source)
         let destinationItem = mapItem(for: destination)
 
@@ -147,8 +130,6 @@ enum CyclingRouteError: LocalizedError {
 // MARK: - GPX Cue Engine
 
 /// Generates turn-by-turn cue sheets from GPX track geometry.
-/// Extracts bearing-change keypoints, routes between them via CyclingRouteService,
-/// and assembles MKRoute.Step instructions with geometry fallback for off-road segments.
 actor GPXCueEngine {
     static let shared = GPXCueEngine()
     private init() {}
@@ -163,7 +144,9 @@ actor GPXCueEngine {
 
         let keypoints = extractKeypoints(from: points)
         guard keypoints.count >= 2 else {
-            return [makeArrivalCue(at: points.last!.coordinate.clCoordinate, distance: route.totalDistance)]
+            let lastCoord = points.last!.coordinate
+            let lastCL = CLLocationCoordinate2D(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+            return [makeArrivalCue(at: lastCL, distance: route.totalDistance)]
         }
 
         let segments = await routeBetween(keypoints: keypoints)
@@ -185,8 +168,14 @@ actor GPXCueEngine {
             var delta = abs(outBearing - inBearing)
             if delta > 180 { delta = 360 - delta }
 
-            let distSinceLast = points[i].coordinate.clCoordinate
-                .distance(to: keypoints.last!.clCoordinate)
+            let lastCoord = keypoints.last!
+            let lastCL = CLLocationCoordinate2D(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+            let currCL = CLLocationCoordinate2D(
+                latitude: points[i].coordinate.latitude,
+                longitude: points[i].coordinate.longitude
+            )
+            let distSinceLast = CLLocation(latitude: currCL.latitude, longitude: currCL.longitude)
+                .distance(from: CLLocation(latitude: lastCL.latitude, longitude: lastCL.longitude))
 
             if delta >= minBearingChange, distSinceLast >= minKeypointSpacing {
                 keypoints.append(points[i].coordinate)
@@ -199,13 +188,21 @@ actor GPXCueEngine {
 
     private func gatherWindow(points: [TrackPoint], center: Int, windowM: Double, backward: Bool) -> [CLLocationCoordinate2D] {
         var accumulated: Double = 0
-        var result: [CLLocationCoordinate2D] = [points[center].coordinate.clCoordinate]
+        let centerCoord = points[center].coordinate
+        var result: [CLLocationCoordinate2D] = [
+            CLLocationCoordinate2D(latitude: centerCoord.latitude, longitude: centerCoord.longitude)
+        ]
         var idx = center
         while accumulated < windowM {
             let next = backward ? idx - 1 : idx + 1
             guard next >= 0, next < points.count else { break }
-            accumulated += points[idx].coordinate.clCoordinate.distance(to: points[next].coordinate.clCoordinate)
-            result.append(points[next].coordinate.clCoordinate)
+            let a = points[idx].coordinate
+            let b = points[next].coordinate
+            let aCL = CLLocationCoordinate2D(latitude: a.latitude, longitude: a.longitude)
+            let bCL = CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)
+            accumulated += CLLocation(latitude: aCL.latitude, longitude: aCL.longitude)
+                .distance(from: CLLocation(latitude: bCL.latitude, longitude: bCL.longitude))
+            result.append(bCL)
             idx = next
         }
         return result
@@ -221,15 +218,16 @@ actor GPXCueEngine {
 
         await withTaskGroup(of: SegmentSteps?.self) { group in
             for (i, pair) in pairs.enumerated() {
-                let from = pair.0.clCoordinate
-                let to = pair.1.clCoordinate
+                let from = CLLocationCoordinate2D(latitude: pair.0.latitude, longitude: pair.0.longitude)
+                let to   = CLLocationCoordinate2D(latitude: pair.1.latitude, longitude: pair.1.longitude)
                 group.addTask {
                     do {
                         let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
                         let steps = result.route.steps.map { ($0.instructions, $0.distance) }
                         return (i, from, steps)
                     } catch {
-                        let dist = from.distance(to: to)
+                        let dist = CLLocation(latitude: from.latitude, longitude: from.longitude)
+                            .distance(from: CLLocation(latitude: to.latitude, longitude: to.longitude))
                         let bearingDeg = self.bearing(from: from, to: to)
                         let icon = self.bearingToIcon(bearingDeg)
                         let desc = self.geometryInstruction(for: icon)
@@ -265,15 +263,17 @@ actor GPXCueEngine {
             }
         }
 
-        if var last = entries.last,
+        if let last = entries.last,
            last.instruction.lowercased().contains("arrive") || last.instruction.lowercased().contains("destination") {
             entries[entries.count - 1] = CueSheetEntry(
-                id: last.id, cumulativeDistance: last.cumulativeDistance,
-                instruction: "Arrive at destination", coordinate: last.coordinate, icon: .arrive
+                id: last.id,
+                cumulativeDistance: last.cumulativeDistance,
+                instruction: "Arrive at destination",
+                coordinate: last.coordinate,
+                icon: .arrive
             )
         }
 
-        // Deduplicate adjacent identical instructions
         var deduped: [CueSheetEntry] = []
         for entry in entries {
             if let prev = deduped.last, prev.instruction == entry.instruction { continue }

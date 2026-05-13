@@ -7,11 +7,11 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Café"
+    @State private var selectedCategory = "Caf\u00e9"
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Café",        "cup.and.saucer.fill",      "Café"),
+        ("Caf\u00e9",        "cup.and.saucer.fill",      "Caf\u00e9"),
         ("Water",       "drop.fill",                "Water"),
         ("Bike Shop",   "wrench.and.screwdriver",   "Bike Shop"),
         ("Restaurant",  "fork.knife",               "Restaurant")
@@ -20,7 +20,6 @@ struct NearbySearchSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.query) { cat in
@@ -102,11 +101,16 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
-    // MARK: - Deterministic ID (coordinate-based)
+    // MARK: - Deterministic coordinate-based ID
+
+    private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
+        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    }
 
     private func deterministicID(for item: MKMapItem) -> UUID {
-        let lat = (item.placemark.coordinate.latitude * 1_000_000).rounded() / 1_000_000
-        let lon = (item.placemark.coordinate.longitude * 1_000_000).rounded() / 1_000_000
+        let coord = itemCoordinate(item)
+        let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000
+        let lon = (coord.longitude * 1_000_000).rounded() / 1_000_000
         let seed = "\(lat),\(lon)"
         var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
             (acc ^ UInt64(byte)) &* 1099511628211
@@ -141,13 +145,22 @@ struct NearbySearchSheet: View {
         if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.id == itemID }) {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
+            let coord = itemCoordinate(item)
+            // Address: prefer structured address over deprecated .placemark.thoroughfare
+            let address: String? = {
+                if #available(iOS 26.0, *) {
+                    return item.addressRepresentations.first?.formattedAddressLine
+                } else {
+                    return item.placemark.thoroughfare
+                }
+            }()
             let poi = POIModel(
                 id: itemID,
                 name: item.name ?? "POI",
                 category: category(for: selectedCategory),
-                coordinate: item.placemark.coordinate,
+                coordinate: coord,
                 distanceFromRoute: 0,
-                address: item.placemark.thoroughfare,
+                address: address,
                 phone: item.phoneNumber,
                 website: item.url?.absoluteString
             )
@@ -163,9 +176,6 @@ struct NearbySearchSheet: View {
         }
         hasInvalidCoordinate = false
         isLoading = true
-        // Issue 3b fix: cap radius at 1000 m for mid-ride nearby search.
-        // The previous default of 5000 m returned results up to 4 km off-route,
-        // most of which are unreachable or irrelevant while riding.
         results = (try? await POISearchService.shared.search(
             query: selectedCategory,
             near: coordinate,
@@ -176,7 +186,7 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Café":        return .cafe
+        case "Caf\u00e9":        return .cafe
         case "Water":       return .water
         case "Bike Shop":   return .bikeRepair
         case "Restaurant":  return .restaurant
@@ -194,16 +204,27 @@ private struct NearbyResultCard: View {
     let isAdded: Bool
     let onToggle: () -> Void
 
+    private var itemCoordinate: CLLocationCoordinate2D {
+        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    }
+
     private var distanceMeters: CLLocationDistance {
         CLLocation(latitude: searchCoordinate.latitude, longitude: searchCoordinate.longitude)
-            .distance(from: CLLocation(latitude: item.placemark.coordinate.latitude,
-                                       longitude: item.placemark.coordinate.longitude))
+            .distance(from: CLLocation(latitude: itemCoordinate.latitude, longitude: itemCoordinate.longitude))
     }
 
     private var distanceLabel: String {
         distanceMeters < 1000
             ? String(format: "%.0f m away", distanceMeters)
             : String(format: "%.1f km away", distanceMeters / 1000)
+    }
+
+    private var addressLine: String? {
+        if #available(iOS 26.0, *) {
+            return item.addressRepresentations.first?.formattedAddressLine
+        } else {
+            return item.placemark.thoroughfare
+        }
     }
 
     var body: some View {
@@ -221,7 +242,7 @@ private struct NearbyResultCard: View {
                 Text(item.name ?? "Unknown")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                if let address = item.placemark.thoroughfare {
+                if let address = addressLine {
                     Text(address)
                         .font(.caption)
                         .foregroundStyle(.secondary)

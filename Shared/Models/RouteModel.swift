@@ -14,7 +14,6 @@ public struct RouteModel: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var createdAt: Date
     public var originalFilename: String?
 
-    // Hash on id only — cheap and correct for navigation identity.
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
@@ -88,7 +87,6 @@ public struct WaypointPoint: Codable, Identifiable, Hashable, Sendable, Equatabl
 public enum RouteFormat: String, Codable, Hashable, Sendable {
     case gpx
     case geojson
-    /// Route created interactively in the Plan tab.
     case planned
 }
 
@@ -176,8 +174,6 @@ public extension RouteModel {
         return .easy
     }
 
-    // MARK: - Climb detection
-
     func detectClimbs() -> [ClimbSegment] {
         guard trackPoints.count > 50 else { return [] }
 
@@ -187,7 +183,7 @@ public extension RouteModel {
         }
         guard withElevation.count > 10 else { return [] }
 
-        let windowMeters: Double = 100
+        // windowMeters intentionally unused — climb detection uses grade threshold only
         var candidateRuns: [(start: Int, end: Int)] = []
         var runStart: Int?
 
@@ -215,7 +211,6 @@ public extension RouteModel {
         }
 
         let merged = mergeClimbRuns(candidateRuns)
-
         return merged.compactMap { segment in
             classifyClimb(start: segment.start, end: segment.end)
         }
@@ -228,8 +223,6 @@ public extension RouteModel {
                 acc + pair.0.coordinate.clCoordinate.distance(to: pair.1.coordinate.clCoordinate)
             }
     }
-
-    // MARK: - Private helpers
 
     private func mergeClimbRuns(_ runs: [(start: Int, end: Int)]) -> [(start: Int, end: Int)] {
         guard runs.count > 1 else { return runs }
