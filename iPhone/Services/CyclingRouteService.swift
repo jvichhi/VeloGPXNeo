@@ -2,16 +2,9 @@
 //  CyclingRouteService.swift
 //  VeloGPX
 //
-//  Computes cycling directions between two points using MKDirections.
-//  - iOS 26+: .cycling transport type + MKMapItem(location:address:)
-//  - Fallback: .walking + MKMapItem(placemark: MKPlacemark(coordinate:))
-//
-//  MKMapItem and MKRoute are @MainActor-isolated.
-//  Pattern: MainActor.run to build request → directions.calculate() off-actor
-//           → MainActor.run to read route properties into plain Sendable struct.
-//
-//  CLLocationCoordinate2D.init is @MainActor on iOS 26+.
-//  GPXCueEngine always uses CueSheetEntry(lat:lon:) to avoid actor isolation issues.
+//  iOS 26+ only: .cycling transport type, MKMapItem(location:address:).
+//  CLLocationCoordinate2D.init is @MainActor on iOS 26 — all constructions
+//  in non-@MainActor contexts use raw lat/lon doubles and build on MainActor.
 //
 
 import Foundation
@@ -20,7 +13,6 @@ import CoreLocation
 
 // MARK: - Route Result
 
-/// Plain-Sendable snapshot of MKRoute data extracted on @MainActor.
 struct CyclingRouteResult: @unchecked Sendable {
     let route: MKRoute
     let steps: [(instructions: String, distance: Double)]
@@ -34,46 +26,30 @@ struct CyclingRouteResult: @unchecked Sendable {
 
 // MARK: - Service
 
+@available(iOS 26.0, *)
 actor CyclingRouteService {
 
     static let shared = CyclingRouteService()
     private init() {}
 
     func calculateRoute(
-        from source: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D
+        from sourceLat: Double, _ sourceLon: Double,
+        to destLat: Double, _ destLon: Double
     ) async throws -> CyclingRouteResult {
-
-        let sourceLat = source.latitude
-        let sourceLon = source.longitude
-        let destLat   = destination.latitude
-        let destLon   = destination.longitude
-
-        let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
-            let src: MKMapItem
-            let dst: MKMapItem
-            if #available(iOS 26.0, *) {
-                src = MKMapItem(
-                    location: CLLocation(latitude: sourceLat, longitude: sourceLon),
-                    address: nil
-                )
-                dst = MKMapItem(
-                    location: CLLocation(latitude: destLat, longitude: destLon),
-                    address: nil
-                )
-            } else {
-                src = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: sourceLat, longitude: sourceLon)))
-                dst = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: destLat, longitude: destLon)))
-            }
+        let (sourceItem, destItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
+            let src = MKMapItem(
+                location: CLLocation(latitude: sourceLat, longitude: sourceLon),
+                address: nil
+            )
+            let dst = MKMapItem(
+                location: CLLocation(latitude: destLat, longitude: destLon),
+                address: nil
+            )
             let req = MKDirections.Request()
             req.source = src
             req.destination = dst
             req.requestsAlternateRoutes = true
-            if #available(iOS 26.0, *) {
-                req.transportType = .cycling
-            } else {
-                req.transportType = .walking
-            }
+            req.transportType = .cycling
             return (src, dst, req)
         }
 
@@ -91,47 +67,30 @@ actor CyclingRouteService {
                 expectedTravelTime: firstRoute.expectedTravelTime,
                 routeName: firstRoute.name.isEmpty ? nil : firstRoute.name,
                 matchedSource: sourceItem,
-                matchedDestination: destinationItem,
-                isCycling: { if #available(iOS 26.0, *) { true } else { false } }()
+                matchedDestination: destItem,
+                isCycling: true
             )
         }
     }
 
     func calculateAlternativeRoutes(
-        from source: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D
+        from sourceLat: Double, _ sourceLon: Double,
+        to destLat: Double, _ destLon: Double
     ) async throws -> [CyclingRouteResult] {
-
-        let sourceLat = source.latitude
-        let sourceLon = source.longitude
-        let destLat   = destination.latitude
-        let destLon   = destination.longitude
-
-        let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
-            let src: MKMapItem
-            let dst: MKMapItem
-            if #available(iOS 26.0, *) {
-                src = MKMapItem(
-                    location: CLLocation(latitude: sourceLat, longitude: sourceLon),
-                    address: nil
-                )
-                dst = MKMapItem(
-                    location: CLLocation(latitude: destLat, longitude: destLon),
-                    address: nil
-                )
-            } else {
-                src = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: sourceLat, longitude: sourceLon)))
-                dst = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: destLat, longitude: destLon)))
-            }
+        let (sourceItem, destItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
+            let src = MKMapItem(
+                location: CLLocation(latitude: sourceLat, longitude: sourceLon),
+                address: nil
+            )
+            let dst = MKMapItem(
+                location: CLLocation(latitude: destLat, longitude: destLon),
+                address: nil
+            )
             let req = MKDirections.Request()
             req.source = src
             req.destination = dst
             req.requestsAlternateRoutes = true
-            if #available(iOS 26.0, *) {
-                req.transportType = .cycling
-            } else {
-                req.transportType = .walking
-            }
+            req.transportType = .cycling
             return (src, dst, req)
         }
 
@@ -139,9 +98,7 @@ actor CyclingRouteService {
         let response = try await directions.calculate()
 
         return await MainActor.run {
-            let isCycling: Bool
-            if #available(iOS 26.0, *) { isCycling = true } else { isCycling = false }
-            return response.routes.prefix(3).map { route in
+            response.routes.prefix(3).map { route in
                 CyclingRouteResult(
                     route: route,
                     steps: route.steps.map { ($0.instructions, $0.distance) },
@@ -149,8 +106,8 @@ actor CyclingRouteService {
                     expectedTravelTime: route.expectedTravelTime,
                     routeName: route.name.isEmpty ? nil : route.name,
                     matchedSource: sourceItem,
-                    matchedDestination: destinationItem,
-                    isCycling: isCycling
+                    matchedDestination: destItem,
+                    isCycling: true
                 )
             }
         }
@@ -161,23 +118,17 @@ actor CyclingRouteService {
 
 enum CyclingRouteError: LocalizedError {
     case noRoutesFound
-
     var errorDescription: String? {
-        switch self {
-        case .noRoutesFound:
-            return NSLocalizedString(
-                "No cycling route found between those two points.",
-                comment: "CyclingRouteError.noRoutesFound"
-            )
-        }
+        NSLocalizedString("No cycling route found between those two points.", comment: "CyclingRouteError.noRoutesFound")
     }
 }
 
 // MARK: - GPX Cue Engine
 
 /// Generates turn-by-turn cue sheets from GPX track geometry.
-/// All CueSheetEntry construction uses the lat/lon init to avoid
-/// @MainActor isolation on CLLocationCoordinate2D.init (iOS 26+).
+/// Uses CueSheetEntry(lat:lon:) exclusively — the nonisolated init that
+/// avoids @MainActor isolation from CLLocationCoordinate2D on iOS 26+.
+@available(iOS 26.0, *)
 actor GPXCueEngine {
     static let shared = GPXCueEngine()
     private init() {}
@@ -210,7 +161,6 @@ actor GPXCueEngine {
 
     private func extractKeypoints(from points: [TrackPoint]) -> [Coordinate] {
         var keypoints: [Coordinate] = [points.first!.coordinate]
-
         for i in 1..<(points.count - 1) {
             let behind = gatherWindow(points: points, center: i, windowM: windowDistanceMeters, backward: true)
             let ahead  = gatherWindow(points: points, center: i, windowM: windowDistanceMeters, backward: false)
@@ -229,17 +179,14 @@ actor GPXCueEngine {
                 keypoints.append(points[i].coordinate)
             }
         }
-
         keypoints.append(points.last!.coordinate)
         return keypoints
     }
 
     private func gatherWindow(points: [TrackPoint], center: Int, windowM: Double, backward: Bool) -> [CLLocationCoordinate2D] {
         var accumulated: Double = 0
-        let centerCoord = points[center].coordinate
-        var result: [CLLocationCoordinate2D] = [
-            CLLocationCoordinate2D(latitude: centerCoord.latitude, longitude: centerCoord.longitude)
-        ]
+        let c = points[center].coordinate
+        var result = [CLLocationCoordinate2D(latitude: c.latitude, longitude: c.longitude)]
         var idx = center
         while accumulated < windowM {
             let next = backward ? idx - 1 : idx + 1
@@ -258,50 +205,37 @@ actor GPXCueEngine {
 
     private func routeBetween(keypoints: [Coordinate]) async -> [(lat: Double, lon: Double, steps: [(String, Double)])] {
         let pairs = Array(zip(keypoints, keypoints.dropFirst()))
+        typealias Seg = (index: Int, lat: Double, lon: Double, steps: [(String, Double)])
+        var results: [Seg] = []
 
-        typealias SegmentSteps = (index: Int, lat: Double, lon: Double, steps: [(String, Double)])
-        var results: [SegmentSteps] = []
-
-        await withTaskGroup(of: SegmentSteps?.self) { group in
+        await withTaskGroup(of: Seg?.self) { group in
             for (i, pair) in pairs.enumerated() {
-                let fromLat = pair.0.latitude
-                let fromLon = pair.0.longitude
-                let toLat   = pair.1.latitude
-                let toLon   = pair.1.longitude
+                let fLat = pair.0.latitude, fLon = pair.0.longitude
+                let tLat = pair.1.latitude, tLon = pair.1.longitude
                 group.addTask {
-                    // Build CLLocationCoordinate2D on MainActor (iOS 26+)
-                    let (from, to) = await MainActor.run {
-                        (CLLocationCoordinate2D(latitude: fromLat, longitude: fromLon),
-                         CLLocationCoordinate2D(latitude: toLat, longitude: toLon))
-                    }
                     do {
-                        let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
-                        return (i, fromLat, fromLon, result.steps)
-                    } catch {
-                        let dist = CLLocation(latitude: fromLat, longitude: fromLon)
-                            .distance(from: CLLocation(latitude: toLat, longitude: toLon))
-                        let bearingDeg = self.bearing(
-                            from: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLon),
-                            to:   CLLocationCoordinate2D(latitude: toLat,   longitude: toLon)
+                        let result = try await CyclingRouteService.shared.calculateRoute(
+                            from: fLat, fLon, to: tLat, tLon
                         )
-                        let icon = self.bearingToIcon(bearingDeg)
-                        let desc = self.geometryInstruction(for: icon)
-                        return (i, fromLat, fromLon, [(desc, dist)])
+                        return (i, fLat, fLon, result.steps)
+                    } catch {
+                        let dist = CLLocation(latitude: fLat, longitude: fLon)
+                            .distance(from: CLLocation(latitude: tLat, longitude: tLon))
+                        let b = self.bearing(
+                            from: CLLocationCoordinate2D(latitude: fLat, longitude: fLon),
+                            to:   CLLocationCoordinate2D(latitude: tLat, longitude: tLon)
+                        )
+                        return (i, fLat, fLon, [(self.geometryInstruction(for: self.bearingToIcon(b)), dist)])
                     }
                 }
             }
-            for await seg in group {
-                if let s = seg { results.append(s) }
-            }
+            for await seg in group { if let s = seg { results.append(s) } }
         }
-
         results.sort { $0.index < $1.index }
         return results.map { (lat: $0.lat, lon: $0.lon, steps: $0.steps) }
     }
 
-    // MARK: - Cue assembly
-    // All CueSheetEntry construction uses lat:/lon: to avoid @MainActor
-    // isolation on CLLocationCoordinate2D.init (iOS 26+).
+    // MARK: - Cue assembly — always uses CueSheetEntry(lat:lon:) nonisolated init
 
     private func assembleCueSheet(from segments: [(lat: Double, lon: Double, steps: [(String, Double)])]) -> [CueSheetEntry] {
         var entries: [CueSheetEntry] = []
@@ -309,13 +243,12 @@ actor GPXCueEngine {
 
         for seg in segments {
             for (instruction, distance) in seg.steps {
-                let icon = cueIcon(from: instruction)
                 entries.append(CueSheetEntry(
                     cumulativeDistance: cumulative,
                     instruction: instruction,
                     lat: seg.lat,
                     lon: seg.lon,
-                    icon: icon
+                    icon: cueIcon(from: instruction)
                 ))
                 cumulative += distance
             }
@@ -341,36 +274,36 @@ actor GPXCueEngine {
         return deduped
     }
 
-    // MARK: - Icon mapping
+    // MARK: - Helpers
 
     private func cueIcon(from instructions: String) -> CueIcon {
-        let lower = instructions.lowercased()
-        if lower.contains("roundabout")           { return .roundabout }
-        if lower.contains("u-turn")               { return .uTurn }
-        if lower.contains("merge")                { return .merge }
-        if lower.contains("slight left")          { return .slightLeft }
-        if lower.contains("slight right")         { return .slightRight }
-        if lower.contains("sharp left")           { return .sharpLeft }
-        if lower.contains("sharp right")          { return .sharpRight }
-        if lower.contains("turn left")            { return .left }
-        if lower.contains("turn right")           { return .right }
-        if lower.contains("left")                 { return .left }
-        if lower.contains("right")                { return .right }
-        if lower.contains("arrive") || lower.contains("destination") { return .arrive }
+        let l = instructions.lowercased()
+        if l.contains("roundabout")  { return .roundabout }
+        if l.contains("u-turn")      { return .uTurn }
+        if l.contains("merge")       { return .merge }
+        if l.contains("slight left") { return .slightLeft }
+        if l.contains("slight right"){ return .slightRight }
+        if l.contains("sharp left")  { return .sharpLeft }
+        if l.contains("sharp right") { return .sharpRight }
+        if l.contains("turn left")   { return .left }
+        if l.contains("turn right")  { return .right }
+        if l.contains("left")        { return .left }
+        if l.contains("right")       { return .right }
+        if l.contains("arrive") || l.contains("destination") { return .arrive }
         return .straight
     }
 
-    nonisolated private func bearingToIcon(_ bearing: Double) -> CueIcon {
-        switch bearing {
-        case 330...360, 0..<30:  return .straight
-        case 30..<60:            return .slightRight
-        case 60..<120:           return .right
-        case 120..<150:          return .sharpRight
-        case 150..<210:          return .uTurn
-        case 210..<240:          return .sharpLeft
-        case 240..<300:          return .left
-        case 300..<330:          return .slightLeft
-        default:                 return .straight
+    nonisolated private func bearingToIcon(_ b: Double) -> CueIcon {
+        switch b {
+        case 330...360, 0..<30: return .straight
+        case 30..<60:           return .slightRight
+        case 60..<120:          return .right
+        case 120..<150:         return .sharpRight
+        case 150..<210:         return .uTurn
+        case 210..<240:         return .sharpLeft
+        case 240..<300:         return .left
+        case 300..<330:         return .slightLeft
+        default:                return .straight
         }
     }
 
@@ -393,7 +326,6 @@ actor GPXCueEngine {
         let dLon = (to.longitude - from.longitude) * .pi / 180
         let y = sin(dLon) * cos(lat2)
         let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
-        let b = atan2(y, x) * 180 / .pi
-        return (b + 360).truncatingRemainder(dividingBy: 360)
+        return ((atan2(y, x) * 180 / .pi) + 360).truncatingRemainder(dividingBy: 360)
     }
 }

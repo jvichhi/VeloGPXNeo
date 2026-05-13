@@ -113,6 +113,9 @@ public enum CueIcon: String, Codable, Sendable {
     }
 }
 
+/// Stores lat/lon as raw Doubles — no CLLocationCoordinate2D in stored properties.
+/// This keeps the struct fully Sendable and callable from any concurrency context,
+/// including non-@MainActor actors, since CLLocationCoordinate2D.init is @MainActor on iOS 26+.
 public struct CueSheetEntry: Identifiable, Codable, Sendable {
     public let id: UUID
     public let cumulativeDistance: Double
@@ -121,32 +124,16 @@ public struct CueSheetEntry: Identifiable, Codable, Sendable {
     public let longitude: Double
     public let icon: CueIcon
 
+    /// Returns a CLLocationCoordinate2D from stored raw values.
+    /// Must be accessed on @MainActor on iOS 26+ (CLLocationCoordinate2D is @MainActor-isolated).
+    @MainActor
     public var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
-    /// Convenience init accepting CLLocationCoordinate2D.
-    /// Note: CLLocationCoordinate2D.init is @MainActor on iOS 26+,
-    /// so call this only from a @MainActor context on iOS 26.
-    /// For actor/background contexts use init(id:cumulativeDistance:instruction:lat:lon:icon:).
-    public init(
-        id: UUID = UUID(),
-        cumulativeDistance: Double,
-        instruction: String,
-        coordinate: CLLocationCoordinate2D,
-        icon: CueIcon
-    ) {
-        self.id = id
-        self.cumulativeDistance = cumulativeDistance
-        self.instruction = instruction
-        self.latitude = coordinate.latitude
-        self.longitude = coordinate.longitude
-        self.icon = icon
-    }
-
-    /// Isolation-safe init for use from actors and background tasks.
-    /// Takes raw lat/lon doubles — no CLLocationCoordinate2D construction.
-    public init(
+    /// Primary init — takes raw lat/lon Doubles.
+    /// Safe to call from any concurrency context.
+    public nonisolated init(
         id: UUID = UUID(),
         cumulativeDistance: Double,
         instruction: String,
@@ -159,6 +146,24 @@ public struct CueSheetEntry: Identifiable, Codable, Sendable {
         self.instruction = instruction
         self.latitude = lat
         self.longitude = lon
+        self.icon = icon
+    }
+
+    /// Convenience init accepting CLLocationCoordinate2D.
+    /// Only call from @MainActor context (SwiftUI views, MainActor.run blocks).
+    @MainActor
+    public init(
+        id: UUID = UUID(),
+        cumulativeDistance: Double,
+        instruction: String,
+        coordinate: CLLocationCoordinate2D,
+        icon: CueIcon
+    ) {
+        self.id = id
+        self.cumulativeDistance = cumulativeDistance
+        self.instruction = instruction
+        self.latitude = coordinate.latitude
+        self.longitude = coordinate.longitude
         self.icon = icon
     }
 }
