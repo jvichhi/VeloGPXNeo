@@ -106,8 +106,6 @@ actor PlaceDescriptorService {
             let search = MKLocalSearch(request: request)
             let response = try await search.start()
             let ref = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            // iOS 26: item.location is non-optional CLLocation
-            // Earlier: use CLLocation from placemark.coordinate
             let closest: MKMapItem? = response.mapItems.min(by: {
                 let aLoc: CLLocation
                 let bLoc: CLLocation
@@ -127,15 +125,8 @@ actor PlaceDescriptorService {
                 resolvedViaPlaceDescriptor: false
             )
         } catch {
-            // Build a plain MKMapItem inline — no private helper needed
-            let fallbackItem: MKMapItem
-            if #available(iOS 26.0, *) {
-                let item = MKMapItem()
-                item.coordinate = coordinate
-                fallbackItem = item
-            } else {
-                fallbackItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-            }
+            // MKMapItem has no settable .coordinate — always use MKPlacemark to carry the coordinate
+            let fallbackItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
             fallbackItem.name = waypoint.name ?? "Waypoint"
             return ResolvedWaypoint(
                 name: waypoint.name ?? "Waypoint",
