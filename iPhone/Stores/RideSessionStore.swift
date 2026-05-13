@@ -7,6 +7,7 @@ import Foundation
 import CoreLocation
 import MapKit
 import UIKit
+import ActivityKit
 import UserNotifications
 import WatchConnectivity
 import Combine
@@ -16,7 +17,7 @@ struct RouteProgress {
     let remaining: [CLLocationCoordinate2D]
 }
 
-// MARK: - Background notification identifier
+// MARK: - Background notification identifier (fallback for non-Dynamic Island devices)
 
 private let kRideInProgressNotificationID = "com.velogpx.rideInProgress"
 
@@ -29,13 +30,10 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var reroutePolyline: [CLLocationCoordinate2D] = []
     /// Estimated arrival time — nil until the rider has enough speed history (10+ s).
     @Published var eta: Date? = nil
-    /// Surfaced routing/rerouting error message. Shown as a dismissible HUD banner in RideView.
-    /// Cleared automatically after 6 seconds or when the user taps the banner.
+    /// Surfaced routing/rerouting error message.
     @Published var lastError: String? = nil
 
     // MARK: - Grade
-    /// Current road gradient in percent, smoothed over the last 3 breadcrumb pairs
-    /// spanning at least 20 m of horizontal distance. Zero when insufficient data.
     @Published var currentGrade: Double = 0
 
     // MARK: - Cue sheet tracking
@@ -44,7 +42,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private var manager: CLLocationManager!
 
-    // internal so file-separated extensions (RideSessionStore+Spurs) can read these.
     var route: RouteModel?
     var pois: [POIModel] = []
     var nearestTrackIndex: Int = 0
@@ -65,6 +62,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Watch throttle
     private var lastWatchUpdateTime: Date = .distantPast
     private let watchUpdateInterval: TimeInterval = 1.0
+
+    // MARK: - Live Activity
+    /// The currently running Live Activity, if any.
+    private var liveActivity: Activity<RideActivityAttributes>?
+    /// Throttle: only push a Live Activity update every 5 s to conserve battery.
+    private var lastLiveActivityUpdate: Date = .distantPast
+    private let liveActivityUpdateInterval: TimeInterval = 5.0
 
     // MARK: - Breadcrumb trail
     private var breadcrumbLocations: [CLLocation] = []
@@ -138,6 +142,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.eta = nil
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
+        self.lastLiveActivityUpdate = .distantPast
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -145,7 +150,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
         startElapsedTimer()
-        postRideInProgressNotification(routeName: route.name)
+        startLiveActivity(routeName: route.name)
     }
 
     // MARK: - Elapsed Timer
@@ -185,6 +190,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         rideState.speed = 0
         currentGrade = 0
         eta = nil
+        // Immediately reflect paused state in Live Activity
+        pushLiveActivityUpdate(force: true)
         sendWatchUpdate()
     }
 
@@ -206,6 +213,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
         startElapsedTimer()
+        // Immediately reflect resumed state in Live Activity
+        pushLiveActivityUpdate(force: true)
         sendWatchUpdate()
     }
 
@@ -268,34 +277,115 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         currentGrade = 0
         eta = nil
         reroutePolyline = []
+        endLiveActivity()
         cancelRideInProgressNotification()
         sendWatchUpdate()
     }
 
-    // MARK: - Background ride notification
+    // MARK: - Live Activity lifecycle
     //
-    // Posts a persistent banner so the rider knows VeloGPX is still recording
-    // when they leave the app mid-ride (e.g. check Messages, lock screen).
-    // Uses a fixed identifier so repeated calls replace the existing notification
-    // rather than stacking up, and so cancelRideInProgressNotification() can
-    // reliably remove it by ID.
+    // startLiveActivity: called in start(). Requests a new Activity<RideActivityAttributes>.
+    // On devices without Dynamic Island (or when Live Activities are disabled by the user),
+    // ActivityKit will return an error and we silently fall back to the plain notification.
     //
-    // No sound — this is a status indicator, not an alert.
-    // No trigger — delivered immediately and stays in Notification Centre until
-    // cancelled or the app removes it.
+    // pushLiveActivityUpdate: throttled to every 5 s (forced on pause/resume).
+    //
+    // endLiveActivity: called in endLocationUpdates(). Posts final state then dismisses
+    // after 4 seconds so the rider sees their last stats before the island clears.
+
+    private func startLiveActivity(routeName: String) {
+        // Dismiss any stale activity from a previous ride that wasn't cleanly ended.
+        Task {
+            for activity in Activity<RideActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            // Live Activities disabled in Settings — fall back to plain notification.
+            postRideInProgressNotification(routeName: routeName)
+            return
+        }
+
+        let initialState = RideActivityAttributes.ContentState(
+            totalDistance: 0,
+            elapsedTime: 0,
+            speed: 0,
+            isPaused: false
+        )
+        let attributes = RideActivityAttributes(routeName: routeName)
+        let content = ActivityContent(state: initialState, staleDate: nil)
+
+        do {
+            liveActivity = try Activity.request(
+                attributes: attributes,
+                content: content,
+                pushType: nil          // local updates only — no APNs needed
+            )
+        } catch {
+            // e.g. simulator, older device, or user has disabled Live Activities.
+            // Fall back to the plain persistent notification.
+            postRideInProgressNotification(routeName: routeName)
+        }
+    }
+
+    /// Push the current ride stats to the Live Activity.
+    /// Pass force: true to bypass the throttle (used on pause/resume).
+    private func pushLiveActivityUpdate(force: Bool = false) {
+        guard let liveActivity else { return }
+        let now = Date()
+        guard force || now.timeIntervalSince(lastLiveActivityUpdate) >= liveActivityUpdateInterval else { return }
+        lastLiveActivityUpdate = now
+
+        let newState = RideActivityAttributes.ContentState(
+            totalDistance: rideState.totalDistance,
+            elapsedTime: rideState.elapsedTime,
+            speed: rideState.speed,
+            isPaused: rideState.isPaused
+        )
+        Task {
+            await liveActivity.update(
+                ActivityContent(state: newState, staleDate: nil)
+            )
+        }
+    }
+
+    private func endLiveActivity() {
+        guard let activity = liveActivity else {
+            // No Live Activity — cancel the fallback notification instead.
+            cancelRideInProgressNotification()
+            return
+        }
+        let finalState = RideActivityAttributes.ContentState(
+            totalDistance: rideState.totalDistance,
+            elapsedTime: rideState.elapsedTime,
+            speed: 0,
+            isPaused: false
+        )
+        let finalContent = ActivityContent(state: finalState, staleDate: nil)
+        Task {
+            // Show final stats for 4 seconds, then dismiss automatically.
+            await activity.end(finalContent, dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
+        }
+        liveActivity = nil
+    }
+
+    // MARK: - Plain notification fallback
+    //
+    // Used on devices where Live Activities are unavailable or disabled.
+    // Fixed identifier prevents stacking; both pending + delivered are
+    // cleared on end so nothing lingers in Notification Centre.
 
     private func postRideInProgressNotification(routeName: String) {
         let content = UNMutableNotificationContent()
         content.title = "\u{1F6B4} Ride in Progress"
         content.body = "\(routeName) \u{00B7} VeloGPX is recording your ride."
         content.sound = nil
-        // categoryIdentifier lets the user dismiss from Notification Centre
-        // without accidentally ending the ride (no destructive action attached).
         content.categoryIdentifier = "RIDE_IN_PROGRESS"
         let request = UNNotificationRequest(
             identifier: kRideInProgressNotificationID,
             content: content,
-            trigger: nil          // deliver immediately, no repeat
+            trigger: nil
         )
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
@@ -379,6 +469,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         updateNextPOI(from: location.coordinate)
         updateSpeedBuffer(speed: newSpeed)
         updateETA()
+        pushLiveActivityUpdate()
         sendWatchUpdate()
     }
 
@@ -636,13 +727,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         let sorted = candidatesAhead.sorted { $0.trackIndex < $1.trackIndex }
 
         if let first = sorted.first {
-            // Issue 1b fix: if the rider has already passed the current nextPOI's
-            // snap index, advance immediately without waiting for the next GPS tick.
-            // This closes the 1-2 tick gap where nextPOI was stale after passing a POI.
             if let current = rideState.nextPOI,
                let currentCandidate = sorted.first(where: { $0.poi.id == current.id }),
                currentCandidate.trackIndex < searchStart {
-                // current nextPOI is now behind us — pick the new first candidate
                 rideState.nextPOI = first.poi
                 rideState.nextPOIDistance = first.straightLineDistance
             } else {

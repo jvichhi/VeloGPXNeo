@@ -2,79 +2,146 @@
 //  VeloGPXLiveActivityLiveActivity.swift
 //  VeloGPXLiveActivity
 //
-//  Created by J on 2026-05-12.
+//  Live Activity UI rendered on the Dynamic Island and Lock Screen
+//  while a VeloGPX ride is in progress.
 //
 
 import ActivityKit
 import WidgetKit
 import SwiftUI
 
-struct VeloGPXLiveActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        // Dynamic stateful properties about your activity go here!
-        var emoji: String
-    }
-
-    // Fixed non-changing properties about your activity go here!
-    var name: String
-}
+// MARK: - Widget entry point
 
 struct VeloGPXLiveActivityLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: VeloGPXLiveActivityAttributes.self) { context in
-            // Lock screen/banner UI goes here
-            VStack {
-                Text("Hello \(context.state.emoji)")
-            }
-            .activityBackgroundTint(Color.cyan)
-            .activitySystemActionForegroundColor(Color.black)
+        ActivityConfiguration(for: RideActivityAttributes.self) { context in
+
+            // ── Lock Screen / Notification Banner ──────────────────────────
+            LockScreenView(context: context)
+                .activityBackgroundTint(Color(red: 0.06, green: 0.06, blue: 0.07)) // near-black
+                .activitySystemActionForegroundColor(.white)
 
         } dynamicIsland: { context in
             DynamicIsland {
-                // Expanded UI goes here.  Compose the expanded UI through
-                // various regions, like leading/trailing/center/bottom
+
+                // Expanded (long-press or always-on display)
                 DynamicIslandExpandedRegion(.leading) {
-                    Text("Leading")
+                    Label(context.attributes.routeName, systemImage: "bicycle")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("Trailing")
+                    Text(context.state.isPaused ? "Paused" : context.state.speedString)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(context.state.isPaused ? .yellow : .green)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text("Bottom \(context.state.emoji)")
-                    // more content
+                    HStack(spacing: 24) {
+                        StatPill(value: context.state.distanceString, label: "Distance")
+                        StatPill(value: context.state.elapsedTimeString, label: "Time")
+                        StatPill(value: context.state.speedString, label: "Speed")
+                    }
+                    .padding(.bottom, 6)
                 }
+
             } compactLeading: {
-                Text("L")
+                // Compact — left capsule: bicycle icon
+                Image(systemName: "bicycle")
+                    .foregroundStyle(.green)
+                    .font(.caption2)
+
             } compactTrailing: {
-                Text("T \(context.state.emoji)")
+                // Compact — right capsule: distance
+                Text(context.state.distanceString)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+
             } minimal: {
-                Text(context.state.emoji)
+                // Minimal (second app running) — just the icon
+                Image(systemName: "bicycle")
+                    .foregroundStyle(.green)
             }
-            .widgetURL(URL(string: "http://www.apple.com"))
-            .keylineTint(Color.red)
+            .widgetURL(URL(string: "velogpx://ride"))
+            .keylineTint(.green)
         }
     }
 }
 
-extension VeloGPXLiveActivityAttributes {
-    fileprivate static var preview: VeloGPXLiveActivityAttributes {
-        VeloGPXLiveActivityAttributes(name: "World")
+// MARK: - Lock Screen banner
+
+private struct LockScreenView: View {
+    let context: ActivityViewContext<RideActivityAttributes>
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // Left: icon + route name
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bicycle")
+                        .foregroundStyle(.green)
+                    Text(context.attributes.routeName)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+                Text(context.state.isPaused ? "Paused" : "Recording")
+                    .font(.caption2)
+                    .foregroundStyle(context.state.isPaused ? .yellow : .green)
+            }
+
+            Spacer()
+
+            // Right: three stat pills
+            HStack(spacing: 12) {
+                StatPill(value: context.state.distanceString, label: "Dist")
+                StatPill(value: context.state.elapsedTimeString, label: "Time")
+                StatPill(value: context.state.speedString, label: "Speed")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
-extension VeloGPXLiveActivityAttributes.ContentState {
-    fileprivate static var smiley: VeloGPXLiveActivityAttributes.ContentState {
-        VeloGPXLiveActivityAttributes.ContentState(emoji: "😀")
-     }
-     
-     fileprivate static var starEyes: VeloGPXLiveActivityAttributes.ContentState {
-         VeloGPXLiveActivityAttributes.ContentState(emoji: "🤩")
-     }
+// MARK: - Reusable stat pill
+
+private struct StatPill: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(value)
+                .font(.system(.caption, design: .rounded, weight: .bold))
+                .foregroundStyle(.white)
+            Text(label)
+                .font(.system(size: 9, weight: .regular))
+                .foregroundStyle(.secondary)
+        }
+    }
 }
 
-#Preview("Notification", as: .content, using: VeloGPXLiveActivityAttributes.preview) {
-   VeloGPXLiveActivityLiveActivity()
+// MARK: - Xcode Previews
+
+extension RideActivityAttributes {
+    fileprivate static var preview: RideActivityAttributes {
+        RideActivityAttributes(routeName: "Mont Royal Loop")
+    }
+}
+
+extension RideActivityAttributes.ContentState {
+    fileprivate static var riding: RideActivityAttributes.ContentState {
+        .init(totalDistance: 12450, elapsedTime: 2713, speed: 7.8, isPaused: false)
+    }
+    fileprivate static var paused: RideActivityAttributes.ContentState {
+        .init(totalDistance: 8200, elapsedTime: 1830, speed: 0, isPaused: true)
+    }
+}
+
+#Preview("Notification", as: .content, using: RideActivityAttributes.preview) {
+    VeloGPXLiveActivityLiveActivity()
 } contentStates: {
-    VeloGPXLiveActivityAttributes.ContentState.smiley
-    VeloGPXLiveActivityAttributes.ContentState.starEyes
+    RideActivityAttributes.ContentState.riding
+    RideActivityAttributes.ContentState.paused
 }
