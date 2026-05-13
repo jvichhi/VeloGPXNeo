@@ -16,8 +16,6 @@ import MapKit
 final class PlanRouteEngine {
 
     // Cancels any in-flight routing task before starting a new one.
-    // Prevents stale upsertSegment calls from a prior add/delete/move
-    // landing on a state that has already moved on.
     private var currentTask: Task<Void, Never>?
 
     // MARK: - Public API
@@ -122,8 +120,6 @@ final class PlanRouteEngine {
                 }
             }
             for await segment in group {
-                // Drop results from a cancelled task — the Task wrapper above
-                // will have set isCancelled before any await resumes.
                 guard !Task.isCancelled else { continue }
                 guard let seg = segment else { continue }
                 await MainActor.run { state.upsertSegment(seg) }
@@ -136,10 +132,15 @@ final class PlanRouteEngine {
         to: PlanWaypoint,
         isLoop: Bool
     ) async -> PlanSegment {
+        // Pass raw lat/lon Doubles — calculateRoute no longer accepts CLLocationCoordinate2D
+        // directly, since CLLocationCoordinate2D.init is @MainActor on iOS 26+.
+        let fLat = from.coordinate.latitude,  fLon = from.coordinate.longitude
+        let tLat = to.coordinate.latitude,    tLon = to.coordinate.longitude
+
         do {
             let result = try await CyclingRouteService.shared.calculateRoute(
-                from: from.coordinate,
-                to: to.coordinate
+                from: fLat, fLon,
+                to:   tLat, tLon
             )
             let coords = Self.extractCoordinates(from: result.route.polyline)
             return PlanSegment(
@@ -173,7 +174,6 @@ final class PlanRouteEngine {
 }
 
 // MARK: - CLLocationCoordinate2D plan-local helper
-// Named planDistance to avoid collision with any app-wide distance(to:) extension.
 
 private extension CLLocationCoordinate2D {
     func planDistance(to other: CLLocationCoordinate2D) -> CLLocationDistance {
