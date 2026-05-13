@@ -152,10 +152,9 @@ struct NearbySearchSheet: View {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
             let coord = itemCoordinate(item)
-            // Address: use MKAddressRepresentations on iOS 26+, thoroughfare on earlier
             let address: String? = {
                 if #available(iOS 26.0, *) {
-                    return item.address?.streetAddress
+                    return item.address?.shortAddress
                 } else {
                     return item.placemark.thoroughfare
                 }
@@ -231,7 +230,7 @@ private struct NearbyResultCard: View {
 
     private var addressLine: String? {
         if #available(iOS 26.0, *) {
-            return item.address?.streetAddress
+            return item.address?.shortAddress
         } else {
             return item.placemark.thoroughfare
         }

@@ -167,10 +167,9 @@ struct POIDiscoverySheet: View {
         let itemID = deterministicID(for: item)
         guard !routeStore.selectedPOIs.contains(where: { $0.id == itemID }) else { return }
         let coord = itemCoordinate(item)
-        // Address: use MKAddress on iOS 26+, placemark.title on earlier
         let address: String? = {
             if #available(iOS 26.0, *) {
-                return item.address?.streetAddress
+                return item.address?.shortAddress
             } else {
                 return item.placemark.title
             }
@@ -224,7 +223,7 @@ private struct POIDiscoveryResultCard: View {
 
     private var addressLine: String? {
         if #available(iOS 26.0, *) {
-            return item.address?.streetAddress
+            return item.address?.shortAddress
         } else {
             return item.placemark.title
         }
