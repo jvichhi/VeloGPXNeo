@@ -242,7 +242,14 @@ struct CyclingRouteOverlay: View {
         isLoading = true
         errorMessage = nil
         do {
-            let result = try await CyclingRouteService.shared.calculateRoute(from: start, to: end)
+            // Extract raw Doubles — CLLocationCoordinate2D is @MainActor-isolated on iOS 26+,
+            // so we pass Doubles across the actor boundary into CyclingRouteService.
+            let fLat = start.latitude,  fLon = start.longitude
+            let tLat = end.latitude,    tLon = end.longitude
+            let result = try await CyclingRouteService.shared.calculateRoute(
+                from: fLat, fLon,
+                to:   tLat, tLon
+            )
             routeResult = result
             showMap = true
         } catch {
