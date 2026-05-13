@@ -294,6 +294,16 @@ struct RideView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.nextCue?.id)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
+        // FIX: Bridge mid-ride POI additions from NearbySearchSheet → RideSessionStore.
+        // NearbySearchSheet writes to routeStore.selectedPOIs, but RideSessionStore
+        // holds its own pois array (set once at start). Without this observer,
+        // updateNextPOI, spur computation, and approach alerts never see POIs added
+        // during an active ride — nextPOI chip stays blank, spurs don't draw,
+        // approach haptics don't fire.
+        .onChange(of: routeStore.selectedPOIs) { _, newPOIs in
+            guard rideStore.rideState.isActive else { return }
+            rideStore.updatePOIs(newPOIs)
+        }
         .sheet(isPresented: $showNearbySheet) {
             if let loc = rideStore.currentLocation {
                 NearbySearchSheet(coordinate: loc.coordinate)
