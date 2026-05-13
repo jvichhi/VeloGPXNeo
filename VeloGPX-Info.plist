@@ -6,5 +6,7 @@
 	<array>
 		<string>location</string>
 	</array>
+	<key>NSMotionUsageDescription</key>
+	<string>VeloGPX uses motion data to improve cadence and elevation accuracy during your ride.</string>
 </dict>
 </plist>
