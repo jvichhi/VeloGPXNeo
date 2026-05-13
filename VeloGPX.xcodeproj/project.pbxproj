@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		972D58E92FA6F99D00B5BD63 /* PreRidePOISheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */; };
+		972D58F12FB3F98300B5BD63 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F02FB3F98300B5BD63 /* WidgetKit.framework */; };
+		972D58F32FB3F98300B5BD63 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F22FB3F98300B5BD63 /* SwiftUI.framework */; };
+		972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -69,6 +72,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		972D58FE2FB3F98300B5BD63 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97F812532F9468570068A42A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 972D58ED2FB3F98300B5BD63;
+			remoteInfo = VeloGPXLiveActivityExtension;
+		};
 		97F812A42F9469480068A42A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97F812532F9468570068A42A /* Project object */;
@@ -79,6 +89,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		972D59052FB3F98300B5BD63 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97F812AA2F9469480068A42A /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -94,6 +115,9 @@
 
 /* Begin PBXFileReference section */
 		972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreRidePOISheet.swift; sourceTree = "<group>"; };
+		972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VeloGPXLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		972D58F02FB3F98300B5BD63 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		972D58F22FB3F98300B5BD63 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
@@ -159,7 +183,25 @@
 		97F812B82F948CB00068A42A /* RideSessionStore.swift (corrected section) */ = {isa = PBXFileReference; lastKnownFileType = text; path = "RideSessionStore.swift (corrected section)"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		972D59012FB3F98300B5BD63 /* Exceptions for "VeloGPXLiveActivity" folder in "VeloGPXLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 972D58ED2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		972D58F42FB3F98300B5BD63 /* VeloGPXLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				972D59012FB3F98300B5BD63 /* Exceptions for "VeloGPXLiveActivity" folder in "VeloGPXLiveActivityExtension" target */,
+			);
+			path = VeloGPXLiveActivity;
+			sourceTree = "<group>";
+		};
 		97F8129D2F9469470068A42A /* VeloGPXWatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "VeloGPXWatch Watch App";
@@ -168,6 +210,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		972D58EB2FB3F98300B5BD63 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				972D58F32FB3F98300B5BD63 /* SwiftUI.framework in Frameworks */,
+				972D58F12FB3F98300B5BD63 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97F812582F9468570068A42A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -185,6 +236,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		972D58EF2FB3F98300B5BD63 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				972D58F02FB3F98300B5BD63 /* WidgetKit.framework */,
+				972D58F22FB3F98300B5BD63 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		978915652F9DDB8C0047D8F7 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
@@ -230,6 +290,8 @@
 				97F812802F9468CE0068A42A /* Shared */,
 				97F812852F9468CE0068A42A /* Watch */,
 				97F8129D2F9469470068A42A /* VeloGPXWatch Watch App */,
+				972D58F42FB3F98300B5BD63 /* VeloGPXLiveActivity */,
+				972D58EF2FB3F98300B5BD63 /* Frameworks */,
 				97F8125C2F9468570068A42A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -239,6 +301,7 @@
 			children = (
 				97F8125B2F9468570068A42A /* VeloGPX.app */,
 				97F8129C2F9469470068A42A /* VeloGPXWatch Watch App.app */,
+				972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -357,6 +420,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		972D58ED2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 972D59022FB3F98300B5BD63 /* Build configuration list for PBXNativeTarget "VeloGPXLiveActivityExtension" */;
+			buildPhases = (
+				972D58EA2FB3F98300B5BD63 /* Sources */,
+				972D58EB2FB3F98300B5BD63 /* Frameworks */,
+				972D58EC2FB3F98300B5BD63 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				972D58F42FB3F98300B5BD63 /* VeloGPXLiveActivity */,
+			);
+			name = VeloGPXLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = VeloGPXLiveActivityExtension;
+			productReference = 972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		97F8125A2F9468570068A42A /* VeloGPX */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97F812682F9468580068A42A /* Build configuration list for PBXNativeTarget "VeloGPX" */;
@@ -365,11 +450,13 @@
 				97F812582F9468570068A42A /* Frameworks */,
 				97F812592F9468570068A42A /* Resources */,
 				97F812AA2F9469480068A42A /* Embed Watch Content */,
+				972D59052FB3F98300B5BD63 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				97F812A52F9469480068A42A /* PBXTargetDependency */,
+				972D58FF2FB3F98300B5BD63 /* PBXTargetDependency */,
 			);
 			name = VeloGPX;
 			packageProductDependencies = (
@@ -410,6 +497,9 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					972D58ED2FB3F98300B5BD63 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					97F8125A2F9468570068A42A = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
@@ -448,11 +538,19 @@
 			targets = (
 				97F8125A2F9468570068A42A /* VeloGPX */,
 				97F8129B2F9469470068A42A /* VeloGPXWatch Watch App */,
+				972D58ED2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		972D58EC2FB3F98300B5BD63 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97F812592F9468570068A42A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -473,6 +571,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		972D58EA2FB3F98300B5BD63 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97F812572F9468570068A42A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -545,6 +650,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		972D58FF2FB3F98300B5BD63 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 972D58ED2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension */;
+			targetProxy = 972D58FE2FB3F98300B5BD63 /* PBXContainerItemProxy */;
+		};
 		97F812A52F9469480068A42A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 97F8129B2F9469470068A42A /* VeloGPXWatch Watch App */;
@@ -578,6 +688,71 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		972D59032FB3F98300B5BD63 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.VeloGPXLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		972D59042FB3F98300B5BD63 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.VeloGPXLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		97F812662F9468580068A42A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -723,7 +898,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
@@ -774,7 +949,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
@@ -874,6 +1049,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		972D59022FB3F98300B5BD63 /* Build configuration list for PBXNativeTarget "VeloGPXLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				972D59032FB3F98300B5BD63 /* Debug */,
+				972D59042FB3F98300B5BD63 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		97F812562F9468570068A42A /* Build configuration list for PBXProject "VeloGPX" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
