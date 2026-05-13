@@ -63,8 +63,12 @@ final class RouteStore: ObservableObject {
             let route: RouteModel
             if ext == "gpx" {
                 route = try GPXParser.parse(data: data, filename: url.lastPathComponent)
-                selectedPOIs = route.waypoints.map { wp in
-                    POIModel(name: wp.name ?? "Waypoint", category: .custom, coordinate: wp.coordinate.clCoordinate)
+                // Resolve waypoint coordinates to canonical place names via
+                // PlaceDescriptorService (iOS 26+ MKReverseGeocodingRequest,
+                // CLGeocoder fallback, then MKLocalSearch fallback).
+                let resolved = await PlaceDescriptorService.shared.resolveAll(route.waypoints)
+                selectedPOIs = resolved.map { rw in
+                    POIModel(name: rw.name, category: .custom, coordinate: rw.coordinate)
                 }
             } else if ext == "geojson" || ext == "json" {
                 let result = try GeoJSONParser.parse(data: data, filename: url.lastPathComponent)
@@ -83,13 +87,17 @@ final class RouteStore: ObservableObject {
         }
     }
 
-    func importRoute(data: Data, filename: String) throws {
+    func importRoute(data: Data, filename: String) async throws {
         let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
         let route: RouteModel
         if ext == "gpx" {
             route = try GPXParser.parse(data: data, filename: filename)
-            selectedPOIs = route.waypoints.map { wp in
-                POIModel(name: wp.name ?? "Waypoint", category: .custom, coordinate: wp.coordinate.clCoordinate)
+            // Resolve waypoint coordinates to canonical place names via
+            // PlaceDescriptorService (iOS 26+ MKReverseGeocodingRequest,
+            // CLGeocoder fallback, then MKLocalSearch fallback).
+            let resolved = await PlaceDescriptorService.shared.resolveAll(route.waypoints)
+            selectedPOIs = resolved.map { rw in
+                POIModel(name: rw.name, category: .custom, coordinate: rw.coordinate)
             }
         } else {
             let result = try GeoJSONParser.parse(data: data, filename: filename)
@@ -137,7 +145,7 @@ final class RouteStore: ObservableObject {
     }
 
     func reverseRoute(_ route: RouteModel) {
-        guard var updated = routes.first(where: { $0.id == route.id }) else { return }
+        guard var updated = routes.first(where: { $0.id == route.id }) else { return }\
         updated.trackPoints = updated.trackPoints.reversed()
         try? save(updated)
         loadFromDisk()
