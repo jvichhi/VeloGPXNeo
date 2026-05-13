@@ -5,6 +5,7 @@
 
 import Foundation
 import CoreLocation
+import CoreMotion
 import MapKit
 import UIKit
 import ActivityKit
@@ -73,13 +74,15 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Breadcrumb trail
     private var breadcrumbLocations: [CLLocation] = []
 
-    // MARK: - Altitude smoothing
-    private var altitudeBuffer: [Double] = []
-    private let altitudeBufferSize = 3
-    private var smoothedAltitude: Double? {
-        guard !altitudeBuffer.isEmpty else { return nil }
-        return altitudeBuffer.reduce(0, +) / Double(altitudeBuffer.count)
-    }
+    // MARK: - Barometric altimeter (elevation gain/loss)
+    // CMAltimeter must be a stored property — creating it inline causes a known iOS bug
+    // where relativeAltitude updates are never delivered.
+    private let altimeter = CMAltimeter()
+    /// Last relativeAltitude reading from the barometer. Reset on start and resume so
+    /// post-pause pressure drift doesn't corrupt the accumulated totals.
+    private var lastRelativeAltitude: Double? = nil
+    /// Minimum barometric delta (metres) to count as real elevation change.
+    private let minElevationThreshold: Double = 0.5
 
     // MARK: - Speed smoothing
     private var smoothedSpeed: Double = 0
@@ -129,7 +132,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.progressPercent = 0
         self.reroutePolyline = []
         self.breadcrumbLocations = []
-        self.altitudeBuffer = []
+        self.lastRelativeAltitude = nil
         self.speedBuffer = []
         self.smoothedSpeed = 0
         self.smoothedGrade = 0
@@ -150,6 +153,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
         startElapsedTimer()
+        startAltimeter()
         startLiveActivity(routeName: route.name)
     }
 
@@ -181,6 +185,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         pauseStartTime = Date()
         rideState.isPaused = true
         stopElapsedTimer()
+        stopAltimeter()
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
         #if !targetEnvironment(simulator)
@@ -203,6 +208,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         pauseStartTime = nil
         rideState.isPaused = false
         lastLocation = nil
+        lastRelativeAltitude = nil  // Reset so resumed baseline doesn't carry pause-time pressure drift
         speedBuffer = []
         smoothedSpeed = 0
         smoothedGrade = 0
@@ -213,6 +219,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
         startElapsedTimer()
+        startAltimeter()
         // Immediately reflect resumed state in Live Activity
         pushLiveActivityUpdate(force: true)
         sendWatchUpdate()
@@ -265,6 +272,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func endLocationUpdates() {
         stopElapsedTimer()
+        stopAltimeter()
         UIApplication.shared.isIdleTimerDisabled = false
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
@@ -280,6 +288,36 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         endLiveActivity()
         cancelRideInProgressNotification()
         sendWatchUpdate()
+    }
+
+    // MARK: - Barometric Altimeter
+
+    private func startAltimeter() {
+        guard CMAltimeter.isRelativeAltitudeAvailable() else { return }
+        altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
+            guard let self, let data, error == nil else { return }
+            guard !self.rideState.isPaused else { return }
+            let current = data.relativeAltitude.doubleValue
+            if let last = self.lastRelativeAltitude {
+                let delta = current - last
+                if abs(delta) > self.minElevationThreshold {
+                    if delta > 0 {
+                        self.rideState.elevationGain += delta
+                    } else {
+                        self.rideState.elevationLoss += abs(delta)
+                    }
+                    // Advance the baseline only when a real change is committed,
+                    // so sub-threshold noise doesn't quietly accumulate.
+                    self.lastRelativeAltitude = current
+                }
+            } else {
+                self.lastRelativeAltitude = current
+            }
+        }
+    }
+
+    private func stopAltimeter() {
+        altimeter.stopRelativeAltitudeUpdates()
     }
 
     // MARK: - Live Activity lifecycle
@@ -427,28 +465,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
                 rideState.totalDistance += delta
                 breadcrumbLocations.append(location)
             }
-
-            altitudeBuffer.append(location.altitude)
-            if altitudeBuffer.count > altitudeBufferSize {
-                altitudeBuffer.removeFirst()
-            }
-            if let currentSmoothed = smoothedAltitude {
-                let prevBuf = Array(altitudeBuffer.dropLast())
-                let prevSmoothed: Double = prevBuf.isEmpty
-                    ? lastLocation.altitude
-                    : prevBuf.reduce(0, +) / Double(prevBuf.count)
-                let elevationDelta = currentSmoothed - prevSmoothed
-                if abs(elevationDelta) > 1.5 {
-                    if elevationDelta > 0 {
-                        rideState.elevationGain += elevationDelta
-                    } else {
-                        rideState.elevationLoss += abs(elevationDelta)
-                    }
-                }
-            }
         } else {
             breadcrumbLocations.append(location)
-            altitudeBuffer.append(location.altitude)
         }
         self.lastLocation = location
 
@@ -478,6 +496,9 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - Grade computation
+    // Grade still uses CLLocation.altitude from the breadcrumb trail — this is correct
+    // because grade is a relative slope over a short rolling window (~50 m), not an
+    // absolute or accumulated measurement, so GPS altitude noise largely cancels out.
 
     private let gradeWindowDistance: Double = 50
     private let gradeMinDistance:    Double = 20
