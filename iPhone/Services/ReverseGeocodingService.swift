@@ -3,7 +3,7 @@
 //  VeloGPX
 //
 //  iOS 26+: MKReverseGeocodingRequest via MapKit.
-//  iOS 18 fallback: CLGeocoder.
+//  iOS <26 fallback: CLGeocoder.
 //
 
 import Foundation
@@ -40,15 +40,15 @@ actor ReverseGeocodingService {
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         do {
             let items = try await request.mapItems
-            // Use item.name; avoid deprecated .placemark property
             return items.first?.name
         } catch {
             return nil
         }
     }
 
-    // MARK: - iOS 18 fallback path
+    // MARK: - iOS <26 fallback path
 
+    @available(iOS, deprecated: 26.0, message: "Use reverseGeocodeModern on iOS 26+")
     private func reverseGeocodeLegacy(_ coordinate: CLLocationCoordinate2D) async -> String? {
         let geocoder = CLGeocoder()
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)

@@ -69,23 +69,35 @@ actor PlaceDescriptorService {
                 return nil
             }
         } else {
-            let geocoder = CLGeocoder()
-            do {
-                let placemarks = try await geocoder.reverseGeocodeLocation(location)
-                guard let placemark = placemarks.first else { return nil }
-                let name = placemark.name ?? placemark.thoroughfare ?? waypoint.name ?? "Waypoint"
-                let mkPlacemark = MKPlacemark(placemark: placemark)
-                let mapItem = MKMapItem(placemark: mkPlacemark)
-                mapItem.name = name
-                return ResolvedWaypoint(
-                    name: name,
-                    coordinate: coordinate,
-                    mapItem: mapItem,
-                    resolvedViaPlaceDescriptor: true
-                )
-            } catch {
-                return nil
-            }
+            return await resolveViaGeocoderLegacy(waypoint: waypoint, coordinate: coordinate, location: location)
+        }
+    }
+
+    // MARK: - CLGeocoder fallback (iOS <26)
+
+    @available(iOS, deprecated: 26.0, message: "Use MKReverseGeocodingRequest on iOS 26+")
+    private func resolveViaGeocoderLegacy(
+        waypoint: WaypointPoint,
+        coordinate: CLLocationCoordinate2D,
+        location: CLLocation
+    ) async -> ResolvedWaypoint? {
+        let geocoder = CLGeocoder()
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            guard let placemark = placemarks.first else { return nil }
+            let name = placemark.name ?? placemark.thoroughfare ?? waypoint.name ?? "Waypoint"
+            // iOS 26 deprecated MKPlacemark(placemark:) — use init(coordinate:) and set name manually
+            let mkPlacemark = MKPlacemark(coordinate: coordinate)
+            let mapItem = MKMapItem(placemark: mkPlacemark)
+            mapItem.name = name
+            return ResolvedWaypoint(
+                name: name,
+                coordinate: coordinate,
+                mapItem: mapItem,
+                resolvedViaPlaceDescriptor: true
+            )
+        } catch {
+            return nil
         }
     }
 
@@ -125,7 +137,6 @@ actor PlaceDescriptorService {
                 resolvedViaPlaceDescriptor: false
             )
         } catch {
-            // MKMapItem has no settable .coordinate — always use MKPlacemark to carry the coordinate
             let fallbackItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
             fallbackItem.name = waypoint.name ?? "Waypoint"
             return ResolvedWaypoint(
