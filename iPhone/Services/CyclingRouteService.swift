@@ -10,6 +10,9 @@
 //  Pattern: MainActor.run to build request → directions.calculate() off-actor
 //           → MainActor.run to read route properties into plain Sendable struct.
 //
+//  CLLocationCoordinate2D.init is @MainActor on iOS 26+.
+//  GPXCueEngine always uses CueSheetEntry(lat:lon:) to avoid actor isolation issues.
+//
 
 import Foundation
 import MapKit
@@ -18,11 +21,9 @@ import CoreLocation
 // MARK: - Route Result
 
 /// Plain-Sendable snapshot of MKRoute data extracted on @MainActor.
-/// Callers (SwiftUI views) are already @MainActor, so using `route` for
-/// MapPolyline / distance / ETA is safe there.
 struct CyclingRouteResult: @unchecked Sendable {
-    let route: MKRoute                                          // @MainActor-isolated; access only from @MainActor
-    let steps: [(instructions: String, distance: Double)]      // pre-extracted Sendable copy
+    let route: MKRoute
+    let steps: [(instructions: String, distance: Double)]
     let totalDistance: Double
     let expectedTravelTime: TimeInterval
     let routeName: String?
@@ -43,16 +44,26 @@ actor CyclingRouteService {
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
 
-        // Step 1: build MKMapItems + request on @MainActor
+        let sourceLat = source.latitude
+        let sourceLon = source.longitude
+        let destLat   = destination.latitude
+        let destLon   = destination.longitude
+
         let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
             let src: MKMapItem
             let dst: MKMapItem
             if #available(iOS 26.0, *) {
-                src = MKMapItem(location: CLLocation(latitude: source.latitude, longitude: source.longitude), address: nil)
-                dst = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
+                src = MKMapItem(
+                    location: CLLocation(latitude: sourceLat, longitude: sourceLon),
+                    address: nil
+                )
+                dst = MKMapItem(
+                    location: CLLocation(latitude: destLat, longitude: destLon),
+                    address: nil
+                )
             } else {
-                src = MKMapItem(placemark: MKPlacemark(coordinate: source))
-                dst = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+                src = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: sourceLat, longitude: sourceLon)))
+                dst = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: destLat, longitude: destLon)))
             }
             let req = MKDirections.Request()
             req.source = src
@@ -66,18 +77,14 @@ actor CyclingRouteService {
             return (src, dst, req)
         }
 
-        // Step 2: fire network call off @MainActor
         let directions = MKDirections(request: request)
         let response = try await directions.calculate()
         guard let firstRoute = response.routes.first else {
             throw CyclingRouteError.noRoutesFound
         }
 
-        // Step 3: extract all @MainActor-isolated route properties on @MainActor
         return await MainActor.run {
-            let isCycling: Bool
-            if #available(iOS 26.0, *) { isCycling = true } else { isCycling = false }
-            return CyclingRouteResult(
+            CyclingRouteResult(
                 route: firstRoute,
                 steps: firstRoute.steps.map { ($0.instructions, $0.distance) },
                 totalDistance: firstRoute.distance,
@@ -85,7 +92,7 @@ actor CyclingRouteService {
                 routeName: firstRoute.name.isEmpty ? nil : firstRoute.name,
                 matchedSource: sourceItem,
                 matchedDestination: destinationItem,
-                isCycling: isCycling
+                isCycling: { if #available(iOS 26.0, *) { true } else { false } }()
             )
         }
     }
@@ -95,15 +102,26 @@ actor CyclingRouteService {
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
 
+        let sourceLat = source.latitude
+        let sourceLon = source.longitude
+        let destLat   = destination.latitude
+        let destLon   = destination.longitude
+
         let (sourceItem, destinationItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
             let src: MKMapItem
             let dst: MKMapItem
             if #available(iOS 26.0, *) {
-                src = MKMapItem(location: CLLocation(latitude: source.latitude, longitude: source.longitude), address: nil)
-                dst = MKMapItem(location: CLLocation(latitude: destination.latitude, longitude: destination.longitude), address: nil)
+                src = MKMapItem(
+                    location: CLLocation(latitude: sourceLat, longitude: sourceLon),
+                    address: nil
+                )
+                dst = MKMapItem(
+                    location: CLLocation(latitude: destLat, longitude: destLon),
+                    address: nil
+                )
             } else {
-                src = MKMapItem(placemark: MKPlacemark(coordinate: source))
-                dst = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+                src = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: sourceLat, longitude: sourceLon)))
+                dst = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: destLat, longitude: destLon)))
             }
             let req = MKDirections.Request()
             req.source = src
@@ -158,6 +176,8 @@ enum CyclingRouteError: LocalizedError {
 // MARK: - GPX Cue Engine
 
 /// Generates turn-by-turn cue sheets from GPX track geometry.
+/// All CueSheetEntry construction uses the lat/lon init to avoid
+/// @MainActor isolation on CLLocationCoordinate2D.init (iOS 26+).
 actor GPXCueEngine {
     static let shared = GPXCueEngine()
     private init() {}
@@ -249,15 +269,21 @@ actor GPXCueEngine {
                 let toLat   = pair.1.latitude
                 let toLon   = pair.1.longitude
                 group.addTask {
-                    let from = CLLocationCoordinate2D(latitude: fromLat, longitude: fromLon)
-                    let to   = CLLocationCoordinate2D(latitude: toLat,   longitude: toLon)
+                    // Build CLLocationCoordinate2D on MainActor (iOS 26+)
+                    let (from, to) = await MainActor.run {
+                        (CLLocationCoordinate2D(latitude: fromLat, longitude: fromLon),
+                         CLLocationCoordinate2D(latitude: toLat, longitude: toLon))
+                    }
                     do {
                         let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
                         return (i, fromLat, fromLon, result.steps)
                     } catch {
                         let dist = CLLocation(latitude: fromLat, longitude: fromLon)
                             .distance(from: CLLocation(latitude: toLat, longitude: toLon))
-                        let bearingDeg = self.bearing(from: from, to: to)
+                        let bearingDeg = self.bearing(
+                            from: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLon),
+                            to:   CLLocationCoordinate2D(latitude: toLat,   longitude: toLon)
+                        )
                         let icon = self.bearingToIcon(bearingDeg)
                         let desc = self.geometryInstruction(for: icon)
                         return (i, fromLat, fromLon, [(desc, dist)])
@@ -274,6 +300,8 @@ actor GPXCueEngine {
     }
 
     // MARK: - Cue assembly
+    // All CueSheetEntry construction uses lat:/lon: to avoid @MainActor
+    // isolation on CLLocationCoordinate2D.init (iOS 26+).
 
     private func assembleCueSheet(from segments: [(lat: Double, lon: Double, steps: [(String, Double)])]) -> [CueSheetEntry] {
         var entries: [CueSheetEntry] = []
