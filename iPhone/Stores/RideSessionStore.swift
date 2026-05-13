@@ -16,6 +16,10 @@ struct RouteProgress {
     let remaining: [CLLocationCoordinate2D]
 }
 
+// MARK: - Background notification identifier
+
+private let kRideInProgressNotificationID = "com.velogpx.rideInProgress"
+
 @MainActor
 final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDelegate, WCSessionDelegate {
     @Published var rideState = RideState()
@@ -141,6 +145,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
         manager.startUpdatingHeading()
         startElapsedTimer()
+        postRideInProgressNotification(routeName: route.name)
     }
 
     // MARK: - Elapsed Timer
@@ -263,7 +268,42 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         currentGrade = 0
         eta = nil
         reroutePolyline = []
+        cancelRideInProgressNotification()
         sendWatchUpdate()
+    }
+
+    // MARK: - Background ride notification
+    //
+    // Posts a persistent banner so the rider knows VeloGPX is still recording
+    // when they leave the app mid-ride (e.g. check Messages, lock screen).
+    // Uses a fixed identifier so repeated calls replace the existing notification
+    // rather than stacking up, and so cancelRideInProgressNotification() can
+    // reliably remove it by ID.
+    //
+    // No sound — this is a status indicator, not an alert.
+    // No trigger — delivered immediately and stays in Notification Centre until
+    // cancelled or the app removes it.
+
+    private func postRideInProgressNotification(routeName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\u{1F6B4} Ride in Progress"
+        content.body = "\(routeName) \u{00B7} VeloGPX is recording your ride."
+        content.sound = nil
+        // categoryIdentifier lets the user dismiss from Notification Centre
+        // without accidentally ending the ride (no destructive action attached).
+        content.categoryIdentifier = "RIDE_IN_PROGRESS"
+        let request = UNNotificationRequest(
+            identifier: kRideInProgressNotificationID,
+            content: content,
+            trigger: nil          // deliver immediately, no repeat
+        )
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+    }
+
+    private func cancelRideInProgressNotification() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [kRideInProgressNotificationID])
+        center.removeDeliveredNotifications(withIdentifiers: [kRideInProgressNotificationID])
     }
 
     // MARK: - Location
