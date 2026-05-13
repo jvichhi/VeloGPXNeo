@@ -167,9 +167,9 @@ private struct ImportTipCard: View {
         .init(icon: "doc.badge.arrow.up",
               text: "Export a GPX or GeoJSON file from any route planning app."),
         .init(icon: "globe",
-              text: "Search the web for \u201cGPX routes [your city]\u201d \u2014 many cycling communities share free files online."),
+              text: "Search the web for \"GPX routes [your city]\" \u{2014} many cycling communities share free files online."),
         .init(icon: "square.and.arrow.down",
-              text: "Tap \u2b above or the Import button, then pick the file from Files, Mail, or AirDrop."),
+              text: "Tap + above or the Import button, then pick the file from Files, Mail, or AirDrop."),
         .init(icon: "map",
               text: "Prefer to build your own? Head to the Plan tab to draw a route from scratch."),
     ]
