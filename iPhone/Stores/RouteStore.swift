@@ -19,6 +19,11 @@ final class RouteStore: ObservableObject {
     @Published var selectedTab: AppTab = .routes
     @Published var routeToEditInPlan: RouteModel? = nil
 
+    /// Set this to trigger the "ride this route" flow from anywhere.
+    /// RootView observes it, selects the route, loads POIs, switches to
+    /// the Ride tab, then clears it — identical to routeToEditInPlan pattern.
+    @Published var pendingRideRoute: RouteModel? = nil
+
     private let directoryName = "ImportedRoutes"
     private let poisDirectoryName = "RoutePOIs"
 

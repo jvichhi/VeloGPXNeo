@@ -35,18 +35,24 @@ struct RootView: View {
                 .tag(AppTab.settings)
         }
         .id(lm.currentLanguage)
-        // When routeToEditInPlan is set (e.g. from Routes "Plan" swipe action
-        // or context menu), switch to the Plan tab. PlanView reads and clears
-        // routeToEditInPlan in its own .task so there is no timing race.
+
+        // "Ride This Route" action (swipe or context menu in RouteLibraryView).
+        // Selecting the route, loading its POIs, and switching the tab all happen
+        // here so the sequence is atomic and consistent — mirrors routeToEditInPlan.
+        .onChange(of: routeStore.pendingRideRoute) { _, route in
+            guard let route else { return }
+            routeStore.selectedRoute = route
+            routeStore.loadPOIs(forRoute: route)
+            routeStore.selectedTab = .ride
+            routeStore.pendingRideRoute = nil
+        }
+
+        // "Edit in Plan" action — switch to Plan tab; PlanView reads and
+        // clears routeToEditInPlan in its own .task so there is no timing race.
         .onChange(of: routeStore.routeToEditInPlan) { _, route in
             if route != nil {
                 routeStore.selectedTab = .plan
             }
-        }
-        // Reload persisted POIs whenever the selected route changes.
-        .onChange(of: routeStore.selectedRoute?.id) { _, _ in
-            guard let route = routeStore.selectedRoute else { return }
-            routeStore.loadPOIs(forRoute: route)
         }
     }
 }
