@@ -181,6 +181,9 @@ business renames, address changes, and duplicate names. Without it:
 > **Availability gate required:** `MKMapItem.identifier` is iOS 18+. Coordinate `deterministicID` is the
 > universal fallback for Watch builds and any POI without a resolved identifier (custom waypoints).
 
+> **Full feature spec** — see `FEATURES.md` § F-B for the complete implementation plan including
+> the `POIModel+MapKit.swift` factory, `isAdded` update pattern, and Watch compatibility notes.
+
 ---
 
 ### AC-1 — Swift 6 actor isolation: `clCoordinate` / `route` / `distance(to:)` on wrong actor
@@ -264,6 +267,40 @@ Add an `AccentColor` color set matching VeloGPX brand teal (`#01696F` light / `#
 let windowMeters = ...  // never read after assignment
 ```
 Either use it or replace with `_`.
+
+---
+
+### MISC-5 — Duplicated `bearing()` haversine function [ NEW — May 13, 2026 ]
+
+**Affects:** `RideSessionStore.swift` · `GPXCueEngine` (both implement independently)
+
+Both files contain an identical haversine bearing calculation. Extract to a shared extension:
+```swift
+// Shared/Extensions/CLLocationCoordinate2D+Bearing.swift
+extension CLLocationCoordinate2D {
+    func bearing(to destination: CLLocationCoordinate2D) -> Double {
+        // single canonical implementation
+    }
+}
+```
+Delete the duplicate from whichever file is the secondary copy.
+
+---
+
+### MISC-6 — Notification permission result silently ignored [ NEW — May 13, 2026 ]
+
+**Affects:** `RideSessionStore.swift:92`
+
+```swift
+// Current — granted is discarded
+UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
+// Fix — store and gate
+UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+    DispatchQueue.main.async { self.notificationsGranted = granted }
+}
+```
+Add a `private var notificationsGranted = false` flag and guard all `UNUserNotificationCenter.add(...)` call sites with it.
 
 ---
 
@@ -375,7 +412,7 @@ Either use it or replace with `_`.
   Fix: at minimum log errors; ideally surface via published error string / toast.
 
 - [ ] **Notification auth result silently ignored** — `RideSessionStore.swift:92`
-  Fix: check `granted` and skip notification attempts when denied.
+  See MISC-6 above for full fix.
 
 - [x] **`FileManager` URL force-unwrap** — ✅ Resolved May 12, 2026
   `RouteStore.swift:150,161` — both `storageDirectory()` and `poisStorageURL()` now
