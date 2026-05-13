@@ -13,6 +13,8 @@
 		972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		972D59152FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
 		972D59162FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
+		972D59272FB40F5000B5BD63 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D59252FB40F4800B5BD63 /* CoreMotion.framework */; };
+		972D59282FB40F5000B5BD63 /* CoreMotion.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 972D59252FB40F4800B5BD63 /* CoreMotion.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -102,6 +104,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		972D59292FB40F5000B5BD63 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				972D59282FB40F5000B5BD63 /* CoreMotion.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97F812AA2F9469480068A42A /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -121,6 +134,7 @@
 		972D58F02FB3F98300B5BD63 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		972D58F22FB3F98300B5BD63 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideActivityAttributes.swift; sourceTree = "<group>"; };
+		972D59252FB40F4800B5BD63 /* CoreMotion.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk/System/Library/Frameworks/CoreMotion.framework; sourceTree = DEVELOPER_DIR; };
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
@@ -226,6 +240,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				972D59272FB40F5000B5BD63 /* CoreMotion.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,6 +257,7 @@
 		972D58EF2FB3F98300B5BD63 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				972D59252FB40F4800B5BD63 /* CoreMotion.framework */,
 				972D58F02FB3F98300B5BD63 /* WidgetKit.framework */,
 				972D58F22FB3F98300B5BD63 /* SwiftUI.framework */,
 			);
@@ -455,6 +471,7 @@
 				97F812592F9468570068A42A /* Resources */,
 				97F812AA2F9469480068A42A /* Embed Watch Content */,
 				972D59052FB3F98300B5BD63 /* Embed Foundation Extensions */,
+				972D59292FB40F5000B5BD63 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
