@@ -89,7 +89,7 @@ struct POIDiscoverySheet: View {
                                 ForEach(results, id: \.self) { item in
                                     POIDiscoveryResultCard(
                                         item: item,
-                                        isAdded: routeStore.selectedPOIs.contains(where: { $0.name == (item.name ?? "") }),
+                                        isAdded: routeStore.selectedPOIs.contains(where: { $0.id == deterministicID(for: item) }),
                                         categoryIcon: categories.first(where: { $0.label == selectedCategory })?.icon ?? "mappin",
                                         onTap: { addPOI(from: item) }
                                     )
@@ -110,10 +110,38 @@ struct POIDiscoverySheet: View {
         }
     }
 
+    // MARK: - Deterministic coordinate-based ID (matches NearbySearchSheet)
+
+    private func deterministicID(for item: MKMapItem) -> UUID {
+        let lat = (item.placemark.coordinate.latitude  * 1_000_000).rounded() / 1_000_000
+        let lon = (item.placemark.coordinate.longitude * 1_000_000).rounded() / 1_000_000
+        let seed = "\(lat),\(lon)"
+        var hash = seed.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 1099511628211
+        }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        for i in 0..<8 {
+            bytes[i] = UInt8(hash & 0xFF)
+            hash >>= 8
+        }
+        var hash2 = seed.reversed().description.utf8.reduce(UInt64(14695981039346656037)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 1099511628211
+        }
+        for i in 8..<16 {
+            bytes[i] = UInt8(hash2 & 0xFF)
+            hash2 >>= 8
+        }
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+
+    // MARK: - Search
+
     private func search() async {
-        // Issue 3a fix: search from route start (trackPoints.first), not the
-        // midpoint. On a long route the midpoint can be 20+ km from where the
-        // rider is planning, making results irrelevant.
         guard let startPoint = route.trackPoints.first else { return }
         let origin = startPoint.coordinate.clCoordinate
         isLoading = true
@@ -121,26 +149,47 @@ struct POIDiscoverySheet: View {
         isLoading = false
     }
 
+    // MARK: - Add POI
+
     private func addPOI(from item: MKMapItem) {
-        let coord = item.placemark.coordinate
+        let itemID = deterministicID(for: item)
+        // P0 fix: use coordinate-based ID, not name string comparison
+        guard !routeStore.selectedPOIs.contains(where: { $0.id == itemID }) else { return }
         let poi = POIModel(
+            id: itemID,
             name: item.name ?? "Unknown",
             category: categoryFromMapItem(item),
-            coordinate: coord,
+            coordinate: item.placemark.coordinate,
+            distanceFromRoute: 0,
             address: item.placemark.title,
-            phone: item.phoneNumber
+            phone: item.phoneNumber,
+            website: item.url?.absoluteString
         )
-        if !routeStore.selectedPOIs.contains(where: { $0.name == poi.name }) {
-            routeStore.selectedPOIs.append(poi)
-        }
+        routeStore.selectedPOIs.append(poi)
     }
 
+    // MARK: - Category detection (typed MKPointOfInterestCategory, iOS 18+)
+
     private func categoryFromMapItem(_ item: MKMapItem) -> POICategory {
+        // Prefer the structured pointOfInterestCategory over name heuristics
+        if let poiCat = item.pointOfInterestCategory {
+            switch poiCat {
+            case .cafe:                             return .cafe
+            case .restaurant, .foodMarket:         return .restaurant
+            case .bicycle:                          return .bikeRepair
+            case .pharmacy:                         return .pharmacy
+            case .hotel:                            return .accommodation
+            case .campground:                       return .campsite
+            case .nationalPark, .park:              return .water  // mapped for water/fountain searches
+            default:                                return .custom
+            }
+        }
+        // Fallback: name heuristics for items without a typed category
         let name = item.name?.lowercased() ?? ""
         if name.contains("caf\u{00e9}") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
-        if name.contains("restaurant") || name.contains("food") || name.contains("pizza") { return .restaurant }
-        if name.contains("pharmacy") || name.contains("drug") { return .pharmacy }
+        if name.contains("restaurant") || name.contains("food") { return .restaurant }
+        if name.contains("pharmacy") { return .pharmacy }
         if name.contains("water") || name.contains("fountain") { return .water }
         if name.contains("hotel") || name.contains("hostel") || name.contains("inn") { return .accommodation }
         if name.contains("camp") { return .campsite }
