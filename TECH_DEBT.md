@@ -1,5 +1,5 @@
 # VeloGPXNeo — Tech Debt Checkpoint
-> Last reviewed: May 12, 2026 (v1.2 build 3 — iOS 26 deprecation + Swift 6 actor warnings pass)
+> Last reviewed: May 13, 2026 (v1.2 build 3 — iOS 26 deprecation + Swift 6 actor warnings pass)
 
 ---
 
@@ -125,6 +125,61 @@ and capture it before the async callback.
 Natural language retained as fallback for free-text / unknown queries.
 > **Note:** No `MKPointOfInterestCategory` constant exists for drinking water/fountains yet.
 > "Water" searches currently map to `.nationalPark` as a proxy. Track for future SDK update.
+
+---
+
+### MK-6 — `POIModel` missing `mapItemIdentifier` + `mapsURL` (Place IDs) [ NEW — May 13, 2026 ]
+
+**Affects:** `POIModel.swift`, `NearbySearchSheet.swift`, `POIDiscoverySheet.swift`, `PreRidePOISheet.swift`
+
+`POIModel` currently uses a coordinate-based `deterministicID` as its stable identity. While this
+works, it misses the stable **Apple Maps Place ID** (`MKMapItem.identifier`, iOS 18+) that survives
+business renames, address changes, and duplicate names. Without it:
+- Two POIs at the same coordinate (e.g. a café that moved 5 m) collide
+- No deep-link URL to open the place in Maps
+- No foundation for sharing POI lists as tappable Maps links
+
+**Plan:**
+1. Add two optional fields to `POIModel`:
+   ```swift
+   public var mapItemIdentifier: String?   // MKMapItem.identifier.rawValue (iOS 18+)
+   public var mapsURL: URL?                // maps://?auid=<identifier>
+   ```
+2. Create `Shared/Models/POIModel+MapKit.swift` with a factory:
+   ```swift
+   extension POIModel {
+       static func from(_ mapItem: MKMapItem, distanceFromRoute: Double = 0) -> POIModel {
+           var poi = POIModel(
+               id: UUID(),
+               name: mapItem.name ?? "",
+               category: POICategory.from(mapItem.pointOfInterestCategory),
+               coordinate: mapItem.location?.coordinate ?? mapItem.placemark.coordinate,
+               distanceFromRoute: distanceFromRoute
+           )
+           if #available(iOS 18, *) {
+               poi.mapItemIdentifier = mapItem.identifier?.rawValue
+               poi.mapsURL = mapItem.identifier.flatMap {
+                   URL(string: "maps://?auid=\($0.rawValue)")
+               }
+           }
+           return poi
+       }
+   }
+   ```
+3. Update `isAdded` in all three sheets: prefer `mapItemIdentifier` match when both sides have one;
+   fall back to `deterministicID(for:)` coordinate hash.
+4. Add "Open in Maps" button to POI detail row / `NearbyResultCard`:
+   ```swift
+   if let url = poi.mapsURL {
+       Button { UIApplication.shared.open(url) } label: {
+           Label("Open in Maps", systemImage: "map")
+       }
+   }
+   ```
+5. `POIModel` is `Codable` — adding optional fields is backwards-compatible. No JSON migration needed.
+
+> **Availability gate required:** `MKMapItem.identifier` is iOS 18+. Coordinate `deterministicID` is the
+> universal fallback for Watch builds and any POI without a resolved identifier (custom waypoints).
 
 ---
 
@@ -259,6 +314,8 @@ Either use it or replace with `_`.
   - `WatchSyncManager` — WCSession framing and throttle
   `RideSessionStore` becomes a thin coordinator.
 
+- [ ] **F-5/F-6 — `POIModel` Place IDs + Unified Maps URLs** — see MK-6 above
+
 - [x] **Fix `nextPOI` to use on-route ordering, not raw distance** — ✅ Done
 
 - [x] **Replace manual `Annotation("You", ...)` with `UserAnnotation()`** — ✅ Done
@@ -270,7 +327,7 @@ Either use it or replace with `_`.
   `RouteLibraryView.swift:44` — replaced `.constant(routeStore.lastImportMessage != nil)` with
   a proper `@State var showImportAlert: Bool` synced via `.onChange(of: routeStore.lastImportMessage)`.
 
-- [x] **Watch haptic fires every second while off-route** — ✅ Resolved May 12, 2026
+- [x] **Watch haptic fires every second while off-route** — ✅ Resolved May 13, 2026
   `WatchRideStore.swift:26` — added `didAlertOffRoute: Bool` flag; resets on `isOffRoute → false`
   transition. Watch now fires haptic once per off-route event.
 
@@ -393,9 +450,9 @@ Either use it or replace with `_`.
 | **P0** GPX export locale crash fixed (`String(format: "%f", ...)`) | May 12, 2026 |
 | **P0** POI ID collision fixed in `POIDiscoverySheet` (coordinate-based deterministicID) | May 12, 2026 |
 | **P1** `RouteLibraryView` `.constant()` alert binding replaced with `@State` | May 12, 2026 |
-| **P1** Watch haptic loop fixed (`didAlertOffRoute` flag) | May 12, 2026 |
 | **P1** `errorClearTask` memory leak fixed (`deinit` + `[weak self]`) | May 12, 2026 |
 | **P1** Off-route heading guard added (`RideView.swift:369`) | May 12, 2026 |
 | **P1** `RouteStore` force-unwrap crash fixed (`throw StorageError.unavailable`) | May 12, 2026 |
 | **MK-5** `POISearchService` upgraded to typed `MKPointOfInterestFilter` (iOS 18+/26) | May 12, 2026 |
 | **P0** `POIDiscoverySheet` category detection upgraded to `item.pointOfInterestCategory` | May 12, 2026 |
+| **P1** Watch haptic loop fixed (`didAlertOffRoute` flag in `WatchRideStore`) | May 13, 2026 |
