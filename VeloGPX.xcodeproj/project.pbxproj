@@ -11,6 +11,8 @@
 		972D58F12FB3F98300B5BD63 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F02FB3F98300B5BD63 /* WidgetKit.framework */; };
 		972D58F32FB3F98300B5BD63 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F22FB3F98300B5BD63 /* SwiftUI.framework */; };
 		972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		972D59152FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
+		972D59162FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -118,6 +120,7 @@
 		972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VeloGPXLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		972D58F02FB3F98300B5BD63 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		972D58F22FB3F98300B5BD63 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideActivityAttributes.swift; sourceTree = "<group>"; };
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
@@ -389,6 +392,7 @@
 		97F812802F9468CE0068A42A /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */,
 				978915652F9DDB8C0047D8F7 /* Managers */,
 				9789154E2F9D64A40047D8F7 /* GPXExporter.swift */,
 				97F812772F9468CE0068A42A /* Extensions */,
@@ -575,6 +579,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				972D59162FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -591,6 +596,7 @@
 				97F812892F9468CE0068A42A /* WatchRideSummary.swift in Sources */,
 				97F8128B2F9468CE0068A42A /* CLLocationCoordinate2D+Extensions.swift in Sources */,
 				978915662F9DDB8C0047D8F7 /* LocalizationManager.swift in Sources */,
+				972D59152FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */,
 				978915522F9D64D00047D8F7 /* RideSummaryView.swift in Sources */,
 				97F8128C2F9468CE0068A42A /* VeloGPXApp.swift in Sources */,
 				9789154D2F9D64890047D8F7 /* RideSummary.swift in Sources */,
@@ -700,6 +706,7 @@
 				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -732,6 +739,7 @@
 				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
