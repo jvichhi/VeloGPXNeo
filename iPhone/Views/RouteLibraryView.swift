@@ -122,7 +122,6 @@ struct RouteLibraryView: View {
     private var emptyState: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Icon + headline
                 VStack(spacing: 20) {
                     ZStack {
                         Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
@@ -145,7 +144,6 @@ struct RouteLibraryView: View {
                 }
                 .padding(.top, 60)
 
-                // Tip card
                 ImportTipCard()
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)
@@ -168,17 +166,16 @@ private struct ImportTipCard: View {
     private let rows: [TipRow] = [
         .init(icon: "doc.badge.arrow.up",
               text: "Export a GPX or GeoJSON file from any route planning app."),
-        .init(icon: "apps.iphone",
-              text: "Supported sources: Komoot, Strava, Ride with GPS, Garmin Connect, AllTrails, and more."),
+        .init(icon: "globe",
+              text: "Search the web for \u201cGPX routes [your city]\u201d \u2014 many cycling communities share free files online."),
         .init(icon: "square.and.arrow.down",
-              text: "Tap \u{2b} above or the Import button, then pick the file from Files, Mail, or AirDrop."),
+              text: "Tap \u2b above or the Import button, then pick the file from Files, Mail, or AirDrop."),
         .init(icon: "map",
               text: "Prefer to build your own? Head to the Plan tab to draw a route from scratch."),
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack(spacing: 8) {
                 Image(systemName: "lightbulb.fill")
                     .font(.system(size: 13, weight: .semibold))
@@ -193,7 +190,6 @@ private struct ImportTipCard: View {
 
             Divider().padding(.horizontal, 16)
 
-            // Tip rows
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(rows) { row in
                     HStack(alignment: .top, spacing: 12) {
