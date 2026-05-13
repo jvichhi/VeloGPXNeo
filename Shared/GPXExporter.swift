@@ -46,7 +46,12 @@ public struct GPXExporter {
         // ── Waypoints (POIs) ─────────────────────────────────────────────
         if options.includePOIs {
             for poi in summary.pois {
-                gpx += "  <wpt lat=\"\(poi.coordinate.latitude)\" lon=\"\(poi.coordinate.longitude)\">\n"
+                // FIX (locale): use String(format:"%f") to force C-locale decimal point.
+                // Raw Double interpolation produces "46,5" on French/German devices,
+                // which is invalid GPX XML and rejected by every downstream tool.
+                let lat = String(format: "%f", poi.coordinate.latitude)
+                let lon = String(format: "%f", poi.coordinate.longitude)
+                gpx += "  <wpt lat=\"\(lat)\" lon=\"\(lon)\">\n"
                 gpx += "    <name>\(escape(poi.name))</name>\n"
                 gpx += "    <desc>\(escape(poi.category.displayName))</desc>\n"
                 gpx += "    <sym>\(gpxSymbol(for: poi.category))</sym>\n"
@@ -59,7 +64,9 @@ public struct GPXExporter {
             gpx += "  <rte>\n"
             gpx += "    <name>\(escape(summary.routeName)) — Planned</name>\n"
             for coord in summary.plannedTrack {
-                gpx += "    <rtept lat=\"\(coord.latitude)\" lon=\"\(coord.longitude)\" />\n"
+                let lat = String(format: "%f", coord.latitude)
+                let lon = String(format: "%f", coord.longitude)
+                gpx += "    <rtept lat=\"\(lat)\" lon=\"\(lon)\" />\n"
             }
             gpx += "  </rte>\n"
         }
@@ -71,7 +78,9 @@ public struct GPXExporter {
             gpx += "    <desc>\(iso.string(from: summary.startDate)) → \(iso.string(from: summary.endDate))</desc>\n"
             gpx += "    <trkseg>\n"
             for coord in summary.actualTrack {
-                gpx += "      <trkpt lat=\"\(coord.latitude)\" lon=\"\(coord.longitude)\" />\n"
+                let lat = String(format: "%f", coord.latitude)
+                let lon = String(format: "%f", coord.longitude)
+                gpx += "      <trkpt lat=\"\(lat)\" lon=\"\(lon)\" />\n"
             }
             gpx += "    </trkseg>\n"
             gpx += "  </trk>\n"

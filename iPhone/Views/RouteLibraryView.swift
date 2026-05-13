@@ -4,6 +4,11 @@ import UniformTypeIdentifiers
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
+    // FIX (.constant binding): replace .constant(routeStore.lastImportMessage != nil)
+    // with a proper @State flag so the system-generated dismiss write (setting
+    // isPresented = false) is accepted. The old .constant() swallowed those writes,
+    // meaning the alert could never be programmatically or system-dismissed correctly.
+    @State private var showImportAlert = false
 
     var body: some View {
         NavigationStack {
@@ -39,10 +44,19 @@ struct RouteLibraryView: View {
                     Task { await routeStore.importRoute(from: url) }
                 }
             }
+            // Sync the @State flag whenever the store's message changes.
+            .onChange(of: routeStore.lastImportMessage) { _, newValue in
+                showImportAlert = newValue != nil
+            }
         }
         .alert("VeloGPX",
-               isPresented: .constant(routeStore.lastImportMessage != nil),
-               actions: { Button("OK") { routeStore.lastImportMessage = nil } },
+               isPresented: $showImportAlert,
+               actions: {
+                   Button("OK") {
+                       showImportAlert = false
+                       routeStore.lastImportMessage = nil
+                   }
+               },
                message: { Text(routeStore.lastImportMessage ?? "") })
     }
 

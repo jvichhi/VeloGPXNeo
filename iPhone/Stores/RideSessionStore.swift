@@ -113,6 +113,14 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
+    // FIX (memory leak): cancel the errorClearTask and invalidate the
+    // elapsedTimer on deinit so the 6 s sleep Task doesn't hold self alive
+    // after the store is released.
+    deinit {
+        errorClearTask?.cancel()
+        elapsedTimer?.invalidate()
+    }
+
     func prepare() {
         manager.requestWhenInUseAuthorization()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -321,18 +329,8 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     // MARK: - Live Activity lifecycle
-    //
-    // startLiveActivity: called in start(). Requests a new Activity<RideActivityAttributes>.
-    // On devices without Dynamic Island (or when Live Activities are disabled by the user),
-    // ActivityKit will return an error and we silently fall back to the plain notification.
-    //
-    // pushLiveActivityUpdate: throttled to every 5 s (forced on pause/resume).
-    //
-    // endLiveActivity: called in endLocationUpdates(). Posts final state then dismisses
-    // after 4 seconds so the rider sees their last stats before the island clears.
 
     private func startLiveActivity(routeName: String) {
-        // Dismiss any stale activity from a previous ride that wasn't cleanly ended.
         Task {
             for activity in Activity<RideActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
@@ -340,7 +338,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            // Live Activities disabled in Settings — fall back to plain notification.
             postRideInProgressNotification(routeName: routeName)
             return
         }
@@ -358,17 +355,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
             liveActivity = try Activity.request(
                 attributes: attributes,
                 content: content,
-                pushType: nil          // local updates only — no APNs needed
+                pushType: nil
             )
         } catch {
-            // e.g. simulator, older device, or user has disabled Live Activities.
-            // Fall back to the plain persistent notification.
             postRideInProgressNotification(routeName: routeName)
         }
     }
 
-    /// Push the current ride stats to the Live Activity.
-    /// Pass force: true to bypass the throttle (used on pause/resume).
     private func pushLiveActivityUpdate(force: Bool = false) {
         guard let liveActivity else { return }
         let now = Date()
@@ -390,7 +383,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func endLiveActivity() {
         guard let activity = liveActivity else {
-            // No Live Activity — cancel the fallback notification instead.
             cancelRideInProgressNotification()
             return
         }
@@ -402,17 +394,12 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         )
         let finalContent = ActivityContent(state: finalState, staleDate: nil)
         Task {
-            // Show final stats for 4 seconds, then dismiss automatically.
             await activity.end(finalContent, dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
         }
         liveActivity = nil
     }
 
     // MARK: - Plain notification fallback
-    //
-    // Used on devices where Live Activities are unavailable or disabled.
-    // Fixed identifier prevents stacking; both pending + delivered are
-    // cleared on end so nothing lingers in Notification Centre.
 
     private func postRideInProgressNotification(routeName: String) {
         let content = UNMutableNotificationContent()
@@ -492,13 +479,18 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        rideState.currentHeading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        // FIX (heading guard): only accept a heading that has been properly calibrated.
+        // trueHeading is -1 when the device hasn't acquired a true-north fix yet;
+        // magneticHeading is always available but should be preferred only as a fallback.
+        let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        // Guard against the 0° default that fires at startup before any real heading
+        // data arrives — prevents the off-route bearing arrow from pointing north
+        // incorrectly while the device is stationary.
+        guard heading.isFinite, heading != 0 || newHeading.trueHeading >= 0 else { return }
+        rideState.currentHeading = heading
     }
 
     // MARK: - Grade computation
-    // Grade still uses CLLocation.altitude from the breadcrumb trail — this is correct
-    // because grade is a relative slope over a short rolling window (~50 m), not an
-    // absolute or accumulated measurement, so GPS altitude noise largely cancels out.
 
     private let gradeWindowDistance: Double = 50
     private let gradeMinDistance:    Double = 20
@@ -615,10 +607,13 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     func showError(_ message: String) {
         errorClearTask?.cancel()
         lastError = message
-        errorClearTask = Task {
+        errorClearTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
             guard !Task.isCancelled else { return }
-            lastError = nil
+            await MainActor.run { [weak self] in
+                self?.lastError = nil
+                self?.errorClearTask = nil
+            }
         }
     }
 

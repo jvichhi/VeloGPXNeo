@@ -3,6 +3,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Combine
 
+// FIX (force-unwrap): typed error for storage failures so callers
+// get a meaningful throw instead of a crash on unavailable sandbox.
+enum StorageError: Error {
+    case unavailable
+}
+
 @MainActor
 final class RouteStore: ObservableObject {
     @Published private(set) var routes: [RouteModel] = []
@@ -10,19 +16,15 @@ final class RouteStore: ObservableObject {
     @Published var selectedPOIs: [POIModel] = []
     @Published var lastImportMessage: String?
 
-    // Tab navigation: set this to .plan (with routeToEditInPlan) to deep-link
-    // from any view into the Plan tab without needing a NavigationStack push.
     @Published var selectedTab: AppTab = .routes
-    // When non-nil, PlanView preloads this route on appear then clears it.
     @Published var routeToEditInPlan: RouteModel? = nil
 
     private let directoryName = "ImportedRoutes"
-    // Bug 1 fix: sidecar directory for per-route POI persistence.
     private let poisDirectoryName = "RoutePOIs"
 
     func loadFromDisk() {
         let fm = FileManager.default
-        let directory = storageDirectory()
+        guard let directory = try? storageDirectory() else { return }
         guard let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
         routes = files.compactMap { url in
             guard let data = try? Data(contentsOf: url) else { return nil }
@@ -31,10 +33,8 @@ final class RouteStore: ObservableObject {
         if selectedRoute == nil { selectedRoute = routes.first }
     }
 
-    // Bug 1 fix: load persisted POIs for a given route from the sidecar file.
-    // Call this whenever selectedRoute changes (wired in RootView).
     func loadPOIs(forRoute route: RouteModel) {
-        let url = poisStorageURL(for: route.id)
+        guard let url = try? poisStorageURL(for: route.id) else { return }
         guard FileManager.default.fileExists(atPath: url.path),
               let data = try? Data(contentsOf: url),
               let decoded = try? JSONDecoder().decode([POIModel].self, from: data)
@@ -42,11 +42,9 @@ final class RouteStore: ObservableObject {
         selectedPOIs = decoded
     }
 
-    // Bug 1 fix: persist selectedPOIs to a sidecar file keyed to the route UUID.
-    // Called from RouteDetailView.onDisappear and POIDiscoverySheet.onDisappear.
     func savePOIs() {
         guard let route = selectedRoute else { return }
-        let url = poisStorageURL(for: route.id)
+        guard let url = try? poisStorageURL(for: route.id) else { return }
         guard let data = try? JSONEncoder().encode(selectedPOIs) else { return }
         try? data.write(to: url, options: .atomic)
     }
@@ -98,7 +96,6 @@ final class RouteStore: ObservableObject {
         loadFromDisk()
     }
 
-    /// Saves a route built in the Plan tab and selects it.
     func addPlannedRoute(_ route: RouteModel, select: Bool = true) {
         do {
             try save(route)
@@ -112,10 +109,13 @@ final class RouteStore: ObservableObject {
     }
 
     func deleteRoute(_ route: RouteModel) {
-        let url = storageDirectory().appendingPathComponent("\(route.id.uuidString).json")
-        try? FileManager.default.removeItem(at: url)
-        // Also clean up the POI sidecar.
-        try? FileManager.default.removeItem(at: poisStorageURL(for: route.id))
+        if let dir = try? storageDirectory() {
+            let url = dir.appendingPathComponent("\(route.id.uuidString).json")
+            try? FileManager.default.removeItem(at: url)
+        }
+        if let poisURL = try? poisStorageURL(for: route.id) {
+            try? FileManager.default.removeItem(at: poisURL)
+        }
         if selectedRoute?.id == route.id {
             selectedRoute = nil
             selectedPOIs = []
@@ -140,28 +140,35 @@ final class RouteStore: ObservableObject {
     }
 
     private func save(_ route: RouteModel) throws {
-        let url = storageDirectory().appendingPathComponent("\(route.id.uuidString).json")
+        let dir = try storageDirectory()
+        let url = dir.appendingPathComponent("\(route.id.uuidString).json")
         let data = try JSONEncoder().encode(route)
         try data.write(to: url, options: .atomic)
     }
 
-    private func storageDirectory() -> URL {
+    // FIX (force-unwrap): guard-let instead of first! so a missing
+    // applicationSupportDirectory (e.g. during unit tests or a corrupted sandbox)
+    // throws StorageError.unavailable rather than crashing.
+    private func storageDirectory() throws -> URL {
         let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw StorageError.unavailable
+        }
         let dir = base.appendingPathComponent(directoryName, isDirectory: true)
         if !fm.fileExists(atPath: dir.path) {
-            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir
     }
 
-    // Bug 1 fix: sidecar storage for POIs, keyed by route UUID.
-    private func poisStorageURL(for routeID: UUID) -> URL {
+    private func poisStorageURL(for routeID: UUID) throws -> URL {
         let fm = FileManager.default
-        let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw StorageError.unavailable
+        }
         let dir = base.appendingPathComponent(poisDirectoryName, isDirectory: true)
         if !fm.fileExists(atPath: dir.path) {
-            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir.appendingPathComponent("\(routeID.uuidString).json")
     }
