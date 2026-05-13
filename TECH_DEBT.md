@@ -1,5 +1,5 @@
 # VeloGPXNeo — Tech Debt Checkpoint
-> Last reviewed: May 3, 2026 (code review — new bugs, perf, error-handling findings added)
+> Last reviewed: May 12, 2026 (v1.2 build 3 — iOS 26 deprecation + Swift 6 actor warnings pass)
 
 ---
 
@@ -35,6 +35,192 @@
   wasn't compiled, and the 15 `.lproj` bundles used structured keys (`"tab.ride"`) that don't
   match the code's direct-English key pattern (`"Routes".localized`), so they never resolved
   at runtime. Removed 16 dead files. Real localization lives in `Resources/*.lproj/`.
+
+---
+
+## 🟠 iOS 26 Modernization — Tackle Now (warnings → future errors)
+
+These are all active Xcode warnings from the v1.2 b3 build. The MapKit and UIScreen items
+are deprecated-in-iOS-26 APIs that Apple will harden in a future SDK. The Swift 6 actor items
+are already errors in Swift 6 mode and will block a strict-concurrency build.
+
+### MK-1 — `MKPlacemark` / `init(placemark:)` → `MKMapItem.init(location:address:)` [iOS 26]
+
+**Affects:** `CyclingRouteService.swift:47,48,87,88` · `PlaceDescriptorService.swift:63,64,104,105`
+
+Every `MKMapItem(placemark: MKPlacemark(coordinate: coord))` pair must become:
+```swift
+// Before (deprecated iOS 26)
+MKMapItem(placemark: MKPlacemark(coordinate: coord))
+
+// After
+MKMapItem(location: CLLocation(latitude: coord.latitude, longitude: coord.longitude))
+```
+For address strings, use `MKAddressRepresentations` instead of `MKPlacemark.title`.
+
+---
+
+### MK-2 — `MKMapItem.placemark` property reads → `.location` / `.address` [iOS 26]
+
+**Affects:**
+- `NearbySearchSheet.swift:108,109,148,150,199,200,224`
+- `POIDiscoverySheet.swift:125,130,176`
+- `PlaceDescriptorService.swift:94,95`
+- `ReverseGeocodingService.swift:54`
+
+All reads of `mapItem.placemark.coordinate`, `mapItem.placemark.name`, etc. must migrate to
+`mapItem.location?.coordinate` and `mapItem.address` / `mapItem.addressRepresentations`.
+Example pattern across all affected files:
+```swift
+// Before
+let coord = mapItem.placemark.coordinate
+let name  = mapItem.placemark.name ?? mapItem.name
+
+// After
+let coord = mapItem.location?.coordinate ?? mapItem.placemark.coordinate
+let name  = mapItem.name
+```
+
+---
+
+### MK-3 — `CLGeocoder` + `reverseGeocodeLocation` → `MKReverseGeocodingRequest` [iOS 26]
+
+**Affects:** `ReverseGeocodingService.swift:63,66` · `PlaceDescriptorService.swift:57,60`
+
+`CLGeocoder` is deprecated wholesale in iOS 26 in favour of MapKit's new geocoding API.
+```swift
+// Before
+let geocoder = CLGeocoder()
+geocoder.reverseGeocodeLocation(loc) { placemarks, error in ... }
+
+// After (iOS 26+)
+let request = MKReverseGeocodingRequest(location: loc)
+let result  = try await request.result   // MKMapItem, no CLPlacemark needed
+```
+Gate with `#available(iOS 26, *)` and keep the `CLGeocoder` path as a fallback for iOS 17–25
+until the min deployment target is raised above 26.
+
+---
+
+### MK-4 — `UIScreen.main` → context-based screen [iOS 26]
+
+**Affects:**
+- `RideHistoryDetailView.swift:273,298,299`
+- `RideHistoryView.swift:213`
+- `RideSummaryView.swift:262,263`
+
+`UIScreen.main` is deprecated; the replacement is to access the screen through the view hierarchy:
+```swift
+// Before
+let scale = UIScreen.main.scale
+
+// After — in a SwiftUI view body or UIView subclass
+// Option A: via @Environment (SwiftUI)
+@Environment(\.displayScale) var displayScale  // use for scale
+
+// Option B: via UIWindowScene (UIKit context in snapshot callbacks)
+// Pass the windowScene into the snapshot helper, then:
+// windowScene.screen.scale
+```
+`RideSummaryView` and `RideHistoryDetailView` use `UIScreen.main.scale` inside
+`MKMapSnapshotter` completion handlers — extract `displayScale` from the view's environment
+and capture it before the async callback.
+
+---
+
+### AC-1 — Swift 6 actor isolation: `clCoordinate` / `route` / `distance(to:)` on wrong actor
+
+**Affects:** `CyclingRouteService.swift:153,175,176,189,194,195,211,212,216,219,245,257,259,273`
+· `PlaceDescriptorService.swift:31,94,95`
+
+`clCoordinate`, `route`, and the `distance(to:)` helper are `@MainActor`-isolated but called
+from `nonisolated` async contexts in route-building closures. This is currently a warning;
+it is **an error in Swift 6 mode**.
+
+Fix strategy — choose one per property:
+
+1. **Snapshot values before the async boundary** (preferred for coords):
+   ```swift
+   // Capture on MainActor before entering the Task/async closure
+   let origin = await MainActor.run { origin.clCoordinate }
+   let dest   = await MainActor.run { destination.clCoordinate }
+   ```
+
+2. **Mark the model struct `Sendable` and remove `@MainActor`** on pure value properties
+   (`clCoordinate` on a coordinate struct should be actor-agnostic — it's a value type).
+
+3. **Propagate `@MainActor` to the calling function** if the whole call-site is already on main.
+
+---
+
+### AC-2 — Swift 6: `TurnInstruction.init(...)` called from nonisolated context
+
+**Affects:** `CyclingRouteService.swift:245,257,273`
+
+`TurnInstruction` initializer is `@MainActor`-isolated but invoked inside a nonisolated async
+closure building the step array. Fix: mark `TurnInstruction` as `Sendable` struct with no
+actor isolation, or build the array in a `MainActor.run { }` block.
+
+---
+
+### AC-3 — Swift 6: `WatchRideSummary` `Decodable` conformance on wrong actor
+
+**Affects:** `WatchRideStore.swift:23`
+
+```
+Main actor-isolated conformance of 'WatchRideSummary' to 'Decodable' cannot be used
+in nonisolated context; this is an error in Swift 6 mode
+```
+
+`WatchRideSummary` is `@MainActor` but `Decodable` decoding happens on a background `JSONDecoder`
+thread. Fix: remove `@MainActor` from `WatchRideSummary` (it's a plain data struct — no UI
+state), or decode into a nonisolated intermediate and then assign on main.
+
+---
+
+### MISC-1 — `onChange(of:perform:)` deprecated iOS 17 [still a warning]
+
+**Affects:** `RideView.swift:232`
+
+```swift
+// Before (iOS 16 API, deprecated in 17)
+.onChange(of: someValue) { newValue in ... }
+
+// After
+.onChange(of: someValue) { _, newValue in ... }
+// or zero-parameter form if old value not needed:
+.onChange(of: someValue) { ... }
+```
+
+---
+
+### MISC-2 — `PlanView` spurious `await` on sync calls
+
+**Affects:** `PlanView.swift:62,72`
+
+`await` wraps a call that contains no async operations — Xcode warns "No async operations
+occur within await expression." Remove the `await` keyword from those two call sites.
+
+---
+
+### MISC-3 — Missing `AccentColor` in Assets catalog
+
+**Affects:** `iPhone/Assets.xcassets`
+
+The app-level accent color is not defined in any asset catalog. Xcode falls back to the
+system blue. Add an `AccentColor` color set to `Assets.xcassets` matching VeloGPX's brand
+teal (`#01696F` light / `#4F98A3` dark).
+
+---
+
+### MISC-4 — Unused `windowMeters` immutable value
+
+**Affects:** `RouteModel.swift:190` (both VeloGPX and Watch targets)
+
+```swift
+let windowMeters = ...  // never read after assignment
+```
+Either use it or replace with `_`. Quick cleanup, zero risk.
 
 ---
 
@@ -76,14 +262,14 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
   All `MKDirections` calls now route through `CyclingRouteService.shared`.
   Uses `#available(iOS 26.0, *)` to gate `.cycling`; falls back to `.walking` on older OS.
 
-- [ ] **Extract `RideView` into sub-views** (`RideView.swift` is ~30 KB — God View)
+- [ ] **Extract `RideView` into sub-views** (`RideView.swift` is ~37 KB — God View)
   Candidates:
   - `RideMapLayer` — map, camera, polylines, annotations
   - `RideHUDPanel` — metric tiles, buttons, elevation strip
   - `RideBirdsEyePanel` — aerial overview layout branch
   Move all MKDirections spur calls into a dedicated `POISpurService`.
 
-- [ ] **Split `RideSessionStore` (~23 KB God Object)**
+- [ ] **Split `RideSessionStore` (~30 KB God Object)**
   Current responsibilities: `CLLocationManager`, `WCSession`, heading, off-route detection,
   rerouting, POI proximity, breadcrumbs, notifications, history persistence.
   Proposed split:
@@ -138,6 +324,7 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
 - [ ] **`PlaceDescriptorService` (4.1 KB) is not wired to any consumer**
   No visible call site in `RideView`, `NearbySearchSheet`, or any sheet.
   Intended for AI-powered place summaries. Wire to `NearbyResultCard` detail view, or delete.
+  *(Note: also needs the MK-1/MK-2/MK-3 iOS 26 modernization fixes regardless.)*
 
 - [x] **`NextPOIBanner.swift` stub deleted**
   Was 856 B, used `MKMapItem` not `POIModel`, superseded by `RideView.nextPOIChip()`.
@@ -275,3 +462,5 @@ All `MapPolyline` stroke widths in `RideView.mapLayer` doubled:
 | **P0** Duplicate `POISearchService.swift` root copy removed | May 2, 2026 |
 | **P0** `nextPOIChip` `×` removed; long-press annotation delete replaces it | May 2, 2026 |
 | Orphan `Shared/Localization/` directory (17 dead files) removed | May 3, 2026 |
+| CoreMotion re-linked to VeloGPX target; version synced to 1.2/3 across all 3 targets | May 12, 2026 |
+| Stale `RideSessionStore.swift (corrected section)` removed from Watch Resources phase | May 12, 2026 |
