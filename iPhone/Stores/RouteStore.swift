@@ -145,7 +145,7 @@ final class RouteStore: ObservableObject {
     }
 
     func reverseRoute(_ route: RouteModel) {
-        guard var updated = routes.first(where: { $0.id == route.id }) else { return }\
+        guard var updated = routes.first(where: { $0.id == route.id }) else { return }
         updated.trackPoints = updated.trackPoints.reversed()
         try? save(updated)
         loadFromDisk()
