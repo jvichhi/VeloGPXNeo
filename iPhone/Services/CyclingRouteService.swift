@@ -22,17 +22,6 @@ struct CyclingRouteResult {
     let isCycling: Bool
 }
 
-// MARK: - Helpers
-
-/// iOS 26+: MKMapItem(coordinate:). Earlier: MKPlacemark wrapper.
-private func mapItem(for coordinate: CLLocationCoordinate2D) -> MKMapItem {
-    if #available(iOS 26.0, *) {
-        return MKMapItem(coordinate: coordinate)
-    } else {
-        return MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-    }
-}
-
 // MARK: - Service
 
 actor CyclingRouteService {
@@ -40,12 +29,25 @@ actor CyclingRouteService {
     static let shared = CyclingRouteService()
     private init() {}
 
+    // Build an MKMapItem inside the actor (avoids MainActor isolation crossing).
+    // iOS 26: MKMapItem has a coordinate property setter.
+    // Earlier: wrap in MKPlacemark.
+    private func makeMapItem(for coordinate: CLLocationCoordinate2D) -> MKMapItem {
+        if #available(iOS 26.0, *) {
+            let item = MKMapItem()
+            item.coordinate = coordinate
+            return item
+        } else {
+            return MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        }
+    }
+
     func calculateRoute(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
-        let sourceItem = mapItem(for: source)
-        let destinationItem = mapItem(for: destination)
+        let sourceItem = makeMapItem(for: source)
+        let destinationItem = makeMapItem(for: destination)
 
         let request = MKDirections.Request()
         request.source = sourceItem
@@ -80,8 +82,8 @@ actor CyclingRouteService {
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
-        let sourceItem = mapItem(for: source)
-        let destinationItem = mapItem(for: destination)
+        let sourceItem = makeMapItem(for: source)
+        let destinationItem = makeMapItem(for: destination)
 
         let request = MKDirections.Request()
         request.source = sourceItem
@@ -144,9 +146,8 @@ actor GPXCueEngine {
 
         let keypoints = extractKeypoints(from: points)
         guard keypoints.count >= 2 else {
-            let lastCoord = points.last!.coordinate
-            let lastCL = CLLocationCoordinate2D(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
-            return [makeArrivalCue(at: lastCL, distance: route.totalDistance)]
+            let last = points.last!.coordinate
+            return [makeCueEntry(cumulative: route.totalDistance, instruction: "Arrive at destination", lat: last.latitude, lon: last.longitude, icon: .arrive)]
         }
 
         let segments = await routeBetween(keypoints: keypoints)
@@ -210,10 +211,10 @@ actor GPXCueEngine {
 
     // MARK: - Routing
 
-    private func routeBetween(keypoints: [Coordinate]) async -> [(coordinate: CLLocationCoordinate2D, steps: [(String, Double)])] {
+    private func routeBetween(keypoints: [Coordinate]) async -> [(lat: Double, lon: Double, steps: [(String, Double)])] {
         let pairs = Array(zip(keypoints, keypoints.dropFirst()))
 
-        typealias SegmentSteps = (index: Int, coord: CLLocationCoordinate2D, steps: [(String, Double)])
+        typealias SegmentSteps = (index: Int, lat: Double, lon: Double, steps: [(String, Double)])
         var results: [SegmentSteps] = []
 
         await withTaskGroup(of: SegmentSteps?.self) { group in
@@ -224,14 +225,14 @@ actor GPXCueEngine {
                     do {
                         let result = try await CyclingRouteService.shared.calculateRoute(from: from, to: to)
                         let steps = result.route.steps.map { ($0.instructions, $0.distance) }
-                        return (i, from, steps)
+                        return (i, from.latitude, from.longitude, steps)
                     } catch {
                         let dist = CLLocation(latitude: from.latitude, longitude: from.longitude)
                             .distance(from: CLLocation(latitude: to.latitude, longitude: to.longitude))
                         let bearingDeg = self.bearing(from: from, to: to)
                         let icon = self.bearingToIcon(bearingDeg)
                         let desc = self.geometryInstruction(for: icon)
-                        return (i, from, [(desc, dist)])
+                        return (i, from.latitude, from.longitude, [(desc, dist)])
                     }
                 }
             }
@@ -241,22 +242,23 @@ actor GPXCueEngine {
         }
 
         results.sort { $0.index < $1.index }
-        return results.map { (coordinate: $0.coord, steps: $0.steps) }
+        return results.map { (lat: $0.lat, lon: $0.lon, steps: $0.steps) }
     }
 
     // MARK: - Cue assembly
 
-    private func assembleCueSheet(from segments: [(coordinate: CLLocationCoordinate2D, steps: [(String, Double)])]) -> [CueSheetEntry] {
+    private func assembleCueSheet(from segments: [(lat: Double, lon: Double, steps: [(String, Double)])]) -> [CueSheetEntry] {
         var entries: [CueSheetEntry] = []
         var cumulative: Double = 0
 
         for seg in segments {
             for (instruction, distance) in seg.steps {
                 let icon = cueIcon(from: instruction)
-                entries.append(CueSheetEntry(
-                    cumulativeDistance: cumulative,
+                entries.append(makeCueEntry(
+                    cumulative: cumulative,
                     instruction: instruction,
-                    coordinate: seg.coordinate,
+                    lat: seg.lat,
+                    lon: seg.lon,
                     icon: icon
                 ))
                 cumulative += distance
@@ -265,11 +267,12 @@ actor GPXCueEngine {
 
         if let last = entries.last,
            last.instruction.lowercased().contains("arrive") || last.instruction.lowercased().contains("destination") {
-            entries[entries.count - 1] = CueSheetEntry(
+            entries[entries.count - 1] = makeCueEntry(
                 id: last.id,
-                cumulativeDistance: last.cumulativeDistance,
+                cumulative: last.cumulativeDistance,
                 instruction: "Arrive at destination",
-                coordinate: last.coordinate,
+                lat: last.latitude,
+                lon: last.longitude,
                 icon: .arrive
             )
         }
@@ -282,8 +285,24 @@ actor GPXCueEngine {
         return deduped
     }
 
-    private func makeArrivalCue(at coord: CLLocationCoordinate2D, distance: Double) -> CueSheetEntry {
-        CueSheetEntry(cumulativeDistance: distance, instruction: "Arrive at destination", coordinate: coord, icon: .arrive)
+    /// Construct CueSheetEntry directly from lat/lon to stay nonisolated-safe.
+    /// CueSheetEntry stores lat/lon internally; the coordinate computed property
+    /// is @MainActor-adjacent via CLLocationCoordinate2D in some contexts.
+    private func makeCueEntry(
+        id: UUID = UUID(),
+        cumulative: Double,
+        instruction: String,
+        lat: Double,
+        lon: Double,
+        icon: CueIcon
+    ) -> CueSheetEntry {
+        CueSheetEntry(
+            id: id,
+            cumulativeDistance: cumulative,
+            instruction: instruction,
+            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            icon: icon
+        )
     }
 
     // MARK: - Icon mapping

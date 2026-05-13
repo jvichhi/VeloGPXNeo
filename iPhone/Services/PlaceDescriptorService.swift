@@ -25,7 +25,6 @@ actor PlaceDescriptorService {
 
     /// Resolves a single waypoint coordinate to a named MKMapItem.
     func resolve(_ waypoint: WaypointPoint) async -> ResolvedWaypoint {
-        // Extract plain CLLocationCoordinate2D from the Coordinate struct (nonisolated-safe)
         let coord = CLLocationCoordinate2D(
             latitude: waypoint.coordinate.latitude,
             longitude: waypoint.coordinate.longitude
@@ -70,7 +69,6 @@ actor PlaceDescriptorService {
                 return nil
             }
         } else {
-            // iOS 18 fallback: CLGeocoder
             let geocoder = CLGeocoder()
             do {
                 let placemarks = try await geocoder.reverseGeocodeLocation(location)
@@ -107,11 +105,19 @@ actor PlaceDescriptorService {
         do {
             let search = MKLocalSearch(request: request)
             let response = try await search.start()
-            // Use item.location for distance; avoid deprecated .placemark.coordinate
-            let closest = response.mapItems.min(by: {
-                let aLoc = $0.location ?? CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                let bLoc = $1.location ?? CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                let ref  = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            let ref = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            // iOS 26: item.location is non-optional CLLocation
+            // Earlier: use CLLocation from placemark.coordinate
+            let closest: MKMapItem? = response.mapItems.min(by: {
+                let aLoc: CLLocation
+                let bLoc: CLLocation
+                if #available(iOS 26.0, *) {
+                    aLoc = $0.location
+                    bLoc = $1.location
+                } else {
+                    aLoc = CLLocation(latitude: $0.placemark.coordinate.latitude, longitude: $0.placemark.coordinate.longitude)
+                    bLoc = CLLocation(latitude: $1.placemark.coordinate.latitude, longitude: $1.placemark.coordinate.longitude)
+                }
                 return aLoc.distance(from: ref) < bLoc.distance(from: ref)
             })
             return ResolvedWaypoint(
@@ -121,12 +127,20 @@ actor PlaceDescriptorService {
                 resolvedViaPlaceDescriptor: false
             )
         } catch {
-            let item = mapItem(for: coordinate)
-            item.name = waypoint.name ?? "Waypoint"
+            // Build a plain MKMapItem inline — no private helper needed
+            let fallbackItem: MKMapItem
+            if #available(iOS 26.0, *) {
+                let item = MKMapItem()
+                item.coordinate = coordinate
+                fallbackItem = item
+            } else {
+                fallbackItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+            }
+            fallbackItem.name = waypoint.name ?? "Waypoint"
             return ResolvedWaypoint(
                 name: waypoint.name ?? "Waypoint",
                 coordinate: coordinate,
-                mapItem: item,
+                mapItem: fallbackItem,
                 resolvedViaPlaceDescriptor: false
             )
         }
