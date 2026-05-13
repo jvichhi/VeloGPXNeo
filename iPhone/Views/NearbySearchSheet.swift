@@ -7,11 +7,11 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Caf\u00e9"
+    @State private var selectedCategory = "Café"
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Caf\u00e9",        "cup.and.saucer.fill",      "Caf\u00e9"),
+        ("Café",        "cup.and.saucer.fill",      "Café"),
         ("Water",       "drop.fill",                "Water"),
         ("Bike Shop",   "wrench.and.screwdriver",   "Bike Shop"),
         ("Restaurant",  "fork.knife",               "Restaurant")
@@ -101,11 +101,17 @@ struct NearbySearchSheet: View {
         .task { await load() }
     }
 
-    // MARK: - Deterministic coordinate-based ID
+    // MARK: - Coordinate helper (handles iOS 26 non-optional CLLocation)
 
     private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
-        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        if #available(iOS 26.0, *) {
+            return item.location.coordinate
+        } else {
+            return item.placemark.coordinate
+        }
     }
+
+    // MARK: - Deterministic coordinate-based ID
 
     private func deterministicID(for item: MKMapItem) -> UUID {
         let coord = itemCoordinate(item)
@@ -146,10 +152,10 @@ struct NearbySearchSheet: View {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
             let coord = itemCoordinate(item)
-            // Address: prefer structured address over deprecated .placemark.thoroughfare
+            // Address: use MKAddressRepresentations on iOS 26+, thoroughfare on earlier
             let address: String? = {
                 if #available(iOS 26.0, *) {
-                    return item.addressRepresentations.first?.formattedAddressLine
+                    return item.address?.streetAddress
                 } else {
                     return item.placemark.thoroughfare
                 }
@@ -186,7 +192,7 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Caf\u00e9":        return .cafe
+        case "Café":        return .cafe
         case "Water":       return .water
         case "Bike Shop":   return .bikeRepair
         case "Restaurant":  return .restaurant
@@ -205,7 +211,11 @@ private struct NearbyResultCard: View {
     let onToggle: () -> Void
 
     private var itemCoordinate: CLLocationCoordinate2D {
-        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        if #available(iOS 26.0, *) {
+            return item.location.coordinate
+        } else {
+            return item.placemark.coordinate
+        }
     }
 
     private var distanceMeters: CLLocationDistance {
@@ -221,7 +231,7 @@ private struct NearbyResultCard: View {
 
     private var addressLine: String? {
         if #available(iOS 26.0, *) {
-            return item.addressRepresentations.first?.formattedAddressLine
+            return item.address?.streetAddress
         } else {
             return item.placemark.thoroughfare
         }

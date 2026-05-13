@@ -11,7 +11,7 @@ struct POIDiscoverySheet: View {
     @State private var selectedCategory: String? = nil
 
     private let categories: [(label: String, icon: String)] = [
-        ("Caf\u00e9",       "cup.and.saucer.fill"),
+        ("Café",       "cup.and.saucer.fill"),
         ("Water",      "drop.fill"),
         ("Bike Shop",  "wrench.and.screwdriver"),
         ("Restaurant", "fork.knife"),
@@ -108,10 +108,14 @@ struct POIDiscoverySheet: View {
         }
     }
 
-    // MARK: - Coordinate helper
+    // MARK: - Coordinate helper (handles iOS 26 non-optional CLLocation)
 
     private func itemCoordinate(_ item: MKMapItem) -> CLLocationCoordinate2D {
-        item.location?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        if #available(iOS 26.0, *) {
+            return item.location.coordinate
+        } else {
+            return item.placemark.coordinate
+        }
     }
 
     // MARK: - Deterministic coordinate-based ID
@@ -163,9 +167,10 @@ struct POIDiscoverySheet: View {
         let itemID = deterministicID(for: item)
         guard !routeStore.selectedPOIs.contains(where: { $0.id == itemID }) else { return }
         let coord = itemCoordinate(item)
+        // Address: use MKAddress on iOS 26+, placemark.title on earlier
         let address: String? = {
             if #available(iOS 26.0, *) {
-                return item.addressRepresentations.first?.formattedAddressLine
+                return item.address?.streetAddress
             } else {
                 return item.placemark.title
             }
@@ -198,7 +203,7 @@ struct POIDiscoverySheet: View {
             }
         }
         let name = item.name?.lowercased() ?? ""
-        if name.contains("caf\u{00e9}") || name.contains("cafe") || name.contains("coffee") { return .cafe }
+        if name.contains("café") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
         if name.contains("restaurant") || name.contains("food") { return .restaurant }
         if name.contains("pharmacy") { return .pharmacy }
@@ -219,7 +224,7 @@ private struct POIDiscoveryResultCard: View {
 
     private var addressLine: String? {
         if #available(iOS 26.0, *) {
-            return item.addressRepresentations.first?.formattedAddressLine
+            return item.address?.streetAddress
         } else {
             return item.placemark.title
         }
