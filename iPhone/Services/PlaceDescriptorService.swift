@@ -86,7 +86,6 @@ actor PlaceDescriptorService {
             let placemarks = try await geocoder.reverseGeocodeLocation(location)
             guard let placemark = placemarks.first else { return nil }
             let name = placemark.name ?? placemark.thoroughfare ?? waypoint.name ?? "Waypoint"
-            // iOS 26 deprecated MKPlacemark(placemark:) — use init(coordinate:) and set name manually
             let mkPlacemark = MKPlacemark(coordinate: coordinate)
             let mapItem = MKMapItem(placemark: mkPlacemark)
             mapItem.name = name
@@ -103,6 +102,7 @@ actor PlaceDescriptorService {
 
     // MARK: - MKLocalSearch fallback path
 
+    @available(iOS, deprecated: 26.0, message: "Use MKReverseGeocodingRequest on iOS 26+")
     private func resolveLegacy(waypoint: WaypointPoint, coordinate: CLLocationCoordinate2D) async -> ResolvedWaypoint {
         let region = MKCoordinateRegion(
             center: coordinate,
@@ -119,15 +119,8 @@ actor PlaceDescriptorService {
             let response = try await search.start()
             let ref = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
             let closest: MKMapItem? = response.mapItems.min(by: {
-                let aLoc: CLLocation
-                let bLoc: CLLocation
-                if #available(iOS 26.0, *) {
-                    aLoc = $0.location
-                    bLoc = $1.location
-                } else {
-                    aLoc = CLLocation(latitude: $0.placemark.coordinate.latitude, longitude: $0.placemark.coordinate.longitude)
-                    bLoc = CLLocation(latitude: $1.placemark.coordinate.latitude, longitude: $1.placemark.coordinate.longitude)
-                }
+                let aLoc = CLLocation(latitude: $0.placemark.coordinate.latitude, longitude: $0.placemark.coordinate.longitude)
+                let bLoc = CLLocation(latitude: $1.placemark.coordinate.latitude, longitude: $1.placemark.coordinate.longitude)
                 return aLoc.distance(from: ref) < bLoc.distance(from: ref)
             })
             return ResolvedWaypoint(
