@@ -3,9 +3,10 @@
 //  VeloGPX
 //
 //  Computes cycling directions between two points using MKDirections.
-//  - iOS 26+: uses .cycling transport type + MKMapItem(coordinate:)
-//  - Fallback: uses .walking + MKPlacemark
-//  Returns the first MKRoute plus metadata (name, ETA).
+//  - iOS 26+: uses .cycling transport type
+//  - Fallback: uses .walking
+//  MKMapItem is always constructed via MKMapItem(placemark: MKPlacemark(coordinate:))
+//  which is @MainActor; we hop via MainActor.run at each call site.
 //
 
 import Foundation
@@ -29,25 +30,17 @@ actor CyclingRouteService {
     static let shared = CyclingRouteService()
     private init() {}
 
-    // Build an MKMapItem inside the actor (avoids MainActor isolation crossing).
-    // iOS 26: MKMapItem has a coordinate property setter.
-    // Earlier: wrap in MKPlacemark.
-    private func makeMapItem(for coordinate: CLLocationCoordinate2D) -> MKMapItem {
-        if #available(iOS 26.0, *) {
-            let item = MKMapItem()
-            item.coordinate = coordinate
-            return item
-        } else {
-            return MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-        }
-    }
-
     func calculateRoute(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
-        let sourceItem = makeMapItem(for: source)
-        let destinationItem = makeMapItem(for: destination)
+        // MKMapItem(placemark:) is @MainActor — hop and return Sendable result
+        let (sourceItem, destinationItem) = await MainActor.run {
+            (
+                MKMapItem(placemark: MKPlacemark(coordinate: source)),
+                MKMapItem(placemark: MKPlacemark(coordinate: destination))
+            )
+        }
 
         let request = MKDirections.Request()
         request.source = sourceItem
@@ -82,8 +75,12 @@ actor CyclingRouteService {
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
-        let sourceItem = makeMapItem(for: source)
-        let destinationItem = makeMapItem(for: destination)
+        let (sourceItem, destinationItem) = await MainActor.run {
+            (
+                MKMapItem(placemark: MKPlacemark(coordinate: source)),
+                MKMapItem(placemark: MKPlacemark(coordinate: destination))
+            )
+        }
 
         let request = MKDirections.Request()
         request.source = sourceItem
@@ -285,9 +282,7 @@ actor GPXCueEngine {
         return deduped
     }
 
-    /// Construct CueSheetEntry directly from lat/lon to stay nonisolated-safe.
-    /// CueSheetEntry stores lat/lon internally; the coordinate computed property
-    /// is @MainActor-adjacent via CLLocationCoordinate2D in some contexts.
+    /// Build a CueSheetEntry from raw lat/lon — no @MainActor touch needed.
     private func makeCueEntry(
         id: UUID = UUID(),
         cumulative: Double,
