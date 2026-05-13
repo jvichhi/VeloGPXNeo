@@ -383,14 +383,24 @@ Add a `private var notificationsGranted = false` flag and guard all `UNUserNotif
 - [ ] **Elevation gain has no noise smoothing**
   Fix: threshold gate (only accumulate deltas > 2 m) or simple Kalman filter on altitude stream.
 
-- [ ] **`PlaceDescriptorService` (4.1 KB) is not wired to any consumer**
-  Wire to `NearbyResultCard` detail view, or delete.
-  *(Also needs MK-1/MK-2/MK-3 iOS 26 fixes regardless.)*
+- [x] **`PlaceDescriptorService` wired to `WaypointListSheet`** — ✅ Resolved May 13, 2026
+  `WaypointListSheet` now resolves each waypoint coordinate to a human-readable place name via
+  `PlaceDescriptorService.shared.resolve()` (iOS 26+ `MKReverseGeocodingRequest` primary,
+  `MKLocalSearch` fallback). Resolution is lazy and async — a spinner appears in-flight, and
+  results are cached in `resolvedNames: [UUID: String]` so re-renders don't re-fire network calls.
+  The raw `lat, lon` label is still shown as a subtitle under the resolved name.
+  Availability gated: iOS <26 shows raw coordinates (same as before).
 
-- [x] **`NextPOIBanner.swift` stub deleted** — ✅ Done
+- [x] **`NextPOIBanner.swift` stub deleted** — ✅ Resolved May 13, 2026
+  File removed. `nextPOIChip` in `RideView` covers this entirely.
 
 - [ ] **`RouteNoticeView.swift` — kept but unconnected**
-  Wire into `CyclingRouteService` result and surface in `topBanners`.
+  Wire into `CyclingRouteService` result and surface in `topBanners`, OR delete before 1.0.
+  Currently retained alongside `CyclingRouteOverlay` as a pair — both need the same UX decision.
+
+- [ ] **`CyclingRouteOverlay.swift` — deliberately removed from RouteDetailView**
+  Kept for potential reuse. Consider surfacing in `PlanView` pre-ride rather than `RouteDetailView`.
+  `RouteNoticeView` should be wired alongside this when it's reinstated.
 
 - [ ] **`MapStyle` — expose cycling overlay option (WWDC25)**
   Add a user setting to toggle between `.standard`, `.hybrid(elevation: .realistic)`,
@@ -493,3 +503,5 @@ Add a `private var notificationsGranted = false` flag and guard all `UNUserNotif
 | **MK-5** `POISearchService` upgraded to typed `MKPointOfInterestFilter` (iOS 18+/26) | May 12, 2026 |
 | **P0** `POIDiscoverySheet` category detection upgraded to `item.pointOfInterestCategory` | May 12, 2026 |
 | **P1** Watch haptic loop fixed (`didAlertOffRoute` flag in `WatchRideStore`) | May 13, 2026 |
+| **P2** `PlaceDescriptorService` wired to `WaypointListSheet` (lazy async, iOS 26 gated) | May 13, 2026 |
+| **P2** `NextPOIBanner.swift` deleted (superseded by `nextPOIChip` in `RideView`) | May 13, 2026 |

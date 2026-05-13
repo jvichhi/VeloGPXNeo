@@ -6,9 +6,15 @@
 //  Height is controlled by PlanView's drawerHeight state; this view
 //  must NOT stretch beyond its given space.
 //
+//  PlaceDescriptorService wired May 13, 2026:
+//  Waypoint rows now show resolved place names (via MKReverseGeocodingRequest)
+//  instead of raw lat/lon strings. Resolution is lazy — triggered once per
+//  waypoint on first appearance, result cached in resolvedNames dictionary.
+//
 
 import SwiftUI
 import CoreLocation
+import MapKit
 
 struct WaypointListSheet: View {
 
@@ -28,6 +34,10 @@ struct WaypointListSheet: View {
     // editMode drives drag-reorder only; delete is via swipeActions so
     // the leading swipe is never eaten by the edit-mode selection chrome.
     @State private var editMode: EditMode = .active
+    // PlaceDescriptorService results — keyed by waypoint UUID.
+    // Resolution is async and lazy; entries are populated one at a time
+    // as they complete so the list stays responsive during network calls.
+    @State private var resolvedNames: [UUID: String] = [:]
 
     var body: some View {
         Group {
@@ -74,6 +84,7 @@ struct WaypointListSheet: View {
                 Spacer()
                 Button {
                     plan.clearAll()
+                    resolvedNames.removeAll()
                 } label: {
                     Text("Clear")
                         .font(.subheadline)
@@ -119,7 +130,9 @@ struct WaypointListSheet: View {
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(wp.name ?? coordinateLabel(wp.coordinate))
+                        // Show resolved place name when available; fall back to
+                        // raw coordinate string while the async lookup is in flight.
+                        Text(resolvedNames[wp.id] ?? (wp.name ?? coordinateLabel(wp.coordinate)))
                             .font(.subheadline)
                             .lineLimit(1)
                         Text(coordinateLabel(wp.coordinate))
@@ -127,6 +140,12 @@ struct WaypointListSheet: View {
                             .foregroundStyle(.tertiary)
                     }
                     Spacer()
+                    // Spinner while resolution is in-flight
+                    if resolvedNames[wp.id] == nil && wp.name == nil {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .transition(.opacity)
+                    }
                 }
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
@@ -137,6 +156,7 @@ struct WaypointListSheet: View {
                     Button(role: .destructive) {
                         let id = wp.id
                         let bridgeIndex = max(0, index - 1)
+                        resolvedNames.removeValue(forKey: id)
                         plan.removeWaypoint(id: id)
                         Task {
                             if plan.waypoints.count >= 2 {
@@ -146,6 +166,9 @@ struct WaypointListSheet: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
+                }
+                .task(id: wp.id) {
+                    await resolveNameIfNeeded(for: wp)
                 }
             }
             .onMove { from, to in
@@ -290,6 +313,26 @@ struct WaypointListSheet: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 20)
+    }
+
+    // MARK: - PlaceDescriptorService Integration
+
+    /// Resolves a waypoint coordinate to a human-readable place name via
+    /// PlaceDescriptorService (MKReverseGeocodingRequest primary, MKLocalSearch fallback).
+    /// No-ops if the waypoint already has a name or has already been resolved.
+    @available(iOS 26, *)
+    private func resolveNameIfNeeded(for wp: WaypointPoint) async {
+        // Skip if already resolved or the waypoint carried an embedded name
+        guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
+        let resolved = await PlaceDescriptorService.shared.resolve(wp)
+        // Guard against stale updates if waypoint was removed while in-flight
+        guard plan.waypoints.contains(where: { $0.id == wp.id }) else { return }
+        resolvedNames[wp.id] = resolved.name
+    }
+
+    /// iOS <26 fallback — no resolution; raw coordinate label is shown.
+    private func resolveNameIfNeeded(for wp: WaypointPoint) async {
+        // PlaceDescriptorService requires iOS 26+; nothing to do on older OS.
     }
 
     // MARK: - Helpers
