@@ -3,7 +3,7 @@
 //  VeloGPX
 //
 //  Computes cycling directions between two points using MKDirections.
-//  - iOS 26+: uses .cycling transport type
+//  - iOS 26+: uses .cycling transport type + MKMapItem(coordinate:)
 //  - Fallback: uses .walking
 //  Returns the first MKRoute plus metadata (name, ETA).
 //
@@ -31,6 +31,19 @@ struct CyclingRouteResult {
     let isCycling: Bool
 }
 
+// MARK: - Helpers
+
+/// Creates an MKMapItem from a coordinate.
+/// iOS 26+: uses MKMapItem(coordinate:) directly — MKPlacemark is deprecated.
+/// Earlier: wraps in MKPlacemark as before.
+private func mapItem(for coordinate: CLLocationCoordinate2D) -> MKMapItem {
+    if #available(iOS 26.0, *) {
+        return MKMapItem(coordinate: coordinate)
+    } else {
+        return MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+    }
+}
+
 // MARK: - Service
 
 actor CyclingRouteService {
@@ -44,8 +57,8 @@ actor CyclingRouteService {
         to destination: CLLocationCoordinate2D
     ) async throws -> CyclingRouteResult {
 
-        let sourceItem = MKMapItem(placemark: MKPlacemark(coordinate: source))
-        let destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        let sourceItem = mapItem(for: source)
+        let destinationItem = mapItem(for: destination)
 
         let request = MKDirections.Request()
         request.source = sourceItem
@@ -84,8 +97,8 @@ actor CyclingRouteService {
         to destination: CLLocationCoordinate2D
     ) async throws -> [CyclingRouteResult] {
 
-        let sourceItem = MKMapItem(placemark: MKPlacemark(coordinate: source))
-        let destinationItem = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        let sourceItem = mapItem(for: source)
+        let destinationItem = mapItem(for: destination)
 
         let request = MKDirections.Request()
         request.source = sourceItem
