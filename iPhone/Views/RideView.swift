@@ -1,4 +1,3 @@
-
 //
 //  RideView.swift
 //  VeloGPX
@@ -32,10 +31,7 @@ struct RideView: View {
     @State private var preRideCues: [CueSheetEntry] = []
     @State private var completedSummary: RideSummary? = nil
 
-    // F-2b: Long-press delete state.
-    // cameraPauseTask is non-nil while the 3s interaction window is open;
-    // used as a guard in updateRidingCamera to prevent the map panning
-    // away while the rider is mid-confirm.
+    // F-2b long-press delete state
     @State private var pendingDeletePOI: POIModel? = nil
     @State private var cameraPauseTask: Task<Void, Never>? = nil
 
@@ -70,7 +66,11 @@ struct RideView: View {
                     }
                 }
             } else {
-                // Ride ended — cancel any pending delete
+                // Bug 3 fix: clear POIs from routeStore when the ride ends so
+                // they don't persist into the next ride or birds-eye view.
+                routeStore.selectedPOIs.removeAll()
+                routeStore.savePOIs()
+                // Cancel any pending delete interaction.
                 pendingDeletePOI = nil
                 cameraPauseTask?.cancel()
                 cameraPauseTask = nil
@@ -85,8 +85,6 @@ struct RideView: View {
             guard rideStore.rideState.isActive,
                   !rideStore.rideState.isPaused,
                   let coord = newValue?.clCoordinate else { return }
-            // Issue 2 fix: do not pan the camera while the rider is
-            // interacting with a long-pressed annotation.
             if pendingDeletePOI == nil {
                 updateRidingCamera(to: coord)
             }
@@ -230,23 +228,15 @@ struct RideView: View {
             preRideClimbs = route.detectClimbs()
             Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
-        // FIX: re-fit camera when the selected route changes.
-        // .onAppear fires only once (first mount of RideView). If the user
-        // selects a different route in RouteLibraryView and returns here,
-        // the view is already alive so .onAppear is skipped — leaving the
-        // map centred on the previous route. Adding fitCameraToRoute here
-        // ensures the map always snaps to the new route's bounding box.
         .onChange(of: route.id) { _, _ in
             fitCameraToRoute(route)
             preRideClimbs = route.detectClimbs()
             Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
-        // F-2d: PreRidePOISheet
         .sheet(isPresented: $showPOISheet) {
             PreRidePOISheet(route: route, cueEntries: preRideCues)
                 .environmentObject(routeStore)
         }
-        // Legacy sheet kept for any other callers
         .sheet(isPresented: $showDiscoverySheet) {
             POIDiscoverySheet(route: route)
                 .environmentObject(routeStore)
@@ -302,12 +292,10 @@ struct RideView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.nextCue?.id)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
-        // FIX: Bridge mid-ride POI additions from NearbySearchSheet → RideSessionStore.
-        // NearbySearchSheet writes to routeStore.selectedPOIs, but RideSessionStore
-        // holds its own pois array (set once at start). Without this observer,
-        // updateNextPOI, spur computation, and approach alerts never see POIs added
-        // during an active ride — nextPOI chip stays blank, spurs don't draw,
-        // approach haptics don't fire.
+        // Bug 3 fix: mirror routeStore.selectedPOIs changes into rideStore.
+        // This handles BOTH additions (from NearbySearchSheet) AND deletions
+        // (from long-press annotation delete in mapLayer which writes back to
+        // routeStore.selectedPOIs after removing from rideStore.pois).
         .onChange(of: routeStore.selectedPOIs) { _, newPOIs in
             guard rideStore.rideState.isActive else { return }
             rideStore.updatePOIs(newPOIs)
@@ -512,8 +500,6 @@ struct RideView: View {
         }
     }
 
-    // F-2c: chip is display-only — no × button.
-    // F-2f: visibility gate tightened to 500m (was 2000m).
     private var nextPOIChip: some View {
         Group {
             if let poi = rideStore.rideState.nextPOI,
@@ -723,11 +709,12 @@ struct RideView: View {
 
     @ViewBuilder
     private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
-        // F-2a: single source of truth — render from rideStore.pois during active ride
         let activePOIs = rideStore.rideState.isActive ? rideStore.pois : routeStore.selectedPOIs
 
         Map(position: $position) {
-            // F-1: ALL polyline stroke widths doubled
+            // ── Route polylines ────────────────────────────────────────────
+            // Drawn FIRST (bottom-most z-order). Reroute polylines are drawn
+            // after so they appear ON TOP of the blue route line, not under it.
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
                     .stroke(.white, lineWidth: 14)
@@ -745,6 +732,11 @@ struct RideView: View {
                     .stroke(.blue, lineWidth: 12)
             }
 
+            // Bug 2 fix: reroute polylines drawn AFTER (above) route polylines.
+            // Previously they were rendered in the same block as the route lines,
+            // but SwiftUI MapKit composites all Map content in declaration order —
+            // the remaining-route blue line was drawn on top of the orange reroute
+            // line, making it invisible. Moving them here puts orange on top.
             if !rideStore.reroutePolyline.isEmpty {
                 MapPolyline(coordinates: rideStore.reroutePolyline)
                     .stroke(.white, lineWidth: 16)
@@ -752,7 +744,7 @@ struct RideView: View {
                     .stroke(.orange, lineWidth: 10)
             }
 
-            // F-1: spur widths doubled; non-next scaled proportionally
+            // ── POI spurs ──────────────────────────────────────────────────
             ForEach(poiSpurs) { spur in
                 MapPolyline(coordinates: spur.inbound)
                     .stroke(
@@ -775,9 +767,7 @@ struct RideView: View {
                 }
             }
 
-            // F-2a + F-2b: annotations from activePOIs, 56pt target, long-press delete.
-            // Issue 3 fix: long-press handler guards on rideState.isActive —
-            // pre-ride birds-eye annotations are read-only.
+            // ── POI annotations (F-2a + F-2b) ─────────────────────────────
             ForEach(activePOIs) { poi in
                 let isNext    = poi.id == rideStore.rideState.nextPOI?.id
                 let isPending = pendingDeletePOI?.id == poi.id
@@ -795,20 +785,22 @@ struct RideView: View {
                     }
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.5).onEnded { _ in
-                            // Issue 3: no-op during pre-ride birds-eye
                             guard rideStore.rideState.isActive else { return }
 
                             if pendingDeletePOI?.id == poi.id {
                                 // Second long-press — confirm delete
                                 cameraPauseTask?.cancel()
                                 cameraPauseTask = nil
-                                let filtered = rideStore.pois.filter { $0.id != poi.id }
-                                rideStore.updatePOIs(filtered)
-                                routeStore.selectedPOIs = routeStore.selectedPOIs.filter { $0.id != poi.id }
+                                // Bug 3 fix: delete from BOTH stores so the
+                                // onChange(of: routeStore.selectedPOIs) observer
+                                // in ridingLayout fires and calls rideStore.updatePOIs.
+                                // This is the single authoritative delete path.
+                                routeStore.selectedPOIs.removeAll { $0.id == poi.id }
                                 routeStore.savePOIs()
+                                // rideStore.pois is updated reactively via the
+                                // onChange(of: routeStore.selectedPOIs) observer.
                                 pendingDeletePOI = nil
                             } else {
-                                // First long-press — highlight red, pause camera 3s
                                 pendingDeletePOI = poi
                                 pauseCameraTracking(for: poi.id)
                             }
@@ -864,14 +856,6 @@ struct RideView: View {
         }
     }
 
-    // F-2b / Issue 1 fix: Capture the triggering POI's id at task-creation time.
-    // The auto-cancel only clears pendingDeletePOI if it still refers to the
-    // same POI — prevents a rapid double-long-press on two different annotations
-    // from wiping the second POI's pending state prematurely.
-    //
-    // Issue 2 fix: pendingDeletePOI being non-nil also gates updateRidingCamera
-    // in .onChange(of: currentCoordinate) so the map does not pan away during
-    // the 3s interaction window.
     private func pauseCameraTracking(for poiID: UUID) {
         cameraPauseTask?.cancel()
         cameraPauseTask = Task {

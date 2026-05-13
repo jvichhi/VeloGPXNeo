@@ -6,10 +6,13 @@
 //  Height is controlled by PlanView's drawerHeight state; this view
 //  must NOT stretch beyond its given space.
 //
-//  PlaceDescriptorService wired May 13, 2026:
-//  Waypoint rows now show resolved place names (via MKReverseGeocodingRequest)
-//  instead of raw lat/lon strings. Resolution is lazy — triggered once per
-//  waypoint on first appearance, result cached in resolvedNames dictionary.
+//  Bug 1 fix (May 13 2026): swipe-to-delete was silently swallowed
+//  by the always-active editMode reorder chrome. EditMode is now
+//  OFF by default and toggled by a toolbar-style button that appears
+//  only when there are 2+ waypoints (the minimum needed for reorder
+//  to be meaningful). Swipe-to-delete works in both normal and edit mode.
+//
+//  PlaceDescriptorService wired May 13, 2026.
 //
 
 import SwiftUI
@@ -31,12 +34,10 @@ struct WaypointListSheet: View {
     @State private var showSaveAlert = false
     @State private var routeName = ""
     @State private var savedRouteName: String? = nil
-    // editMode drives drag-reorder only; delete is via swipeActions so
-    // the leading swipe is never eaten by the edit-mode selection chrome.
-    @State private var editMode: EditMode = .active
+    // Bug 1 fix: editMode is OFF by default. Swipe-to-delete works without
+    // entering edit mode. The "Reorder" button appears only when count >= 2.
+    @State private var editMode: EditMode = .inactive
     // PlaceDescriptorService results — keyed by waypoint UUID.
-    // Resolution is async and lazy; entries are populated one at a time
-    // as they complete so the list stays responsive during network calls.
     @State private var resolvedNames: [UUID: String] = [:]
 
     var body: some View {
@@ -59,11 +60,9 @@ struct WaypointListSheet: View {
     // MARK: - Planning Content
 
     private var planningContent: some View {
-        // alignment: .top ensures the header is always pinned to the top of
-        // the drawer frame regardless of how much content is below it.
         VStack(alignment: .leading, spacing: 0) {
 
-            // ── Header row: always visible at every drawer height ──
+            // ── Header row ──────────────────────────────────────────────────
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Plan Route")
@@ -82,9 +81,25 @@ struct WaypointListSheet: View {
                     .foregroundStyle(plan.waypoints.isEmpty ? .tertiary : .secondary)
                 }
                 Spacer()
+
+                // Bug 1: Reorder button only appears with 2+ waypoints and
+                // when the drawer is not collapsed. Tapping toggles editMode
+                // so drag handles appear on each row.
+                if plan.waypoints.count >= 2 && !isCollapsed {
+                    Button {
+                        editMode = editMode == .active ? .inactive : .active
+                    } label: {
+                        Text(editMode == .active ? "Done" : "Reorder")
+                            .font(.subheadline)
+                            .foregroundStyle(.blue)
+                    }
+                    .padding(.trailing, 8)
+                }
+
                 Button {
                     plan.clearAll()
                     resolvedNames.removeAll()
+                    editMode = .inactive
                 } label: {
                     Text("Clear")
                         .font(.subheadline)
@@ -96,7 +111,6 @@ struct WaypointListSheet: View {
             .padding(.top, 4)
             .padding(.bottom, 10)
 
-            // ── Everything below hidden when drawer is at peek height ──
             if !isCollapsed {
                 Divider()
 
@@ -130,8 +144,6 @@ struct WaypointListSheet: View {
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
                     VStack(alignment: .leading, spacing: 1) {
-                        // Show resolved place name when available; fall back to
-                        // raw coordinate string while the async lookup is in flight.
                         Text(resolvedNames[wp.id] ?? (wp.name ?? coordinateLabel(wp.coordinate)))
                             .font(.subheadline)
                             .lineLimit(1)
@@ -140,7 +152,6 @@ struct WaypointListSheet: View {
                             .foregroundStyle(.tertiary)
                     }
                     Spacer()
-                    // Spinner while resolution is in-flight
                     if resolvedNames[wp.id] == nil && wp.name == nil {
                         ProgressView()
                             .scaleEffect(0.6)
@@ -150,18 +161,13 @@ struct WaypointListSheet: View {
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
                 .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
-                // Swipe-to-delete via swipeActions so the gesture is never
-                // swallowed by editMode's reorder chrome.
+                // Bug 1 fix: swipeActions now work reliably because editMode
+                // is inactive by default. Swipe delete is available in BOTH
+                // inactive (normal swipe) and active (drag-handle) modes.
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
-                        let id = wp.id
-                        let bridgeIndex = max(0, index - 1)
-                        resolvedNames.removeValue(forKey: id)
-                        plan.removeWaypoint(id: id)
-                        Task {
-                            if plan.waypoints.count >= 2 {
-                                await engine.refreshSegments(in: plan, affectedWaypointIndices: [bridgeIndex])
-                            }
+                        withAnimation {
+                            deleteWaypoint(id: wp.id, index: index)
                         }
                     } label: {
                         Label("Delete", systemImage: "trash")
@@ -179,7 +185,25 @@ struct WaypointListSheet: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, $editMode)
+        // Bug 1: when the last waypoint is removed by swipe, exit edit mode
+        // so the empty-prompt can display without a dangling reorder chrome.
+        .onChange(of: plan.waypoints.count) { _, count in
+            if count < 2 { editMode = .inactive }
+        }
         .frame(maxHeight: CGFloat(min(plan.waypoints.count, 5)) * 52)
+    }
+
+    // MARK: - Delete Helper
+
+    private func deleteWaypoint(id: UUID, index: Int) {
+        let bridgeIndex = max(0, index - 1)
+        resolvedNames.removeValue(forKey: id)
+        plan.removeWaypoint(id: id)
+        Task {
+            if plan.waypoints.count >= 2 {
+                await engine.refreshSegments(in: plan, affectedWaypointIndices: [bridgeIndex])
+            }
+        }
     }
 
     // MARK: - Empty Prompt
@@ -317,22 +341,16 @@ struct WaypointListSheet: View {
 
     // MARK: - PlaceDescriptorService Integration
 
-    /// Resolves a waypoint coordinate to a human-readable place name via
-    /// PlaceDescriptorService (MKReverseGeocodingRequest primary, MKLocalSearch fallback).
-    /// No-ops if the waypoint already has a name or has already been resolved.
     @available(iOS 26, *)
     private func resolveNameIfNeeded(for wp: WaypointPoint) async {
-        // Skip if already resolved or the waypoint carried an embedded name
         guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
         let resolved = await PlaceDescriptorService.shared.resolve(wp)
-        // Guard against stale updates if waypoint was removed while in-flight
         guard plan.waypoints.contains(where: { $0.id == wp.id }) else { return }
         resolvedNames[wp.id] = resolved.name
     }
 
-    /// iOS <26 fallback — no resolution; raw coordinate label is shown.
     private func resolveNameIfNeeded(for wp: WaypointPoint) async {
-        // PlaceDescriptorService requires iOS 26+; nothing to do on older OS.
+        // PlaceDescriptorService requires iOS 26+.
     }
 
     // MARK: - Helpers
