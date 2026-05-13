@@ -86,10 +86,10 @@ struct RouteLibraryView: View {
                 }
 
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    // Use pendingRideRoute so RootView handles selectedRoute +
+                    // POI load + tab switch atomically (mirrors routeToEditInPlan).
                     Button {
-                        withAnimation(.spring(duration: 0.3)) {
-                            routeStore.selectedRoute = route
-                        }
+                        routeStore.pendingRideRoute = route
                     } label: {
                         Label("Ride", systemImage: "bicycle")
                     }
@@ -107,7 +107,7 @@ struct RouteLibraryView: View {
 
                 .contextMenu {
                     Button {
-                        withAnimation { routeStore.selectedRoute = route }
+                        routeStore.pendingRideRoute = route
                     } label: {
                         Label("Ride This Route", systemImage: "bicycle")
                     }
