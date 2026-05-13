@@ -1,3 +1,4 @@
+
 //
 //  RideView.swift
 //  VeloGPX
@@ -229,7 +230,14 @@ struct RideView: View {
             preRideClimbs = route.detectClimbs()
             Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
-        .onChange(of: route.id) { _ in
+        // FIX: re-fit camera when the selected route changes.
+        // .onAppear fires only once (first mount of RideView). If the user
+        // selects a different route in RouteLibraryView and returns here,
+        // the view is already alive so .onAppear is skipped — leaving the
+        // map centred on the previous route. Adding fitCameraToRoute here
+        // ensures the map always snaps to the new route's bounding box.
+        .onChange(of: route.id) { _, _ in
+            fitCameraToRoute(route)
             preRideClimbs = route.detectClimbs()
             Task { preRideCues = await GPXCueEngine.shared.generateCues(for: route) }
         }
