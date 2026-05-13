@@ -47,7 +47,6 @@ struct RouteLibraryView: View {
     }
 
     // MARK: - Route List
-    // swipeActions ONLY work on List rows — LazyVStack/ScrollView rows silently ignore them.
 
     private var routeList: some View {
         List {
@@ -64,7 +63,6 @@ struct RouteLibraryView: View {
                 .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                 .listRowSeparator(.hidden)
 
-                // ── Trailing: Delete ──
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         routeStore.deleteRoute(route)
@@ -73,7 +71,6 @@ struct RouteLibraryView: View {
                     }
                 }
 
-                // ── Leading: Ride (full-swipe) + Plan (planned routes only) ──
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
                         withAnimation(.spring(duration: 0.3)) {
@@ -123,29 +120,101 @@ struct RouteLibraryView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
-                Image(systemName: "list.bullet.below.rectangle")
-                    .font(.system(size: 30)).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Icon + headline
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle().fill(Color(.systemGray5)).frame(width: 72, height: 72)
+                        Image(systemName: "list.bullet.below.rectangle")
+                            .font(.system(size: 30)).foregroundStyle(.secondary)
+                    }
+                    VStack(spacing: 6) {
+                        Text("No routes yet").font(.title3.bold())
+                        Text("Import a GPX or GeoJSON, or use the Plan tab to build one.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Button { isImporterPresented = true } label: {
+                        Label("Import a Route", systemImage: "square.and.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 20).padding(.vertical, 12)
+                            .background(.blue, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                }
+                .padding(.top, 60)
+
+                // Tip card
+                ImportTipCard()
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
             }
-            VStack(spacing: 6) {
-                Text("No routes yet").font(.title3.bold())
-                Text("Import a GPX or GeoJSON, or use the Plan tab to build one.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            Button { isImporterPresented = true } label: {
-                Label("Import a Route", systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 20).padding(.vertical, 12)
-                    .background(.blue, in: Capsule())
-                    .foregroundStyle(.white)
-            }
+            .frame(maxWidth: .infinity)
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - Import Tip Card
+
+private struct ImportTipCard: View {
+    private struct TipRow: Identifiable {
+        let id = UUID()
+        let icon: String
+        let text: String
+    }
+
+    private let rows: [TipRow] = [
+        .init(icon: "doc.badge.arrow.up",
+              text: "Export a GPX or GeoJSON file from any route planning app."),
+        .init(icon: "apps.iphone",
+              text: "Supported sources: Komoot, Strava, Ride with GPS, Garmin Connect, AllTrails, and more."),
+        .init(icon: "square.and.arrow.down",
+              text: "Tap \u{2b} above or the Import button, then pick the file from Files, Mail, or AirDrop."),
+        .init(icon: "map",
+              text: "Prefer to build your own? Head to the Plan tab to draw a route from scratch."),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.orange)
+                Text("How to add routes")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            Divider().padding(.horizontal, 16)
+
+            // Tip rows
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(rows) { row in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: row.icon)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(row.text)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+        }
     }
 }
 
@@ -157,7 +226,6 @@ private struct RouteRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Icon badge
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(iconTint.opacity(isActive ? 0.18 : 0.10))
@@ -167,7 +235,6 @@ private struct RouteRow: View {
                     .foregroundStyle(isActive ? iconTint : iconTint.opacity(0.7))
             }
 
-            // Text
             VStack(alignment: .leading, spacing: 4) {
                 Text(route.name)
                     .font(.subheadline.weight(.semibold))
@@ -191,7 +258,6 @@ private struct RouteRow: View {
 
             Spacer()
 
-            // Active indicator / chevron
             if isActive {
                 ZStack {
                     Circle().fill(Color.blue).frame(width: 22, height: 22)
@@ -224,8 +290,6 @@ private struct RouteRow: View {
 }
 
 // MARK: - Pill Badge
-// `filled: true`  → solid `color` background, white text
-// `filled: false` → systemGray5 background, secondary text  (default)
 
 private struct PillBadge: View {
     let icon: String
