@@ -13,7 +13,6 @@
 		972D59002FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		972D59152FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
 		972D59162FB3FB6200B5BD63 /* RideActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */; };
-		972D59272FB40F5000B5BD63 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D59252FB40F4800B5BD63 /* CoreMotion.framework */; };
 		978915242F9C9AF30047D8F7 /* NextPOIBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */; };
 		978915252F9C9AF30047D8F7 /* NearbySearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */; };
 		978915262F9C9AF30047D8F7 /* POIDiscoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */; };
@@ -69,8 +68,9 @@
 		97F812B22F94705A0068A42A /* RideState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F812792F9468CE0068A42A /* RideState.swift */; };
 		97F812B32F9470600068A42A /* RouteModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127A2F9468CE0068A42A /* RouteModel.swift */; };
 		97F812B42F9470660068A42A /* WatchRideSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127B2F9468CE0068A42A /* WatchRideSummary.swift */; };
-		97F812B52F9470700068A42A /* GeoJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127D2F9468CE0068A42A /* GeoJSONParser.swift */; };
+		97F812B52F94706B0068A42A /* GeoJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127D2F9468CE0068A42A /* GeoJSONParser.swift */; };
 		97F812B62F9470700068A42A /* GPXParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F8127E2F9468CE0068A42A /* GPXParser.swift */; };
+		97F812B92F948CB00068A42A /* RideSessionStore.swift (corrected section) in Resources */ = {isa = PBXBuildFile; fileRef = 97F812B82F948CB00068A42A /* RideSessionStore.swift (corrected section) */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -121,7 +121,6 @@
 		972D58F02FB3F98300B5BD63 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		972D58F22FB3F98300B5BD63 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		972D59142FB3FB6200B5BD63 /* RideActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideActivityAttributes.swift; sourceTree = "<group>"; };
-		972D59252FB40F4800B5BD63 /* CoreMotion.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework; path = System/Library/Frameworks/CoreMotion.framework; sourceTree = SDKROOT; };
 		978915212F9C9AF30047D8F7 /* NearbySearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySearchSheet.swift; sourceTree = "<group>"; };
 		978915222F9C9AF30047D8F7 /* NextPOIBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPOIBanner.swift; sourceTree = "<group>"; };
 		978915232F9C9AF30047D8F7 /* POIDiscoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIDiscoverySheet.swift; sourceTree = "<group>"; };
@@ -184,6 +183,7 @@
 		97F812842F9468CE0068A42A /* WatchRideStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRideStore.swift; sourceTree = "<group>"; };
 		97F8129C2F9469470068A42A /* VeloGPXWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "VeloGPXWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97F812B72F9480CA0068A42A /* VeloGPX-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "VeloGPX-Info.plist"; sourceTree = "<group>"; };
+		97F812B82F948CB00068A42A /* RideSessionStore.swift (corrected section) */ = {isa = PBXFileReference; lastKnownFileType = text; path = "RideSessionStore.swift (corrected section)"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -226,7 +226,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				972D59272FB40F5000B5BD63 /* CoreMotion.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,7 +242,6 @@
 		972D58EF2FB3F98300B5BD63 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				972D59252FB40F4800B5BD63 /* CoreMotion.framework */,
 				972D58F02FB3F98300B5BD63 /* WidgetKit.framework */,
 				972D58F22FB3F98300B5BD63 /* SwiftUI.framework */,
 			);
@@ -418,6 +416,7 @@
 				97F812822F9468CE0068A42A /* Views */,
 				97F812832F9468CE0068A42A /* VeloGPXWatchApp.swift */,
 				97F812842F9468CE0068A42A /* WatchRideStore.swift */,
+				97F812B82F948CB00068A42A /* RideSessionStore.swift (corrected section) */,
 			);
 			path = Watch;
 			sourceTree = "<group>";
@@ -569,6 +568,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				97F812B92F948CB00068A42A /* RideSessionStore.swift (corrected section) in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -636,16 +636,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				97F812AD2F94701E0068A42A /* WatchRideStore.swift in Sources */,
-				97F812AE2F94702E0068A42A /* WatchRideView.swift in Sources */,
-				97F812AF2F9470400068A42A /* VeloGPXWatchApp.swift in Sources */,
-				97F812B02F94704F0068A42A /* CLLocationCoordinate2D+Extensions.swift in Sources */,
-				97F812B12F9470550068A42A /* POIModel.swift in Sources */,
-				97F812B22F94705A0068A42A /* RideState.swift in Sources */,
-				97F812B32F9470600068A42A /* RouteModel.swift in Sources */,
 				97F812B42F9470660068A42A /* WatchRideSummary.swift in Sources */,
-				97F812B52F9470700068A42A /* GeoJSONParser.swift in Sources */,
+				97F812AF2F9470400068A42A /* VeloGPXWatchApp.swift in Sources */,
 				97F812B62F9470700068A42A /* GPXParser.swift in Sources */,
+				9789154C2F9D64890047D8F7 /* RideSummary.swift in Sources */,
+				9789155F2F9DD0080047D8F7 /* TimeInterval+Formatting.swift in Sources */,
+				97F812B02F94704F0068A42A /* CLLocationCoordinate2D+Extensions.swift in Sources */,
+				97F812AE2F94702E0068A42A /* WatchRideView.swift in Sources */,
+				97F812B32F9470600068A42A /* RouteModel.swift in Sources */,
+				97F812B52F94706B0068A42A /* GeoJSONParser.swift in Sources */,
+				978915672F9DDB8C0047D8F7 /* LocalizationManager.swift in Sources */,
+				978915502F9D64A40047D8F7 /* GPXExporter.swift in Sources */,
+				97F812B12F9470550068A42A /* POIModel.swift in Sources */,
+				97F812AD2F94701E0068A42A /* WatchRideStore.swift in Sources */,
+				97F812B22F94705A0068A42A /* RideState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -684,7 +688,7 @@
 				9789159A2F9E794B0047D8F7 /* sv */,
 				9789159B2F9E794B0047D8F7 /* zh-Hans */,
 			);
-			name = "Localizable.strings";
+			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -693,36 +697,67 @@
 		972D59032FB3F98300B5BD63 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivityExtension;
+				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX.VeloGPXLiveActivityExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.VeloGPXLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
 		972D59042FB3F98300B5BD63 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivityExtension;
+				INFOPLIST_FILE = VeloGPXLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXLiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX.VeloGPXLiveActivityExtension";
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.VeloGPXLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -761,6 +796,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = DCMGV2B253;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -778,11 +814,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -823,6 +858,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = DCMGV2B253;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -834,9 +870,9 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -846,20 +882,49 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iPhone/VeloGPX.entitlements;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
-				DEVELOPMENT_ASSET_PATHS = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "VeloGPX-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX";
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPX;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "\"VeloGPX uses your location to track rides in the background\"";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"VeloGPX uses your location to track your ride\"";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				XROS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Debug;
 		};
@@ -868,20 +933,49 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iPhone/VeloGPX.entitlements;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
-				DEVELOPMENT_ASSET_PATHS = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "VeloGPX-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX";
+				INFOPLIST_KEY_CFBundleDisplayName = VeloGPX;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "\"VeloGPX uses your location to track rides in the background\"";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"VeloGPX uses your location to track your ride\"";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				XROS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Release;
 		};
@@ -890,20 +984,35 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "VeloGPXWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXWatch;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX.watchkitapp";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = jvic.VeloGPX;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
 		};
@@ -912,20 +1021,36 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DCMGV2B253;
+				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "VeloGPXWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VeloGPXWatch;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.jvichhi.VeloGPX.watchkitapp";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = jvic.VeloGPX;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = jvic.VeloGPX.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
