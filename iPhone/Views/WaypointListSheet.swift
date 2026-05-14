@@ -2,8 +2,8 @@
 //  WaypointListSheet.swift
 //  VeloGPX
 //
-//  Embedded in PlanView’s bottom drawer — NOT a .sheet presentation.
-//  Height is controlled by PlanView’s drawerHeight state; this view
+//  Embedded in PlanView's bottom drawer — NOT a .sheet presentation.
+//  Height is controlled by PlanView's drawerHeight state; this view
 //  must NOT stretch beyond its given space.
 //
 //  Bug 1 fix (May 13 2026): swipe-to-delete was silently swallowed
@@ -177,7 +177,8 @@ struct WaypointListSheet: View {
 
     /// Returns the best available display name for a waypoint.
     /// Extracted from the view builder to avoid type-checker complexity timeouts.
-    private func displayName(for wp: WaypointPoint) -> String {
+    /// PlanWaypoint.coordinate is already CLLocationCoordinate2D — no bridging needed.
+    private func displayName(for wp: PlanWaypoint) -> String {
         if let resolved = resolvedNames[wp.id] { return resolved }
         if let name = wp.name { return name }
         return coordinateLabel(wp.coordinate)
@@ -332,11 +333,12 @@ struct WaypointListSheet: View {
     // MARK: - PlaceDescriptorService Integration
 
     // No @available needed — iOS 26 is our minimum deployment target.
-    private func resolveNameIfNeeded(for wp: WaypointPoint) async {
+    // PlanWaypoint.coordinate is CLLocationCoordinate2D — passed directly, no .clCoordinate bridge.
+    private func resolveNameIfNeeded(for wp: PlanWaypoint) async {
         guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
-        let resolved = await PlaceDescriptorService.shared.resolve(wp)
+        let resolved = await PlaceDescriptorService.shared.resolve(coordinate: wp.coordinate)
         guard plan.waypoints.contains(where: { $0.id == wp.id }) else { return }
-        resolvedNames[wp.id] = resolved.name
+        resolvedNames[wp.id] = resolved
     }
 
     // MARK: - Helpers
