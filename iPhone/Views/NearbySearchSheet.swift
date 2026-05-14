@@ -7,11 +7,11 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Café"
+    @State private var selectedCategory = "Caf\u00e9"
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Café",        "cup.and.saucer.fill",      "Café"),
+        ("Caf\u00e9",        "cup.and.saucer.fill",      "Caf\u00e9"),
         ("Water",       "drop.fill",                "Water"),
         ("Bike Shop",   "wrench.and.screwdriver",   "Bike Shop"),
         ("Restaurant",  "fork.knife",               "Restaurant")
@@ -114,16 +114,7 @@ struct NearbySearchSheet: View {
         if let idx = routeStore.selectedPOIs.firstIndex(where: { $0.id == id }) {
             routeStore.selectedPOIs.remove(at: idx)
         } else {
-            let poi = POIModel(
-                id: id,
-                name: item.name ?? "POI",
-                category: category(for: selectedCategory),
-                coordinate: item.poiCoordinate,
-                distanceFromRoute: 0,
-                address: item.shortAddress,
-                phone: item.phoneNumber,
-                website: item.url?.absoluteString
-            )
+            let poi = item.toPOIModel(category: category(for: selectedCategory))
             routeStore.selectedPOIs.append(poi)
         }
     }
@@ -150,7 +141,7 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Café":        return .cafe
+        case "Caf\u00e9":        return .cafe
         case "Water":       return .water
         case "Bike Shop":   return .bikeRepair
         case "Restaurant":  return .restaurant
@@ -167,6 +158,8 @@ private struct NearbyResultCard: View {
     let categoryIcon: String
     let isAdded: Bool
     let onToggle: () -> Void
+
+    @Environment(\.openURL) private var openURL
 
     private var distanceMeters: CLLocationDistance {
         CLLocation(latitude: searchCoordinate.latitude, longitude: searchCoordinate.longitude)
@@ -209,17 +202,30 @@ private struct NearbyResultCard: View {
 
             Spacer()
 
-            Button(action: onToggle) {
-                ZStack {
-                    Circle()
-                        .fill(isAdded ? Color.blue : Color(.systemGray5))
-                        .frame(width: 34, height: 34)
-                    Image(systemName: isAdded ? "checkmark" : "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(isAdded ? .white : .secondary)
+            VStack(spacing: 6) {
+                Button(action: onToggle) {
+                    ZStack {
+                        Circle()
+                            .fill(isAdded ? Color.blue : Color(.systemGray5))
+                            .frame(width: 34, height: 34)
+                        Image(systemName: isAdded ? "checkmark" : "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(isAdded ? .white : .secondary)
+                    }
+                }
+                .animation(.spring(duration: 0.25), value: isAdded)
+
+                if let url = item.openInMapsActionURL() {
+                    Button {
+                        openURL(url)
+                    } label: {
+                        Image(systemName: "map")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.blue)
+                    }
+                    .accessibilityLabel("Open in Maps")
                 }
             }
-            .animation(.spring(duration: 0.25), value: isAdded)
         }
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
