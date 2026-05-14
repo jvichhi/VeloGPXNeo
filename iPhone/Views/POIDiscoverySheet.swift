@@ -11,7 +11,7 @@ struct POIDiscoverySheet: View {
     @State private var selectedCategory: String? = nil
 
     private let categories: [(label: String, icon: String)] = [
-        ("Caf\u00e9",       "cup.and.saucer.fill"),
+        ("Café",       "cup.and.saucer.fill"),
         ("Water",      "drop.fill"),
         ("Bike Shop",  "wrench.and.screwdriver"),
         ("Restaurant", "fork.knife"),
@@ -54,7 +54,7 @@ struct POIDiscoverySheet: View {
 
                 Group {
                     if isLoading {
-                        ProgressView("Searching near route start\u{2026}")
+                        ProgressView("Searching near route start…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty && selectedCategory != nil {
                         VStack(spacing: 14) {
@@ -76,7 +76,7 @@ struct POIDiscoverySheet: View {
                                 .foregroundStyle(.blue.opacity(0.6))
                             Text("Pick a category above")
                                 .font(.subheadline.weight(.medium))
-                            Text("We\u{2019}ll search near the route start.")
+                            Text("We'll search near the route start.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -100,7 +100,7 @@ struct POIDiscoverySheet: View {
             }
             .navigationTitle("Discover POIs")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchQuery, prompt: "Search near route start\u{2026}")
+            .searchable(text: $searchQuery, prompt: "Search near route start…")
             .onSubmit(of: .search) {
                 selectedCategory = nil
                 Task { await search() }
@@ -148,7 +148,7 @@ struct POIDiscoverySheet: View {
             }
         }
         let name = item.name?.lowercased() ?? ""
-        if name.contains("caf\u00e9") || name.contains("cafe") || name.contains("coffee") { return .cafe }
+        if name.contains("café") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
         if name.contains("restaurant") || name.contains("food") { return .restaurant }
         if name.contains("pharmacy") { return .pharmacy }
@@ -204,9 +204,9 @@ private struct POIDiscoveryResultCard: View {
             }
             .buttonStyle(.plain)
 
-            if let url = item.openInMapsActionURL() {
+            if let mapsURL = item.toPOIModel(category: .custom).mapsURL {
                 Button {
-                    openURL(url)
+                    openURL(mapsURL)
                 } label: {
                     Image(systemName: "map")
                         .font(.system(size: 14))

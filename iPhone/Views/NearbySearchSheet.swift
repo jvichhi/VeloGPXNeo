@@ -7,14 +7,14 @@ struct NearbySearchSheet: View {
 
     @State private var results: [MKMapItem] = []
     @State private var isLoading = false
-    @State private var selectedCategory = "Caf\u00e9"
+    @State private var selectedCategory = "Café"
     @State private var hasInvalidCoordinate = false
 
     private let categories: [(label: String, icon: String, query: String)] = [
-        ("Caf\u00e9",        "cup.and.saucer.fill",      "Caf\u00e9"),
-        ("Water",       "drop.fill",                "Water"),
-        ("Bike Shop",   "wrench.and.screwdriver",   "Bike Shop"),
-        ("Restaurant",  "fork.knife",               "Restaurant")
+        ("Café",       "cup.and.saucer.fill",    "Café"),
+        ("Water",      "drop.fill",              "Water"),
+        ("Bike Shop",  "wrench.and.screwdriver", "Bike Shop"),
+        ("Restaurant", "fork.knife",             "Restaurant")
     ]
 
     var body: some View {
@@ -65,7 +65,7 @@ struct NearbySearchSheet: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if isLoading {
-                        ProgressView("Searching\u{2026}")
+                        ProgressView("Searching…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if results.isEmpty {
                         VStack(spacing: 14) {
@@ -141,7 +141,7 @@ struct NearbySearchSheet: View {
 
     private func category(for query: String) -> POICategory {
         switch query {
-        case "Caf\u00e9":        return .cafe
+        case "Café":        return .cafe
         case "Water":       return .water
         case "Bike Shop":   return .bikeRepair
         case "Restaurant":  return .restaurant
@@ -215,9 +215,9 @@ private struct NearbyResultCard: View {
                 }
                 .animation(.spring(duration: 0.25), value: isAdded)
 
-                if let url = item.openInMapsActionURL() {
+                if let mapsURL = item.toPOIModel(category: .custom).mapsURL {
                     Button {
-                        openURL(url)
+                        openURL(mapsURL)
                     } label: {
                         Image(systemName: "map")
                             .font(.system(size: 11, weight: .medium))

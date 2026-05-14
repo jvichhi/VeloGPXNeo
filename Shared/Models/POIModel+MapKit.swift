@@ -3,7 +3,7 @@
 //  VeloGPX (iPhone only — uses MapKit APIs not available on watchOS)
 //
 //  Factory that builds a POIModel from an MKMapItem, capturing the stable
-//  place identifier and Maps deep-link URL at the moment of search so both
+//  place identifier and a Maps deep-link URL at the moment of search so both
 //  survive serialisation to disk.
 //
 
@@ -21,8 +21,7 @@ public extension MKMapItem {
         distanceFromRoute: Double = 0
     ) -> POIModel {
         // Stable identifier — available on iOS 18+.
-        // We target iOS 26 so this branch is always taken, but the guard
-        // keeps the compiler happy without a deployment target annotation.
+        // We target iOS 26 so this branch is always taken.
         let identifier: String?
         if #available(iOS 18, *) {
             identifier = self.identifier?.rawValue
@@ -30,15 +29,17 @@ public extension MKMapItem {
             identifier = nil
         }
 
-        // Apple Maps deep-link — openInMapsActionURL() is iOS 17+, always
-        // present on our iOS 26 minimum target.
-        let mapsURL = self.openInMapsActionURL()
+        // Build a maps:// deep-link from the item's coordinate.
+        // MKMapItem has no openInMapsActionURL() method — construct the URL manually.
+        let coord = poiCoordinate
+        let encodedName = (name ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let mapsURL = URL(string: "maps://?ll=\(coord.latitude),\(coord.longitude)&q=\(encodedName)")
 
         return POIModel(
             id: deterministicPOIID,
             name: name ?? "POI",
             category: category,
-            coordinate: poiCoordinate,
+            coordinate: coord,
             distanceFromRoute: distanceFromRoute,
             address: shortAddress,
             phone: phoneNumber,
