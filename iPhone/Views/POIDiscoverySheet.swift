@@ -11,7 +11,7 @@ struct POIDiscoverySheet: View {
     @State private var selectedCategory: String? = nil
 
     private let categories: [(label: String, icon: String)] = [
-        ("Café",       "cup.and.saucer.fill"),
+        ("Caf\u00e9",       "cup.and.saucer.fill"),
         ("Water",      "drop.fill"),
         ("Bike Shop",  "wrench.and.screwdriver"),
         ("Restaurant", "fork.knife"),
@@ -126,15 +126,9 @@ struct POIDiscoverySheet: View {
     private func addPOI(from item: MKMapItem) {
         let id = item.deterministicPOIID
         guard !routeStore.selectedPOIs.contains(where: { $0.id == id }) else { return }
-        let poi = POIModel(
-            id: id,
-            name: item.name ?? "Unknown",
+        let poi = item.toPOIModel(
             category: categoryFromMapItem(item),
-            coordinate: item.poiCoordinate,
-            distanceFromRoute: 0,
-            address: item.shortAddress,
-            phone: item.phoneNumber,
-            website: item.url?.absoluteString
+            distanceFromRoute: 0
         )
         routeStore.selectedPOIs.append(poi)
     }
@@ -154,7 +148,7 @@ struct POIDiscoverySheet: View {
             }
         }
         let name = item.name?.lowercased() ?? ""
-        if name.contains("café") || name.contains("cafe") || name.contains("coffee") { return .cafe }
+        if name.contains("caf\u00e9") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
         if name.contains("restaurant") || name.contains("food") { return .restaurant }
         if name.contains("pharmacy") { return .pharmacy }
@@ -173,41 +167,58 @@ private struct POIDiscoveryResultCard: View {
     let categoryIcon: String
     let onTap: () -> Void
 
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: isAdded ? "checkmark" : categoryIcon)
-                        .font(.system(size: 17, weight: isAdded ? .bold : .regular))
+        HStack(spacing: 12) {
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: isAdded ? "checkmark" : categoryIcon)
+                            .font(.system(size: 17, weight: isAdded ? .bold : .regular))
+                            .foregroundStyle(isAdded ? .green : .blue)
+                    }
+                    .animation(.spring(duration: 0.25), value: isAdded)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.name ?? "Unknown")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        if let address = item.shortAddress {
+                            Text(address)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Spacer()
+
+                    Text(isAdded ? "Added" : "Add")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(isAdded ? .green : .blue)
                 }
-                .animation(.spring(duration: 0.25), value: isAdded)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.name ?? "Unknown")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    if let address = item.shortAddress {
-                        Text(address)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-
-                Text(isAdded ? "Added" : "Add")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isAdded ? .green : .blue)
             }
-            .padding(12)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.05), radius: 4, y: 1)
+            .buttonStyle(.plain)
+
+            if let url = item.openInMapsActionURL() {
+                Button {
+                    openURL(url)
+                } label: {
+                    Image(systemName: "map")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .padding(8)
+                        .background(Color(.systemGray6), in: Circle())
+                }
+                .accessibilityLabel("Open in Maps")
+            }
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 1)
     }
 }
