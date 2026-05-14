@@ -13,7 +13,7 @@
 | **Platform** | iOS + Apple Watch (paired) |
 | **Category** | `public.app-category.navigation` |
 | **Bundle ID** | `jvic.VeloGPX` |
-| **Team ID** | `DCMGV2B253` |
+| **Team** | Jehan Vichhi (`DCMGV2B253`) |
 | **Tagline** | Native iOS + Apple Watch cycling GPS companion. Import GPX/GeoJSON routes, get POI alerts along your route, never get lost on the bike. |
 
 ---
@@ -32,7 +32,7 @@
 
 | Setting | Value |
 |---|---|
-| **Xcode version** | 26.4.1 (all targets created on `26.4.1`) |
+| **Xcode SDK used** | 26.4.1 |
 | **objectVersion / preferredProjectObjectVersion** | 77 |
 | **Swift version** | `SWIFT_VERSION = 5.0` (Swift 6 mode via `SWIFT_APPROACHABLE_CONCURRENCY = YES`) |
 | **Default actor isolation** | `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (iPhone + Watch targets) |
@@ -54,8 +54,6 @@
 |---|---|
 | **Bundle ID** | `jvic.VeloGPX` |
 | **Deployment target** | `IPHONEOS_DEPLOYMENT_TARGET = 26.0` |
-| **macOS deployment** | `MACOSX_DEPLOYMENT_TARGET = 26.4` |
-| **xrOS deployment** | `XROS_DEPLOYMENT_TARGET = 26.4` |
 | **Supported platforms** | `iphoneos iphonesimulator` |
 | **Device family** | `1` (iPhone only) |
 | **Orientations (iPhone)** | Portrait, LandscapeLeft, LandscapeRight |
@@ -196,7 +194,7 @@ VeloGPXNeo/
 
 ## Coding Conventions
 
-- **iOS 26 minimum — use new APIs freely.** No `#available(iOS 25, *)` guards.
+- **iOS 26.0 minimum — use new APIs freely.** No `#available` guards below 26.0.
 - **Exception:** Gate `MKMapItem.identifier` with `#available(iOS 18, *)` — additive enhancement on top of coordinate `deterministicID` fallback.
 - **Swift 6 strict concurrency** — `SWIFT_APPROACHABLE_CONCURRENCY = YES`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. New code must be actor-safe. Legacy violations tracked in `TECH_DEBT.md § AC-1/2/3`.
 - **No force-unwraps** in new code. Existing ones tracked in TECH_DEBT.
