@@ -34,10 +34,7 @@ struct WaypointListSheet: View {
     @State private var showSaveAlert = false
     @State private var routeName = ""
     @State private var savedRouteName: String? = nil
-    // Bug 1 fix: editMode is OFF by default. Swipe-to-delete works without
-    // entering edit mode. The “Reorder” button appears only when count >= 2.
     @State private var editMode: EditMode = .inactive
-    // PlaceDescriptorService results — keyed by waypoint UUID.
     @State private var resolvedNames: [UUID: String] = [:]
 
     var body: some View {
@@ -61,8 +58,6 @@ struct WaypointListSheet: View {
 
     private var planningContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-
-            // ── Header row ────────────────────────────────────────────────────────────────
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Plan Route")
@@ -82,8 +77,6 @@ struct WaypointListSheet: View {
                 }
                 Spacer()
 
-                // Bug 1: Reorder button only appears with 2+ waypoints and
-                // when the drawer is not collapsed.
                 if plan.waypoints.count >= 2 && !isCollapsed {
                     Button {
                         editMode = editMode == .active ? .inactive : .active
@@ -112,21 +105,12 @@ struct WaypointListSheet: View {
 
             if !isCollapsed {
                 Divider()
-
-                if plan.waypoints.isEmpty {
-                    emptyPrompt
-                } else {
-                    waypointList
-                }
-
+                if plan.waypoints.isEmpty { emptyPrompt } else { waypointList }
                 Divider()
-
                 closeLoopRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-
                 Divider()
-
                 actionRow
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -138,17 +122,18 @@ struct WaypointListSheet: View {
     // MARK: - Waypoint List
 
     private var waypointList: some View {
-        // Break the height calculation into a local let so the type-checker
-        // doesn’t time out on a single complex expression (PROJECT.md rule).
         let rowCount = min(plan.waypoints.count, 5)
         let listHeight = CGFloat(rowCount) * 52
 
         return List {
             ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
+                // Resolved name pulled into a helper so the type-checker
+                // doesn't time out on nested ?? inside a ForEach closure.
+                let label = displayName(for: wp)
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(resolvedNames[wp.id] ?? (wp.name ?? coordinateLabel(wp.coordinate)))
+                        Text(label)
                             .font(.subheadline)
                             .lineLimit(1)
                         Text(coordinateLabel(wp.coordinate))
@@ -167,9 +152,7 @@ struct WaypointListSheet: View {
                 .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
-                        withAnimation {
-                            deleteWaypoint(id: wp.id, index: index)
-                        }
+                        withAnimation { deleteWaypoint(id: wp.id, index: index) }
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
@@ -190,6 +173,14 @@ struct WaypointListSheet: View {
             if count < 2 { editMode = .inactive }
         }
         .frame(maxHeight: listHeight)
+    }
+
+    /// Returns the best available display name for a waypoint.
+    /// Extracted from the view builder to avoid type-checker complexity timeouts.
+    private func displayName(for wp: WaypointPoint) -> String {
+        if let resolved = resolvedNames[wp.id] { return resolved }
+        if let name = wp.name { return name }
+        return coordinateLabel(wp.coordinate)
     }
 
     // MARK: - Delete Helper
