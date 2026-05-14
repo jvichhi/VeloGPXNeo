@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 13, 2026 (end of night — synced to actual code state)
+> Last updated: May 13, 2026 (late night — Sprint 1 verified complete via code search)
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -15,48 +15,29 @@
 
 ---
 
-## Sprint 1 — Foundation & Debt Clearance
-> Goal: clean build with zero warnings and stable POI identity. Targets v1.3.
-> All remaining items are parallel-safe — they can be batched in any order.
+## ✅ Sprint 1 — Foundation & Debt Clearance
+> **COMPLETE** as of May 13, 2026. All items verified in source code.
 
-### ✅ Completed
-- [x] **MK-1** `MKPlacemark/init(placemark:)` → `MKMapItem(location:address:)` — resolved in code, documented May 13
-- [x] **MK-2** `MKMapItem.placemark` reads → `.location`/`.address` — resolved in code, documented May 13
-- [x] **MK-3** `CLGeocoder` → `MKReverseGeocodingRequest` — resolved in code, documented May 13
-- [x] **MK-4** `UIScreen.main` → `@Environment(\.displayScale)` + `GeometryReader` — resolved in code, documented May 13
+- [x] **MK-1** `MKPlacemark/init(placemark:)` → `MKMapItem(location:address:)` — verified in code
+- [x] **MK-2** `MKMapItem.placemark` reads → `.location`/`.address` — verified in code
+- [x] **MK-3** `CLGeocoder` → `MKReverseGeocodingRequest` — verified in code
+- [x] **MK-4** `UIScreen.main` → `@Environment(\.displayScale)` + `GeometryReader` — verified in code
 - [x] **MK-5** `POISearchService` typed `MKPointOfInterestFilter` — May 12
-- [x] **AC-1** Swift 6 `clCoordinate`/`route`/`distance(to:)` across async boundary — resolved in code, documented May 13
-- [x] **AC-2** Swift 6 `TurnInstruction.init` nonisolated — resolved in code, documented May 13
-- [x] **AC-3** `WatchRideSummary` `Decodable` on wrong actor — `a587b44`, May 13
-- [x] **MISC-2** Spurious `await` on `plan.loadFrom(route:)` — `cc8f2fc`, May 13
-- [x] **MISC-3** `AccentColor` missing from Assets catalog — `a587b44`, May 13
-
-### 🔲 Remaining (next session starts here)
-
-- [ ] **MISC-1 · `onChange(of:perform:)` → two-argument form**
-  `RideView.swift:232` — one-line fix.
-  → `TECH_DEBT.md § MISC-1`
-
-- [ ] **MISC-4 · Remove unused `windowMeters` immutable value**
-  `RouteModel.swift:190` (both targets) — delete or replace with `_`.
-  → `TECH_DEBT.md § MISC-4`
-
-- [ ] **MISC-5 · Extract duplicate `bearing()` haversine**
-  Create `Shared/Extensions/CLLocationCoordinate2D+Bearing.swift`. Remove duplicates from `RideSessionStore.swift` and `GPXCueEngine`.
-  → `TECH_DEBT.md § MISC-5`
-
-- [ ] **MISC-6 · Gate notification calls on `notificationsGranted` flag**
-  `RideSessionStore.swift:92` — store auth result, guard all `UNUserNotificationCenter.add(...)` calls.
-  → `TECH_DEBT.md § MISC-6`
-
-- [ ] **MK-6 / F-B · POIModel Place IDs + "Open in Maps"**
-  Add `mapItemIdentifier` + `mapsURL` to `POIModel`. New `POIModel+MapKit.swift` factory. Update `isAdded` in all three POI sheets. Add "Open in Maps" button to POI detail rows.
-  → `TECH_DEBT.md § MK-6` · `FEATURES.md § F-B` · `DEVLOG.md § Next to Code`
-  **Files:** `Shared/Models/POIModel.swift`, `Shared/Models/POIModel+MapKit.swift` (new), `NearbySearchSheet.swift`, `POIDiscoverySheet.swift`, `PreRidePOISheet.swift`
+- [x] **MK-6 / F-B** `POIModel` Place IDs + `mapsURL` + "Open in Maps" button — verified in build
+- [x] **AC-1** Swift 6 `clCoordinate`/`route`/`distance(to:)` across async boundary — verified in code
+- [x] **AC-2** Swift 6 `TurnInstruction.init` nonisolated — verified in code
+- [x] **AC-3** `WatchRideSummary` `Decodable` on wrong actor — `a587b44`
+- [x] **MISC-1** `onChange(of:perform:)` → two-argument form — verified in code (zero hits in Swift files)
+- [x] **MISC-2** Spurious `await` on `plan.loadFrom(route:)` — `cc8f2fc`
+- [x] **MISC-3** `AccentColor` missing from Assets catalog — `a587b44`
+- [x] **MISC-4** Unused `windowMeters` immutable value — verified in code (zero hits)
+- [x] **MISC-5** Duplicate `bearing()` haversine — verified in code (consolidated)
+- [x] **MISC-6** Notification auth result gating — verified in code
 
 ---
 
-## Sprint 2 — On-Device AI (FoundationModels, iOS 26)
+## 🔲 Sprint 2 — On-Device AI (FoundationModels, iOS 26)
+> **NEXT — start here next session.**
 > Goal: ship the three standalone AI features. Targets v1.3.
 > Add `FoundationModels` to Build Phases + `VeloAISession` shared wrapper first, then the three features can be built in any order.
 >
@@ -114,31 +95,24 @@
 
 - [ ] **P2 · `buildSnapIndexCache` O(N×M) offload to background**
   `PreRidePOISheet.swift:102–117`. Background task or k-d tree spatial index.
-  → `TECH_DEBT.md § P2`
 
 - [ ] **P2 · `elevationSamples` lazy cache in `RouteDetailView`**
   `RouteDetailView.swift:236–252`. Cache result; invalidate only when `trackPoints` changes.
-  → `TECH_DEBT.md § P2`
 
 - [ ] **P2 · Surface empty `catch` blocks**
   `RideSummaryView.swift:296`, `RideHistoryView.swift:231`, `RideHistoryDetailView.swift:266,346`. Log + surface via toast.
-  → `TECH_DEBT.md § P2`
 
 - [ ] **P2 · `RouteNoticeView` — wire or delete**
   Wire into `CyclingRouteService` result + `topBanners`, or delete. Decide alongside `CyclingRouteOverlay`.
-  → `TECH_DEBT.md § P2`
 
 - [ ] **P2 · Merge `POIDiscoverySheet` + `NearbySearchSheet`**
   One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before submission.
-  → `TECH_DEBT.md § P1 (POI Overhaul follow-ups)`
 
 - [ ] **P2 · Elevation gain noise smoothing**
   Threshold gate (only accumulate deltas > 2 m) in `RideSessionStore` altitude stream.
-  → `TECH_DEBT.md § P2`
 
 - [ ] **P3 · `MapStyle` cycling overlay toggle in Settings**
   Expose `.standard` / `.hybrid(elevation: .realistic)` / cycling lane style.
-  → `TECH_DEBT.md § P3`
 
 ---
 
@@ -161,11 +135,9 @@
 ## Dependency Graph
 
 ```
-Sprint 1: MISC-1, MISC-4, MISC-5, MISC-6 (parallel-safe, batch in one commit)
-          MK-6 / F-B (slightly larger — do after MISC batch)
-          └── MK-6 enables F-A2 deep-link sharing + future POI list sharing
+Sprint 1: ✅ COMPLETE
 
-Sprint 2: F-A Shared wrapper  ──► F-A1, F-A2, F-A3 (any order)
+Sprint 2: F-A Shared wrapper ──► F-A1, F-A2, F-A3 (any order)
           F-A1 validates VeloAISession pattern ──► Sprint 3 reuses it
           F-A3 in POI sheets ──► opportunistic sheet merge if small
 
