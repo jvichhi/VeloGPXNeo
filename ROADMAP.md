@@ -16,7 +16,7 @@
 ---
 
 ## Sprint 1 — Foundation & Debt Clearance
-> Goal: clean build with zero warnings and stable POI identity.
+> Goal: clean build with zero warnings and stable POI identity. Targets v1.3.
 > All items are parallel-safe — they can be batched in any order within the sprint.
 
 - [ ] **MK-6 / F-B · POIModel Place IDs + “Open in Maps”** ← *start here*  
@@ -79,7 +79,7 @@
 ---
 
 ## Sprint 2 — On-Device AI (FoundationModels, iOS 26)
-> Goal: ship the three standalone AI features.  
+> Goal: ship the three standalone AI features. Targets v1.3.
 > Add `FoundationModels` to Build Phases + `VeloAISession` shared wrapper first, then the three features can be built in any order.
 >
 > **F-A3 touches `POIDiscoverySheet` / `NearbySearchSheet`.** While in those files, opportunistically begin the sheet merge (see Backlog). Don’t block shipping F-A3 on it — but if the merge is small, do it in the same commit.
@@ -106,7 +106,7 @@
 ---
 
 ## Sprint 3 — RidePlanAssistant (FoundationModels + MKLocalSearch, iOS 26)
-> Goal: natural language → multi-stop route in the Routes tab.  
+> Goal: natural language → multi-stop route in the Routes tab. Targets v1.4.
 > Requires F-A shared session wrapper from Sprint 2.
 >
 > **F-3 (`RideView` split) — do incrementally here.** F-C2 polish requires touching `RideView` anyway for stop-type icon rendering. When we open `RideView` for F-C2, extract `RideMapLayer` and `RideHUDPanel` at the same time. This spreads the risk across real feature work rather than a standalone refactor, and keeps the split grounded in a concrete reason to be in the file.
@@ -125,8 +125,8 @@
 
 ---
 
-## Sprint 4 — Stability & Pre-1.0 Polish
-> Goal: everything needed before an App Store submission. No new net-new features — just making what exists solid.
+## Sprint 4 — Stability & Pre-1.5 Polish
+> Goal: everything needed before the next major App Store submission. No net-new features — just making what exists solid.
 >
 > **F-4 (`RideSessionStore` split) — do incrementally here.** The P2 performance fixes (`updateNextPOI` hot-path, `buildSnapIndexCache`) require opening `RideSessionStore` anyway. Extract `POITrackingEngine` while making those fixes. Do `RideLocationEngine` and `WatchSyncManager` only if the scope stays manageable — don’t force the full split in one go.
 
@@ -151,7 +151,7 @@
   → `TECH_DEBT.md § P2`
 
 - [ ] **P2 · Merge `POIDiscoverySheet` + `NearbySearchSheet`**  
-  One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before 1.0.  
+  One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before submission.  
   → `TECH_DEBT.md § P1 (POI Overhaul follow-ups)`
 
 - [ ] **P2 · Elevation gain noise smoothing**  
@@ -164,7 +164,7 @@
 
 ---
 
-## Backlog — Post-1.0
+## Backlog — Future
 
 | Item | Where | Notes |
 |---|---|---|
@@ -194,7 +194,7 @@ Sprint 2: F-A Shared wrapper  ──► F-A1, F-A2, F-A3 (any order)
 Sprint 3: F-A (Sprint 2 done) ──► F-C1 ──► F-C2 + partial F-3 RideView split
 
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
-          Pre-1.0 polish items (no feature dependencies)
+          Pre-submission polish items (no feature dependencies)
 ```
 
 ---
