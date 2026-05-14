@@ -10,6 +10,12 @@ public struct POIModel: Codable, Identifiable, Sendable, Equatable {
     public var address: String?
     public var phone: String?
     public var website: String?
+    /// Stable place identifier captured from MKMapItem at search time.
+    /// Nil for POIs persisted before this field was introduced — safe via explicit CodingKeys below.
+    public var mapItemIdentifier: String?
+    /// Deep-link URL that opens this place in Apple Maps.
+    /// Nil for legacy POIs.
+    public var mapsURL: URL?
 
     public init(
         id: UUID = UUID(),
@@ -19,7 +25,9 @@ public struct POIModel: Codable, Identifiable, Sendable, Equatable {
         distanceFromRoute: Double = 0,
         address: String? = nil,
         phone: String? = nil,
-        website: String? = nil
+        website: String? = nil,
+        mapItemIdentifier: String? = nil,
+        mapsURL: URL? = nil
     ) {
         self.id = id
         self.name = name
@@ -29,6 +37,31 @@ public struct POIModel: Codable, Identifiable, Sendable, Equatable {
         self.address = address
         self.phone = phone
         self.website = website
+        self.mapItemIdentifier = mapItemIdentifier
+        self.mapsURL = mapsURL
+    }
+
+    // MARK: - Codable
+    // Explicit keys so existing JSON that lacks the new fields decodes without crashing.
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, coordinate, distanceFromRoute
+        case address, phone, website
+        case mapItemIdentifier, mapsURL
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id                = try c.decode(UUID.self,        forKey: .id)
+        name              = try c.decode(String.self,      forKey: .name)
+        category          = try c.decode(POICategory.self, forKey: .category)
+        coordinate        = try c.decode(Coordinate.self,  forKey: .coordinate)
+        distanceFromRoute = try c.decode(Double.self,      forKey: .distanceFromRoute)
+        address           = try c.decodeIfPresent(String.self, forKey: .address)
+        phone             = try c.decodeIfPresent(String.self, forKey: .phone)
+        website           = try c.decodeIfPresent(String.self, forKey: .website)
+        mapItemIdentifier = try c.decodeIfPresent(String.self, forKey: .mapItemIdentifier)
+        mapsURL           = try c.decodeIfPresent(URL.self,    forKey: .mapsURL)
     }
 }
 
@@ -46,31 +79,31 @@ public enum POICategory: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .cafe: return "Café"
-        case .restaurant: return "Restaurant"
-        case .water: return "Water"
-        case .bikeRepair: return "Bike Repair"
-        case .bikeRental: return "Bike Rental"
+        case .cafe:          return "Café"
+        case .restaurant:    return "Restaurant"
+        case .water:         return "Water"
+        case .bikeRepair:    return "Bike Repair"
+        case .bikeRental:    return "Bike Rental"
         case .accommodation: return "Accommodation"
-        case .viewpoint: return "Viewpoint"
-        case .campsite: return "Campsite"
-        case .pharmacy: return "Pharmacy"
-        case .custom: return "Waypoint"
+        case .viewpoint:     return "Viewpoint"
+        case .campsite:      return "Campsite"
+        case .pharmacy:      return "Pharmacy"
+        case .custom:        return "Waypoint"
         }
     }
 
     public var systemImage: String {
         switch self {
-        case .cafe: return "cup.and.saucer.fill"
-        case .restaurant: return "fork.knife"
-        case .water: return "drop.fill"
-        case .bikeRepair: return "wrench.and.screwdriver.fill"
-        case .bikeRental: return "bicycle"
+        case .cafe:          return "cup.and.saucer.fill"
+        case .restaurant:    return "fork.knife"
+        case .water:         return "drop.fill"
+        case .bikeRepair:    return "wrench.and.screwdriver.fill"
+        case .bikeRental:    return "bicycle"
         case .accommodation: return "bed.double.fill"
-        case .viewpoint: return "binoculars.fill"
-        case .campsite: return "tent.fill"
-        case .pharmacy: return "cross.fill"
-        case .custom: return "mappin.circle.fill"
+        case .viewpoint:     return "binoculars.fill"
+        case .campsite:      return "tent.fill"
+        case .pharmacy:      return "cross.fill"
+        case .custom:        return "mappin.circle.fill"
         }
     }
 }
