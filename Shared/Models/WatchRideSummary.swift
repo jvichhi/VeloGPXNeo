@@ -1,6 +1,8 @@
 import Foundation
 
-struct WatchRideSummary: Codable, Sendable {
+/// Snapshot of live ride state transmitted from iPhone → Watch via WCSession.
+/// Pure value type: Sendable, no actor isolation, safe to decode on any thread.
+struct WatchRideSummary: Sendable {
     let isActive: Bool
     let isPaused: Bool
     let speedKmh: Double
@@ -37,3 +39,6 @@ struct WatchRideSummary: Codable, Sendable {
         self.isRerouting      = state.isRerouting
     }
 }
+
+// Isolated from @MainActor context — safe to call from nonisolated WCSession callbacks.
+nonisolated extension WatchRideSummary: Codable {}
