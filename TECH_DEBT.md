@@ -125,8 +125,7 @@ business renames, address changes, and duplicate names. Without it:
    ```
 5. `POIModel` is `Codable` — adding optional fields is backwards-compatible. No JSON migration needed.
 
-> **Availability gate required:** `MKMapItem.identifier` is iOS 18+. Coordinate `deterministicID` is the
-> universal fallback for Watch builds and any POI without a resolved identifier (custom waypoints).
+> **Availability gate required:** `MKMapItem.identifier` is iOS 18+. Gate with `#available(iOS 18, *)` to keep the Watch target clean. On the iOS 26+ phone target this is always true.
 
 > **Full feature spec** — see `FEATURES.md` § F-B for the complete implementation plan including
 > the `POIModel+MapKit.swift` factory, `isAdded` update pattern, and Watch compatibility notes.
@@ -190,11 +189,13 @@ state), or decode into a nonisolated intermediate and then assign on main.
 
 ---
 
-### MISC-2 — `PlanView` spurious `await` on sync calls
+### MISC-2 — `PlanView` spurious `await` on sync calls — ✅ Resolved May 13, 2026
 
-**Affects:** `PlanView.swift:62,72`
-
-`await` wraps a call that contains no async operations. Remove the `await` keyword.
+`await plan.loadFrom(route:)` removed from both call sites (`PlanView.swift:62,72`).
+`loadFrom(route:)` is `@MainActor` synchronous — the `await` was a fossil from when the function
+was previously `async` (likely when it performed a Supabase/MapKit call). Swift allowed it
+because both call sites were already in async contexts (`Task {}` / `.task {}`), making it a
+no-op actor hop. Zero behaviour change. Clears two Xcode warnings. Commit `cc8f2fc`.
 
 ---
 
@@ -298,7 +299,7 @@ Add a `private var notificationsGranted = false` flag and guard all `UNUserNotif
   - `WatchSyncManager` — WCSession framing and throttle
   `RideSessionStore` becomes a thin coordinator.
 
-- [ ] **F-5/F-6 — `POIModel` Place IDs + Unified Maps URLs** — see MK-6 above
+- [ ] **MK-6 / F-B — `POIModel` Place IDs + Unified Maps URLs** — see MK-6 above
 
 - [x] **Fix `nextPOI` to use on-route ordering, not raw distance** — ✅ Done
 
@@ -456,3 +457,5 @@ Add a `private var notificationsGranted = false` flag and guard all `UNUserNotif
 | **MK-2** `MKMapItem.placemark` reads → `.location`/`.address` | May 13, 2026 |
 | **MK-3** `CLGeocoder` → `MKReverseGeocodingRequest` (iOS 26+ primary path) | May 13, 2026 |
 | **MK-4** `UIScreen.main` → `@Environment(\.displayScale)` + `GeometryReader` width | May 13, 2026 |
+| **MISC-2** Spurious `await` on `plan.loadFrom(route:)` removed (`PlanView.swift:62,72`) | May 13, 2026 |
+| **DOCS** `ROADMAP.md` created — 4-sprint prioritised work order | May 13, 2026 |

@@ -8,9 +8,20 @@
 
 **Build:** ✅ Clean (iOS 26+, SwiftUI / MapKit / CoreLocation / Supabase / WatchConnectivity)
 
+**iOS target:** iOS 26+ only. No backward-compatibility shims required.
+
 ---
 
-## Recently Landed (this session — May 12 evening)
+## Recently Landed (this session — May 13 late)
+
+| Commit | What |
+|---|---|
+| `a77af46` | **DOCS** `ROADMAP.md` created — 4-sprint prioritised work order pulling from DEVLOG + FEATURES + TECH_DEBT |
+| `cc8f2fc` | **MISC-2** Removed spurious `await` on synchronous `plan.loadFrom(route:)` in `PlanView.swift:62,72` — clears two Xcode warnings. Zero behaviour change (`loadFrom` was and remains `@MainActor` sync; the `await` was a no-op hop on an already-MainActor context). |
+
+---
+
+## Recently Landed (May 12–13 evening)
 
 | Commit | What |
 |---|---|
@@ -29,7 +40,7 @@
 
 ## In Progress — Next to Code
 
-### F-5 — Foundational Models: `mapItemIdentifier` + `mapsURL` on `POIModel`
+### MK-6 / F-B — `mapItemIdentifier` + `mapsURL` on `POIModel`
 
 **Goal:** Every POI created from an `MKMapItem` search result carries a stable Apple Maps Place ID and a deep-link `maps://` URL. Enables:
 - Correct deduplication (replaces coordinate-based `deterministicID` as primary key for search-derived POIs)
@@ -64,13 +75,13 @@
 - `iPhone/Views/PreRidePOISheet.swift` — same
 - `iPhone/Views/NearbyResultCard.swift` (if it exists) or inline card row
 
-**Gotcha:** `MKMapItem.identifier` is iOS 18+. Gate with `#available(iOS 18, *)`. The coordinate-based `deterministicID` remains the universal fallback so Watch + older-device builds are unaffected.
+**Gotcha:** `MKMapItem.identifier` is iOS 18+. Gate with `#available(iOS 18, *)`. The coordinate-based `deterministicID` remains the universal fallback so Watch builds are unaffected. Since we target iOS 26+, the `#available` gate will always be true on device — it exists purely to keep the Watch target clean.
 
 ---
 
 ## Open Bugs
 
-*(None — all P0/P1 bugs from May 12 resolved)*
+*(None — all P0/P1 bugs resolved)*
 
 ---
 
@@ -78,17 +89,37 @@
 
 | # | Feature | Notes |
 |---|---|---|
+| MK-6 / F-B | `POIModel` Place IDs + `mapsURL` | **Next to code** — see In Progress above |
 | F-3 | `RideView` God View split | Extract `RideMapLayer`, `RideHUDPanel`, `RideBirdsEyePanel` — see TECH_DEBT P1 |
 | F-4 | `RideSessionStore` God Object split | `RideLocationEngine` + `POITrackingEngine` + `WatchSyncManager` — see TECH_DEBT P1 |
-| F-5 | Foundational Models: `mapItemIdentifier` + `mapsURL` on `POIModel` | See In Progress above |
-| F-6 | Unified Maps URLs + Place IDs — "Open in Maps" from POI detail | Depends on F-5 |
+| F-A | On-device AI — `VeloAISession` wrapper (FoundationModels) | Shared session wrapper, Sprint 3 |
+| F-A1 | Ride Summary Generation | On-device AI, iOS 26+, depends on F-A |
+| F-A2 | Smart Route Naming | On import or rename, depends on F-A |
+| F-A3 | POI Relevance Ranking | Context-aware "Suggested" sort, depends on F-A |
+| F-C1 | RidePlanAssistant core | Natural language → multi-stop route, depends on F-A |
+| F-C2 | RidePlanAssistant polish | Stop icons, dwell time, Save/Discard UX |
+
+---
+
+## Remaining Warnings (Xcode)
+
+| ID | File | Warning | Priority |
+|---|---|---|---|
+| MISC-1 | `RideView.swift:232` | `onChange(of:perform:)` deprecated iOS 17 | Low |
+| MISC-3 | `iPhone/Assets.xcassets` | Missing `AccentColor` color set | Low |
+| MISC-4 | `RouteModel.swift:190` | Unused `windowMeters` immutable value | Low |
+| MISC-5 | `RideSessionStore.swift` / `GPXCueEngine` | Duplicate `bearing()` haversine function | Low |
+| MISC-6 | `RideSessionStore.swift:92` | Notification permission result silently ignored | Medium |
+| AC-1 | `CyclingRouteService.swift` (14 sites) | Swift 6 actor isolation: `clCoordinate`/`route`/`distance(to:)` on wrong actor | Medium |
+| AC-2 | `CyclingRouteService.swift:245,257,273` | Swift 6: `TurnInstruction.init` in nonisolated context | Medium |
+| AC-3 | `WatchRideStore.swift:23` | Swift 6: `WatchRideSummary` `Decodable` on wrong actor | Medium |
 
 ---
 
 ## Notes / Watch-outs
 
-- **MK-2 placemark reads** — `NearbySearchSheet`, `POIDiscoverySheet`, `ReverseGeocodingService`, `PlaceDescriptorService` all still read `mapItem.placemark.coordinate` / `.title` (deprecated iOS 26). These are warnings now; will be errors when min deployment target passes iOS 26. Track as MK-2 in TECH_DEBT.
-- **`MKMapItem.identifier` availability** — iOS 18+ only. Always gate with `#available(iOS 18, *)` and keep the coordinate-based `deterministicID` as the universal fallback.
+- **iOS 26+ only.** No backward-compatibility shims or `#available(iOS X, *)` guards needed except where the Watch target also compiles the same file.
+- **`MKMapItem.identifier` availability** — iOS 18+ only. Always gate with `#available(iOS 18, *)` to keep the Watch target clean. On our iOS 26+ phone target this is always true.
 - **Water fountain POI category** — `POISearchService` maps "Water" to `.nationalPark` as a proxy. No `MKPointOfInterestCategory` constant for drinking fountains exists yet in the iOS 26 SDK. Watch WWDC / SDK release notes.
 - `RideSessionStore.swift` is ~30 KB. F-4 God Object split is overdue — do before adding more ride features.
 - `POIDiscoverySheet` vs `NearbySearchSheet` still overlap in purpose. Worth merging into one sheet with `mode: .preRide | .midRide` before 1.0.
