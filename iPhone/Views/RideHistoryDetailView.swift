@@ -9,6 +9,9 @@ struct RideHistoryDetailView: View {
     @EnvironmentObject private var historyStore: RideHistoryStore
     @Environment(\.dismiss) private var dismiss
 
+    // MK-4: display scale from environment; snapshot width resolved via GeometryReader
+    @Environment(\.displayScale) private var displayScale
+
     @State private var mapSnapshot: UIImage?
     @State private var showPlannedOverlay = false
     @State private var exportPOIs = true
@@ -18,49 +21,53 @@ struct RideHistoryDetailView: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var containerWidth: CGFloat = 390   // safe default until GeometryReader fires
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                mapSection
-                heroSection
-                statsGrid
-                overlayToggle
-                if !ride.pois.isEmpty { poisSection }
-                shareCardSection
-                exportSection
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 16) {
+                    mapSection
+                    heroSection
+                    statsGrid
+                    overlayToggle
+                    if !ride.pois.isEmpty { poisSection }
+                    shareCardSection
+                    exportSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-        }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle(ride.routeName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { toolbarContent }
-        .alert("Rename Ride", isPresented: $isRenaming) {
-            TextField("Ride name", text: $renameText)
-            Button("Save") {
-                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                if !trimmed.isEmpty { historyStore.rename(id: ride.id, to: trimmed) }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(ride.routeName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
+            .alert("Rename Ride", isPresented: $isRenaming) {
+                TextField("Ride name", text: $renameText)
+                Button("Save") {
+                    let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty { historyStore.rename(id: ride.id, to: trimmed) }
+                }
+                Button("Cancel", role: .cancel) {}
             }
-            Button("Cancel", role: .cancel) {}
-        }
-        .confirmationDialog("Delete this ride?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                historyStore.delete(id: ride.id)
-                dismiss()
+            .confirmationDialog("Delete this ride?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    historyStore.delete(id: ride.id)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This cannot be undone.")
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This cannot be undone.")
+            .sheet(isPresented: $showShareGPX) {
+                if let url = gpxFileURL { ShareSheet(items: [url]) }
+            }
+            .sheet(item: $shareCardImage) { item in
+                ShareSheet(items: [item.image])
+            }
+            .onAppear { containerWidth = geo.size.width }
+            .task { await generateSnapshot() }
         }
-        .sheet(isPresented: $showShareGPX) {
-            if let url = gpxFileURL { ShareSheet(items: [url]) }
-        }
-        .sheet(item: $shareCardImage) { item in
-            ShareSheet(items: [item.image])
-        }
-        .task { await generateSnapshot() }
     }
 
     // MARK: - Toolbar
@@ -266,17 +273,20 @@ struct RideHistoryDetailView: View {
     }
 
     // MARK: - Share Card Render
+    // MK-4: ImageRenderer.scale uses displayScale from @Environment, not UIScreen.main.scale
 
     private func renderShareCard() {
         let cardView = ShareableRideCard(ride: ride, snapshot: mapSnapshot)
         let renderer = ImageRenderer(content: cardView)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = displayScale
         if let img = renderer.uiImage {
             shareCardImage = ShareableImage(image: img)
         }
     }
 
     // MARK: - Map Snapshot
+    // MK-4: width from @State containerWidth (set via GeometryReader.onAppear);
+    // scale from @Environment(\.displayScale) — no UIScreen.main references.
 
     private func generateSnapshot() async {
         let actual = ride.actualTrack
@@ -287,6 +297,8 @@ struct RideHistoryDetailView: View {
             latitude: (lats.min()! + lats.max()!) / 2,
             longitude: (lons.min()! + lons.max()!) / 2
         )
+        let snapshotWidth = containerWidth - 32
+        let scale = displayScale
         let opts = MKMapSnapshotter.Options()
         opts.region = MKCoordinateRegion(
             center: center,
@@ -295,15 +307,14 @@ struct RideHistoryDetailView: View {
                 longitudeDelta: max((lons.max()! - lons.min()!) * 1.4, 0.005)
             )
         )
-        opts.size = CGSize(width: UIScreen.main.bounds.width - 32, height: 220)
-        opts.scale = UIScreen.main.scale
+        opts.size = CGSize(width: snapshotWidth, height: 220)
+        opts.scale = scale
         opts.mapType = .standard
         opts.showsBuildings = false
         do {
             let snap = try await MKMapSnapshotter(options: opts).start()
             let img = UIGraphicsImageRenderer(size: opts.size).image { _ in
                 snap.image.draw(at: .zero)
-                // Planned route (gray dashed)
                 if showPlannedOverlay && !ride.plannedTrack.isEmpty {
                     let planned = UIBezierPath()
                     for (i, c) in ride.plannedTrack.enumerated() {
@@ -315,7 +326,6 @@ struct RideHistoryDetailView: View {
                     planned.setLineDash([6, 4], count: 2, phase: 0)
                     planned.stroke()
                 }
-                // Actual track (blue solid)
                 let path = UIBezierPath()
                 for (i, c) in actual.enumerated() {
                     let pt = snap.point(for: c)
@@ -325,14 +335,12 @@ struct RideHistoryDetailView: View {
                 path.lineWidth = 3.5
                 path.lineCapStyle = .round
                 path.stroke()
-                // Start dot (green)
                 if let first = actual.first {
                     let pt = snap.point(for: first)
                     let dot = UIBezierPath(ovalIn: CGRect(x: pt.x - 6, y: pt.y - 6, width: 12, height: 12))
                     UIColor.systemGreen.setFill(); UIColor.white.setStroke()
                     dot.fill(); dot.lineWidth = 2; dot.stroke()
                 }
-                // End dot (red)
                 if let last = actual.last {
                     let pt = snap.point(for: last)
                     let dot = UIBezierPath(ovalIn: CGRect(x: pt.x - 6, y: pt.y - 6, width: 12, height: 12))

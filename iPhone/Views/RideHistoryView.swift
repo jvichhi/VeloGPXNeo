@@ -83,11 +83,9 @@ struct RideHistoryView: View {
     private var rideList: some View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                // Personal records
                 recordsBanner
                     .padding(.vertical, 12)
 
-                // Monthly sections
                 ForEach(historyStore.monthlySections) { section in
                     Section {
                         ForEach(section.rides) { ride in
@@ -141,14 +139,16 @@ private struct MonthSectionHeader: View {
 }
 
 // MARK: - Ride Row Card
+// MK-4: UIScreen.main.scale replaced with @Environment(\.displayScale),
+// captured before the async snapshot boundary.
 
 struct RideRowCard: View {
     let ride: PersistedRideSummary
     @State private var snapshot: UIImage?
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         HStack(spacing: 12) {
-            // Map thumbnail
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(.systemGray5))
@@ -166,7 +166,6 @@ struct RideRowCard: View {
                 }
             }
 
-            // Stats
             VStack(alignment: .leading, spacing: 4) {
                 Text(ride.routeName)
                     .font(.subheadline.weight(.semibold))
@@ -207,10 +206,12 @@ struct RideRowCard: View {
             latitudeDelta:  max((lats.max()! - lats.min()!) * 1.5, 0.004),
             longitudeDelta: max((lons.max()! - lons.min()!) * 1.5, 0.004)
         )
+        // Capture displayScale before async boundary — avoids UIScreen.main (deprecated iOS 26)
+        let scale = displayScale
         let opts = MKMapSnapshotter.Options()
         opts.region = MKCoordinateRegion(center: center, span: span)
         opts.size   = CGSize(width: 144, height: 144)
-        opts.scale  = UIScreen.main.scale
+        opts.scale  = scale
         opts.mapType = .standard
         opts.showsBuildings = false
         do {

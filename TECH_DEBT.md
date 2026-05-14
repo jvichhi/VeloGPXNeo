@@ -33,87 +33,34 @@ These are all active Xcode warnings from the v1.2 b3 build. The MapKit and UIScr
 are deprecated-in-iOS-26 APIs that Apple will harden in a future SDK. The Swift 6 actor items
 are already errors in Swift 6 mode and will block a strict-concurrency build.
 
-### MK-1 — `MKPlacemark` / `init(placemark:)` → `MKMapItem.init(location:address:)` [iOS 26]
+### MK-1 — `MKPlacemark` / `init(placemark:)` → `MKMapItem.init(location:address:)` — ✅ Resolved May 13, 2026
 
-**Affects:** `CyclingRouteService.swift:47,48,87,88` · `PlaceDescriptorService.swift:63,64,104,105`
-
-Every `MKMapItem(placemark: MKPlacemark(coordinate: coord))` pair must become:
-```swift
-// Before (deprecated iOS 26)
-MKMapItem(placemark: MKPlacemark(coordinate: coord))
-
-// After
-MKMapItem(location: CLLocation(latitude: coord.latitude, longitude: coord.longitude))
-```
-For address strings, use `MKAddressRepresentations` instead of `MKPlacemark.title`.
+`CyclingRouteService.swift` and `PlaceDescriptorService.swift` were already fully migrated
+to `MKMapItem(location:address:)`. No `MKPlacemark` or `init(placemark:)` references remain.
 
 ---
 
-### MK-2 — `MKMapItem.placemark` property reads → `.location` / `.address` [iOS 26]
+### MK-2 — `MKMapItem.placemark` property reads → `.location` / `.address` — ✅ Resolved May 13, 2026
 
-**Affects:**
-- `NearbySearchSheet.swift:108,109,148,150,199,200,224`
-- `POIDiscoverySheet.swift:125,130,176`
-- `PlaceDescriptorService.swift:94,95`
-- `ReverseGeocodingService.swift:54`
-
-All reads of `mapItem.placemark.coordinate`, `mapItem.placemark.name`, etc. must migrate to
-`mapItem.location?.coordinate` and `mapItem.address` / `mapItem.addressRepresentations`.
-Example pattern across all affected files:
-```swift
-// Before
-let coord = mapItem.placemark.coordinate
-let name  = mapItem.placemark.name ?? mapItem.name
-
-// After
-let coord = mapItem.location?.coordinate ?? mapItem.placemark.coordinate
-let name  = mapItem.name
-```
+`NearbySearchSheet`, `POIDiscoverySheet`, `PlaceDescriptorService`, and `ReverseGeocodingService`
+all use `mapItem.location?.coordinate` and `mapItem.name`. No `.placemark` reads remain.
 
 ---
 
-### MK-3 — `CLGeocoder` + `reverseGeocodeLocation` → `MKReverseGeocodingRequest` [iOS 26]
+### MK-3 — `CLGeocoder` + `reverseGeocodeLocation` → `MKReverseGeocodingRequest` — ✅ Resolved May 13, 2026
 
-**Affects:** `ReverseGeocodingService.swift:63,66` · `PlaceDescriptorService.swift:57,60`
-
-`CLGeocoder` is deprecated wholesale in iOS 26 in favour of MapKit's new geocoding API.
-```swift
-// Before
-let geocoder = CLGeocoder()
-geocoder.reverseGeocodeLocation(loc) { placemarks, error in ... }
-
-// After (iOS 26+)
-let request = MKReverseGeocodingRequest(location: loc)
-let result  = try await request.result   // MKMapItem, no CLPlacemark needed
-```
-Gate with `#available(iOS 26, *)` and keep the `CLGeocoder` path as a fallback for iOS 17–25
-until the min deployment target is raised above 26.
+`ReverseGeocodingService` and `PlaceDescriptorService` both use `MKReverseGeocodingRequest`
+as the iOS 26+ primary path. `CLGeocoder` is retained only in `ReverseGeocodingService` as
+a properly `@available(iOS, deprecated: 26.0)` gated fallback for the legacy code path.
 
 ---
 
-### MK-4 — `UIScreen.main` → context-based screen [iOS 26]
+### MK-4 — `UIScreen.main` → context-based screen — ✅ Resolved May 13, 2026
 
-**Affects:**
-- `RideHistoryDetailView.swift:273,298,299`
-- `RideHistoryView.swift:213`
-- `RideSummaryView.swift:262,263`
-
-`UIScreen.main` is deprecated; the replacement is to access the screen through the view hierarchy:
-```swift
-// Before
-let scale = UIScreen.main.scale
-
-// After — in a SwiftUI view body or UIView subclass
-// Option A: via @Environment (SwiftUI)
-@Environment(\.displayScale) var displayScale  // use for scale
-
-// Option B: via UIWindowScene (UIKit context in snapshot callbacks)
-// Pass the windowScene into the snapshot helper, then:
-// windowScene.screen.scale
-```
-`RideSummaryView` and `RideHistoryDetailView` use `UIScreen.main.scale` inside
-`MKMapSnapshotter` completion handlers — extract `displayScale` from the view's environment
-and capture it before the async callback.
+`RideSummaryView`, `RideHistoryDetailView`, `RideHistoryView` — all `UIScreen.main.scale`
+and `UIScreen.main.bounds.width` references replaced:
+- Scale: `@Environment(\.displayScale) private var displayScale` captured before async boundary
+- Width: `GeometryReader` passes `geo.size.width` into snapshot functions as a parameter
 
 ---
 
@@ -505,3 +452,7 @@ Add a `private var notificationsGranted = false` flag and guard all `UNUserNotif
 | **P1** Watch haptic loop fixed (`didAlertOffRoute` flag in `WatchRideStore`) | May 13, 2026 |
 | **P2** `PlaceDescriptorService` wired to `WaypointListSheet` (lazy async, iOS 26 gated) | May 13, 2026 |
 | **P2** `NextPOIBanner.swift` deleted (superseded by `nextPOIChip` in `RideView`) | May 13, 2026 |
+| **MK-1** `MKPlacemark`/`init(placemark:)` → `MKMapItem(location:address:)` | May 13, 2026 |
+| **MK-2** `MKMapItem.placemark` reads → `.location`/`.address` | May 13, 2026 |
+| **MK-3** `CLGeocoder` → `MKReverseGeocodingRequest` (iOS 26+ primary path) | May 13, 2026 |
+| **MK-4** `UIScreen.main` → `@Environment(\.displayScale)` + `GeometryReader` width | May 13, 2026 |

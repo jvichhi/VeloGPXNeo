@@ -12,32 +12,37 @@ struct RideSummaryView: View {
     @State private var exportPOIs = true
     @State private var gpxFileURL: ShareableURL?
 
+    // MK-4: capture display scale from environment before async boundary
+    @Environment(\.displayScale) private var displayScale
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    mapSnapshotSection
-                    heroStatsSection
-                    statsGridSection
-                    if !summary.pois.isEmpty { poisSection }
-                    exportSection
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        mapSnapshotSection
+                        heroStatsSection
+                        statsGridSection
+                        if !summary.pois.isEmpty { poisSection }
+                        exportSection
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Ride Complete")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done", action: onDismiss)
-                        .fontWeight(.semibold)
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("Ride Complete")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done", action: onDismiss)
+                            .fontWeight(.semibold)
+                    }
                 }
+                .sheet(item: $gpxFileURL) { item in
+                    ShareSheet(items: [item.url])
+                }
+                .task { await generateMapSnapshot(containerWidth: geo.size.width) }
             }
-            .sheet(item: $gpxFileURL) { item in
-                ShareSheet(items: [item.url])
-            }
-            .task { await generateMapSnapshot() }
         }
     }
 
@@ -102,7 +107,6 @@ struct RideSummaryView: View {
                 columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
                 spacing: 10
             ) {
-                // TIME tile shows moving time — excludes pauses.
                 MetricTile(label: "MOVING",  value: summary.movingTime.hhmm,                    unit: summary.movingTime.unit,  icon: "figure.outdoor.cycle",               color: .purple)
                 MetricTile(label: "AVG",   value: String(format: "%.1f", summary.avgSpeedKmh),   unit: "km/h",                   icon: "speedometer",                       color: .blue)
                 MetricTile(label: "MAX",   value: String(format: "%.1f", summary.maxSpeedKmh),   unit: "km/h",                   icon: "gauge.with.dots.needle.67percent",   color: .red)
@@ -111,7 +115,6 @@ struct RideSummaryView: View {
                 MetricTile(label: "POIs",  value: "\(summary.pois.count)",                       unit: "visited",                icon: "mappin.circle.fill",                 color: .orange)
             }
 
-            // Show total elapsed (including pauses) only when the rider actually paused.
             if summary.hadPauses {
                 HStack(spacing: 4) {
                     Image(systemName: "pause.circle")
@@ -245,8 +248,10 @@ struct RideSummaryView: View {
     }
 
     // MARK: - Map Snapshot
+    // MK-4: containerWidth passed in from GeometryReader; displayScale from @Environment.
+    // Neither UIScreen.main.bounds nor UIScreen.main.scale are used.
 
-    private func generateMapSnapshot() async {
+    private func generateMapSnapshot(containerWidth: CGFloat) async {
         guard !summary.actualTrack.isEmpty else { return }
         let coords = summary.actualTrack
         let minLat = coords.map(\.latitude).min()!
@@ -257,10 +262,12 @@ struct RideSummaryView: View {
         let latDelta = max((maxLat - minLat) * 1.4, 0.005)
         let lonDelta = max((maxLon - minLon) * 1.4, 0.005)
         let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta))
+        let snapshotWidth = containerWidth - 32
+        let scale = displayScale
         let options = MKMapSnapshotter.Options()
         options.region = region
-        options.size = CGSize(width: UIScreen.main.bounds.width - 32, height: 220)
-        options.scale = UIScreen.main.scale
+        options.size = CGSize(width: snapshotWidth, height: 220)
+        options.scale = scale
         options.mapType = .standard
         options.showsBuildings = false
         do {
