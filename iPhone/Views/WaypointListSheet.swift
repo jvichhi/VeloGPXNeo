@@ -13,6 +13,7 @@
 //  to be meaningful). Swipe-to-delete works in both normal and edit mode.
 //
 //  PlaceDescriptorService wired May 13, 2026.
+//  fix: resolve(coordinate:) overload doesn't exist — bridge via WaypointPoint stub (May 13 2026).
 //
 
 import SwiftUI
@@ -332,13 +333,16 @@ struct WaypointListSheet: View {
 
     // MARK: - PlaceDescriptorService Integration
 
-    // No @available needed — iOS 26 is our minimum deployment target.
-    // PlanWaypoint.coordinate is CLLocationCoordinate2D — passed directly, no .clCoordinate bridge.
+    // Called from .task{} which runs on @MainActor — safe for CLLocationCoordinate2D
+    // and WaypointPoint init on iOS 26+.
+    // Bridges PlanWaypoint → WaypointPoint stub so we can call resolve(_:) which
+    // takes WaypointPoint. PlaceDescriptorService has no resolve(coordinate:) overload.
     private func resolveNameIfNeeded(for wp: PlanWaypoint) async {
         guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
-        let resolved = await PlaceDescriptorService.shared.resolve(coordinate: wp.coordinate)
+        let stub = WaypointPoint(coordinate: wp.coordinate, name: nil)
+        let result = await PlaceDescriptorService.shared.resolve(stub)
         guard plan.waypoints.contains(where: { $0.id == wp.id }) else { return }
-        resolvedNames[wp.id] = resolved
+        resolvedNames[wp.id] = result.name
     }
 
     // MARK: - Helpers
