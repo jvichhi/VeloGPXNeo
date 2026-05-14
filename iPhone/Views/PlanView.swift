@@ -59,7 +59,7 @@ struct PlanView: View {
         .task {
             let routeToLoad = routeStore.routeToEditInPlan ?? preloadRoute
             if let route = routeToLoad {
-                await plan.loadFrom(route: route)
+                plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
@@ -69,7 +69,7 @@ struct PlanView: View {
         .onChange(of: routeStore.routeToEditInPlan) { _, route in
             guard let route else { return }
             Task {
-                await plan.loadFrom(route: route)
+                plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
