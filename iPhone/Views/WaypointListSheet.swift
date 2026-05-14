@@ -2,8 +2,8 @@
 //  WaypointListSheet.swift
 //  VeloGPX
 //
-//  Embedded in PlanView's bottom drawer — NOT a .sheet presentation.
-//  Height is controlled by PlanView's drawerHeight state; this view
+//  Embedded in PlanView’s bottom drawer — NOT a .sheet presentation.
+//  Height is controlled by PlanView’s drawerHeight state; this view
 //  must NOT stretch beyond its given space.
 //
 //  Bug 1 fix (May 13 2026): swipe-to-delete was silently swallowed
@@ -35,7 +35,7 @@ struct WaypointListSheet: View {
     @State private var routeName = ""
     @State private var savedRouteName: String? = nil
     // Bug 1 fix: editMode is OFF by default. Swipe-to-delete works without
-    // entering edit mode. The "Reorder" button appears only when count >= 2.
+    // entering edit mode. The “Reorder” button appears only when count >= 2.
     @State private var editMode: EditMode = .inactive
     // PlaceDescriptorService results — keyed by waypoint UUID.
     @State private var resolvedNames: [UUID: String] = [:]
@@ -62,7 +62,7 @@ struct WaypointListSheet: View {
     private var planningContent: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // ── Header row ──────────────────────────────────────────────────
+            // ── Header row ────────────────────────────────────────────────────────────────
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Plan Route")
@@ -83,8 +83,7 @@ struct WaypointListSheet: View {
                 Spacer()
 
                 // Bug 1: Reorder button only appears with 2+ waypoints and
-                // when the drawer is not collapsed. Tapping toggles editMode
-                // so drag handles appear on each row.
+                // when the drawer is not collapsed.
                 if plan.waypoints.count >= 2 && !isCollapsed {
                     Button {
                         editMode = editMode == .active ? .inactive : .active
@@ -139,7 +138,12 @@ struct WaypointListSheet: View {
     // MARK: - Waypoint List
 
     private var waypointList: some View {
-        List {
+        // Break the height calculation into a local let so the type-checker
+        // doesn’t time out on a single complex expression (PROJECT.md rule).
+        let rowCount = min(plan.waypoints.count, 5)
+        let listHeight = CGFloat(rowCount) * 52
+
+        return List {
             ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
@@ -161,9 +165,6 @@ struct WaypointListSheet: View {
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
                 .listRowBackground(Color.clear)
                 .listRowSeparatorTint(Color(UIColor.separator).opacity(0.5))
-                // Bug 1 fix: swipeActions now work reliably because editMode
-                // is inactive by default. Swipe delete is available in BOTH
-                // inactive (normal swipe) and active (drag-handle) modes.
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         withAnimation {
@@ -185,12 +186,10 @@ struct WaypointListSheet: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, $editMode)
-        // Bug 1: when the last waypoint is removed by swipe, exit edit mode
-        // so the empty-prompt can display without a dangling reorder chrome.
         .onChange(of: plan.waypoints.count) { _, count in
             if count < 2 { editMode = .inactive }
         }
-        .frame(maxHeight: CGFloat(min(plan.waypoints.count, 5)) * 52)
+        .frame(maxHeight: listHeight)
     }
 
     // MARK: - Delete Helper
@@ -341,16 +340,12 @@ struct WaypointListSheet: View {
 
     // MARK: - PlaceDescriptorService Integration
 
-    @available(iOS 26, *)
+    // No @available needed — iOS 26 is our minimum deployment target.
     private func resolveNameIfNeeded(for wp: WaypointPoint) async {
         guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
         let resolved = await PlaceDescriptorService.shared.resolve(wp)
         guard plan.waypoints.contains(where: { $0.id == wp.id }) else { return }
         resolvedNames[wp.id] = resolved.name
-    }
-
-    private func resolveNameIfNeeded(for wp: WaypointPoint) async {
-        // PlaceDescriptorService requires iOS 26+.
     }
 
     // MARK: - Helpers
@@ -401,6 +396,6 @@ struct WaypointListSheet: View {
     }
 
     private var elevationString: String {
-        String(format: "%.0f m\u{2191}", plan.totalElevationGain)
+        String(format: "%.0f m↑", plan.totalElevationGain)
     }
 }
