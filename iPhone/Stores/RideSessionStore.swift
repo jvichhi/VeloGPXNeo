@@ -53,7 +53,15 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
     private var startTime: Date?
     private var pauseStartTime: Date?
     private var lastAlertedPOIID: UUID?
-    private var lastRerouteTime: Date?
+
+    // MARK: - Reroute cooldown (distance-based)
+    // Stores the coordinate from which the last reroute was requested.
+    // A new request is only fired if the rider has moved > 30 m from that
+    // origin OR has re-entered the route and gone off again (lastRerouteOrigin
+    // is cleared when isOffRoute → false).
+    private var lastRerouteOrigin: CLLocationCoordinate2D? = nil
+    private let rerouteCooldownDistance: CLLocationDistance = 30
+
     private var historyStore: RideHistoryStore?
     private var errorClearTask: Task<Void, Never>?
 
@@ -146,6 +154,7 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         self.lastWatchUpdateTime = .distantPast
         self.lastError = nil
         self.lastLiveActivityUpdate = .distantPast
+        self.lastRerouteOrigin = nil
         #if !targetEnvironment(simulator)
         manager.allowsBackgroundLocationUpdates = true
         #endif
@@ -547,28 +556,42 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func handleOffRoute(from coordinate: CLLocationCoordinate2D, route: RouteModel) {
         guard rideState.isOffRoute else {
+            // Back on route — clear everything and reset the cooldown origin
+            // so the next off-route event always triggers a fresh reroute.
             rideState.bearingToRoute = nil
             rideState.rerouteSteps = []
             reroutePolyline = []
+            lastRerouteOrigin = nil
             return
         }
+
         let nearestPoint = route.trackPoints[nearestTrackIndex].coordinate.clCoordinate
-        if rideState.offRouteDistance <= 200 {
-            rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
-            rideState.rerouteSteps = []
-            reroutePolyline = []
-        } else {
-            rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
-            let now = Date()
-            if let last = lastRerouteTime, now.timeIntervalSince(last) < 30 { return }
-            lastRerouteTime = now
-            requestReroute(from: coordinate, to: nearestPoint)
+
+        // Always update the bearing arrow regardless of distance band.
+        rideState.bearingToRoute = bearing(from: coordinate, to: nearestPoint)
+
+        // Distance-based cooldown: skip a new MKDirections call if the rider
+        // hasn't moved more than rerouteCooldownDistance (30 m) from the last
+        // origin. This prevents rapid-fire requests while still refreshing the
+        // polyline when the rider continues away from the route.
+        if let origin = lastRerouteOrigin {
+            let distFromLastOrigin = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                .distance(from: CLLocation(latitude: origin.latitude, longitude: origin.longitude))
+            if distFromLastOrigin < rerouteCooldownDistance { return }
         }
+
+        // Fire the reroute request for all off-route distances ≥ 50 m.
+        // Short requests (50–200 m) are cheap cycling MKDirections calls and
+        // give the rider a proper orange line back to the nearest track point.
+        requestReroute(from: coordinate, to: nearestPoint)
     }
 
     // MARK: - Reroute
 
     private func requestReroute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
+        // Store the origin so the distance-based cooldown can compare against it.
+        lastRerouteOrigin = from
+
         // Extract raw doubles — CLLocationCoordinate2D.init is @MainActor on iOS 26+,
         // so we pass Doubles across the actor boundary into CyclingRouteService.
         let fLat = from.latitude, fLon = from.longitude
