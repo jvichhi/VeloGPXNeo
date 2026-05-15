@@ -295,12 +295,11 @@ struct RideView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.rerouteSteps.isEmpty)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.nextCue?.id)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: rideStore.rideState.isPaused)
-        // Bug 3 fix: mirror routeStore.selectedPOIs changes into rideStore.
-        // This handles BOTH additions (from NearbySearchSheet) AND deletions
-        // (from long-press annotation delete in mapLayer which writes back to
-        // routeStore.selectedPOIs after removing from rideStore.pois).
+        // Mirror routeStore.selectedPOIs changes into rideStore and invalidate
+        // the spur cache so new/removed POIs get fresh routes immediately.
         .onChange(of: routeStore.selectedPOIs) { _, newPOIs in
             guard rideStore.rideState.isActive else { return }
+            rideStore.invalidateSpurCache()
             rideStore.updatePOIs(newPOIs)
         }
         .sheet(isPresented: $showNearbySheet) {
@@ -503,10 +502,11 @@ struct RideView: View {
         }
     }
 
+    /// Chip showing routed distance to the next POI (uses spur cache when available).
     private var nextPOIChip: some View {
         Group {
             if let poi = rideStore.rideState.nextPOI,
-               let dist = rideStore.rideState.nextPOIDistance,
+               let dist = nextPOIRoutedDistance,
                dist < 500 {
                 HStack(spacing: 4) {
                     Image(systemName: poi.category.systemImage)
@@ -523,6 +523,17 @@ struct RideView: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+    }
+
+    /// Returns the road-routed inbound distance for nextPOI when the spur cache
+    /// has resolved; falls back to the straight-line distance from rideState.
+    private var nextPOIRoutedDistance: CLLocationDistance? {
+        guard let poi = rideStore.rideState.nextPOI else { return nil }
+        // Prefer the resolved routed distance from the rendered spur.
+        if let spur = poiSpurs.first(where: { $0.id == poi.id }), !spur.isPending {
+            return spur.inboundDistance
+        }
+        return rideStore.rideState.nextPOIDistance
     }
 
     private var nearbyButton: some View {
@@ -715,7 +726,7 @@ struct RideView: View {
         let activePOIs = rideStore.rideState.isActive ? rideStore.pois : routeStore.selectedPOIs
 
         Map(position: $position) {
-            // ── Route polylines ────────────────────────────────────────────
+            // ── Route polylines ─────────────────────────────────────────────────────────────
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
                     .stroke(.white, lineWidth: 14)
@@ -740,18 +751,47 @@ struct RideView: View {
                     .stroke(.orange, lineWidth: 10)
             }
 
-            // ── POI spurs ──────────────────────────────────────────────────
+            // ── POI spurs ──────────────────────────────────────────────────────────────────
+            //
+            // Pending spurs (CyclingRouteService still computing):
+            //   • Thin (3 pt) grey dashed line for both legs.
+            //   • Signals to the rider that a routed path is on the way.
+            //
+            // Resolved spurs (road-snapped cycling route):
+            //   • inbound  — green dashed, thicker when isNext
+            //   • outbound — red   dashed, thicker when isNext
             ForEach(poiSpurs) { spur in
-                MapPolyline(coordinates: spur.inbound)
-                    .stroke(
-                        spur.isNext ? Color.green : Color.green.opacity(0.65),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 8 : 5, dash: [7, 5])
-                    )
-                MapPolyline(coordinates: spur.outbound)
-                    .stroke(
-                        spur.isNext ? Color.red : Color.red.opacity(0.5),
-                        style: StrokeStyle(lineWidth: spur.isNext ? 7 : 4, dash: [7, 5])
-                    )
+                if spur.isPending {
+                    // Placeholder: thin grey straight line while route is computing
+                    MapPolyline(coordinates: spur.inbound)
+                        .stroke(
+                            Color.gray.opacity(0.5),
+                            style: StrokeStyle(lineWidth: 3, dash: [5, 6])
+                        )
+                    MapPolyline(coordinates: spur.outbound)
+                        .stroke(
+                            Color.gray.opacity(0.4),
+                            style: StrokeStyle(lineWidth: 3, dash: [5, 6])
+                        )
+                } else {
+                    // Resolved: road-snapped cycling route
+                    MapPolyline(coordinates: spur.inbound)
+                        .stroke(
+                            spur.isNext ? Color.green : Color.green.opacity(0.65),
+                            style: StrokeStyle(
+                                lineWidth: spur.isNext ? 8 : 5,
+                                dash: [7, 5]
+                            )
+                        )
+                    MapPolyline(coordinates: spur.outbound)
+                        .stroke(
+                            spur.isNext ? Color.red : Color.red.opacity(0.5),
+                            style: StrokeStyle(
+                                lineWidth: spur.isNext ? 7 : 4,
+                                dash: [7, 5]
+                            )
+                        )
+                }
             }
 
             if !rideStore.rideState.isActive {
@@ -763,7 +803,7 @@ struct RideView: View {
                 }
             }
 
-            // ── POI annotations (F-2a + F-2b) ─────────────────────────────
+            // ── POI annotations (F-2a + F-2b) ──────────────────────────────────────────
             ForEach(activePOIs) { poi in
                 let isNext    = poi.id == rideStore.rideState.nextPOI?.id
                 let isPending = pendingDeletePOI?.id == poi.id
