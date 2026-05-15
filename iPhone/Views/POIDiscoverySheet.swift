@@ -14,7 +14,6 @@ struct POIDiscoverySheet: View {
     @State private var selectedCategory: String? = nil
     @State private var sortOrder: POISortOrder = .suggested
 
-    // F-A3
     @AppStorage(VeloAI.enabledKey) private var aiEnabled = true
 
     private let categories: [(label: String, icon: String)] = [
@@ -30,104 +29,34 @@ struct POIDiscoverySheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-
-                // Category filter chips
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(categories, id: \.label) { cat in
-                            CategoryChip(
-                                label: cat.label,
-                                icon: cat.icon,
-                                isSelected: selectedCategory == cat.label
-                            ) {
-                                selectedCategory = cat.label
-                                searchQuery = cat.label
-                                Task { await search() }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                }
-
-                // Sort picker — only shown when results are available
-                if !results.isEmpty {
-                    Divider()
-                    Picker("Sort", selection: $sortOrder) {
-                        ForEach(POISortOrder.allCases) { order in
-                            if order == .suggested && !(VeloAI.isAvailable && aiEnabled) {
-                                EmptyView()
-                            } else {
-                                Label(order.label, systemImage: order.icon).tag(order)
-                            }
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .onChange(of: sortOrder) { _, newOrder in
+                POICategoryBar(
+                    categories: categories,
+                    selectedCategory: $selectedCategory,
+                    sortOrder: $sortOrder,
+                    hasResults: !results.isEmpty,
+                    aiEnabled: aiEnabled,
+                    onSelect: { cat in
+                        selectedCategory = cat.label
+                        searchQuery = cat.label
+                        Task { await search() }
+                    },
+                    onSortChange: { newOrder in
                         if newOrder == .suggested { Task { await rankResults() } }
                     }
-                }
+                )
 
                 Divider()
 
-                Group {
-                    if isLoading {
-                        ProgressView("Searching near route start…")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if results.isEmpty && selectedCategory != nil {
-                        VStack(spacing: 14) {
-                            Image(systemName: "mappin.slash")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.tertiary)
-                            Text("No results found")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text("Try a different category.")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if selectedCategory == nil {
-                        VStack(spacing: 14) {
-                            Image(systemName: "sparkle.magnifyingglass")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.blue.opacity(0.6))
-                            Text("Pick a category above")
-                                .font(.subheadline.weight(.medium))
-                            Text("We'll search near the route start.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            if isRanking {
-                                HStack(spacing: 8) {
-                                    ProgressView().controlSize(.small).tint(.purple)
-                                    Text("Ranking by relevance…")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.top, 12)
-                            }
-
-                            LazyVStack(spacing: 10) {
-                                ForEach(displayItems) { ranked in
-                                    POIDiscoveryRow(
-                                        ranked: ranked,
-                                        mapItem: results.first(where: { $0.deterministicPOIID == ranked.poi.id }),
-                                        isAdded: routeStore.selectedPOIs.contains(where: { $0.id == ranked.poi.id }),
-                                        showReason: sortOrder == .suggested,
-                                        onAdd: addPOI
-                                    )
-                                }
-                            }
-                            .padding(16)
-                        }
-                    }
-                }
+                POIResultsContent(
+                    isLoading: isLoading,
+                    isRanking: isRanking,
+                    selectedCategory: selectedCategory,
+                    sortOrder: sortOrder,
+                    displayItems: displayItems,
+                    results: results,
+                    selectedPOIs: routeStore.selectedPOIs,
+                    onAdd: addPOI
+                )
             }
             .navigationTitle("Discover POIs")
             .navigationBarTitleDisplayMode(.inline)
@@ -145,13 +74,11 @@ struct POIDiscoverySheet: View {
         let asPOIs = results.map { item in
             item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
         }
-
         switch sortOrder {
         case .suggested:
             return rankedResults.isEmpty
                 ? asPOIs.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
                 : rankedResults
-
         case .nearest:
             guard let start = route.trackPoints.first else {
                 return asPOIs.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
@@ -161,8 +88,6 @@ struct POIDiscoverySheet: View {
                 longitude: start.coordinate.longitude
             )
             // ⚠️ REGRESSION GUARD — DO NOT REMOVE EXPLICIT TYPES ⚠️
-            // The Swift type-checker cannot infer types for CLLocation distance calls
-            // inside a .sorted closure without explicit annotations.
             let sorted: [POIModel] = asPOIs.sorted { (a: POIModel, b: POIModel) -> Bool in
                 let distA = CLLocation(latitude: a.coordinate.latitude, longitude: a.coordinate.longitude)
                     .distance(from: originLocation)
@@ -171,7 +96,6 @@ struct POIDiscoverySheet: View {
                 return distA < distB
             }
             return sorted.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
-
         case .byCategory:
             let sorted = asPOIs.sorted { $0.category.rawValue < $1.category.rawValue }
             return sorted.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
@@ -190,13 +114,12 @@ struct POIDiscoverySheet: View {
         rankedResults = []
         results = (try? await POISearchService.shared.search(query: searchQuery, near: origin)) ?? []
         isLoading = false
-
         if sortOrder == .suggested && VeloAI.isAvailable && aiEnabled && !results.isEmpty {
             Task { await rankResults() }
         }
     }
 
-    // MARK: - F-A3: Rank
+    // MARK: - Rank
 
     private func rankResults() async {
         guard VeloAI.isAvailable && aiEnabled && !results.isEmpty else { return }
@@ -215,14 +138,10 @@ struct POIDiscoverySheet: View {
         isRanking = false
     }
 
-    // MARK: - Add POI dispatcher
+    // MARK: - Add POI
 
     private func addPOI(ranked: RankedPOI, mapItem: MKMapItem?) {
-        if let mi = mapItem {
-            addPOIFromMapItem(mi)
-        } else {
-            addPOIFromModel(ranked.poi)
-        }
+        if let mi = mapItem { addPOIFromMapItem(mi) } else { addPOIFromModel(ranked.poi) }
     }
 
     private func addPOIFromMapItem(_ item: MKMapItem) {
@@ -263,8 +182,124 @@ struct POIDiscoverySheet: View {
     }
 }
 
+// MARK: - POICategoryBar
+
+private struct POICategoryBar: View {
+    let categories: [(label: String, icon: String)]
+    @Binding var selectedCategory: String?
+    @Binding var sortOrder: POISortOrder
+    let hasResults: Bool
+    let aiEnabled: Bool
+    let onSelect: ((label: String, icon: String)) -> Void
+    let onSortChange: (POISortOrder) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(categories, id: \.label) { cat in
+                        CategoryChip(
+                            label: cat.label,
+                            icon: cat.icon,
+                            isSelected: selectedCategory == cat.label,
+                            action: { onSelect(cat) }
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+            if hasResults {
+                Divider()
+                Picker("Sort", selection: $sortOrder) {
+                    ForEach(POISortOrder.allCases) { order in
+                        if order == .suggested && !(VeloAI.isAvailable && aiEnabled) {
+                            EmptyView()
+                        } else {
+                            Label(order.label, systemImage: order.icon).tag(order)
+                        }
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .onChange(of: sortOrder) { _, newOrder in onSortChange(newOrder) }
+            }
+        }
+    }
+}
+
+// MARK: - POIResultsContent
+
+private struct POIResultsContent: View {
+    let isLoading: Bool
+    let isRanking: Bool
+    let selectedCategory: String?
+    let sortOrder: POISortOrder
+    let displayItems: [RankedPOI]
+    let results: [MKMapItem]
+    let selectedPOIs: [POIModel]
+    let onAdd: (RankedPOI, MKMapItem?) -> Void
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView("Searching near route start…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if results.isEmpty && selectedCategory != nil {
+                emptyResultsView
+            } else if selectedCategory == nil {
+                promptView
+            } else {
+                resultsList
+            }
+        }
+    }
+
+    private var emptyResultsView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "mappin.slash").font(.system(size: 32)).foregroundStyle(.tertiary)
+            Text("No results found").font(.subheadline).foregroundStyle(.secondary)
+            Text("Try a different category.").font(.caption).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var promptView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "sparkle.magnifyingglass").font(.system(size: 40)).foregroundStyle(.blue.opacity(0.6))
+            Text("Pick a category above").font(.subheadline.weight(.medium))
+            Text("We'll search near the route start.").font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var resultsList: some View {
+        ScrollView {
+            if isRanking {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small).tint(.purple)
+                    Text("Ranking by relevance…").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.top, 12)
+            }
+            LazyVStack(spacing: 10) {
+                ForEach(displayItems) { ranked in
+                    POIDiscoveryRow(
+                        ranked: ranked,
+                        mapItem: results.first(where: { $0.deterministicPOIID == ranked.poi.id }),
+                        isAdded: selectedPOIs.contains(where: { $0.id == ranked.poi.id }),
+                        showReason: sortOrder == .suggested,
+                        onAdd: onAdd
+                    )
+                }
+            }
+            .padding(16)
+        }
+    }
+}
+
 // MARK: - CategoryChip
-// Extracted from the ForEach body to avoid chained ternary type-check timeouts.
 
 private struct CategoryChip: View {
     let label: String
@@ -275,10 +310,8 @@ private struct CategoryChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+                Text(label).font(.system(size: 13, weight: .medium))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -288,13 +321,8 @@ private struct CategoryChip: View {
         .animation(.spring(duration: 0.2), value: isSelected)
     }
 
-    private var chipBackground: Color {
-        isSelected ? .blue : Color(.systemGray5)
-    }
-
-    private var chipForeground: Color {
-        isSelected ? .white : Color(.label)
-    }
+    private var chipBackground: Color { isSelected ? .blue : Color(.systemGray5) }
+    private var chipForeground: Color { isSelected ? .white : Color(.label) }
 }
 
 // MARK: - POIDiscoveryRow
@@ -354,22 +382,19 @@ private struct POIDiscoveryResultCard: View {
 
     @Environment(\.openURL) private var openURL
 
-    // Pre-computed to avoid chained ternaries in the result builder
-    private var iconName: String    { isAdded ? "checkmark" : categoryIcon }
+    private var iconName: String        { isAdded ? "checkmark" : categoryIcon }
     private var iconWeight: Font.Weight { isAdded ? .bold : .regular }
-    private var iconColor: Color    { isAdded ? .green : .blue }
-    private var circleFill: Color   { isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1) }
-    private var addLabel: String    { isAdded ? "Added" : "Add" }
-    private var addColor: Color     { isAdded ? .green : .blue }
+    private var iconColor: Color        { isAdded ? .green : .blue }
+    private var circleFill: Color       { isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1) }
+    private var addLabel: String        { isAdded ? "Added" : "Add" }
+    private var addColor: Color         { isAdded ? .green : .blue }
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onTap) {
                 HStack(spacing: 12) {
                     ZStack {
-                        Circle()
-                            .fill(circleFill)
-                            .frame(width: 44, height: 44)
+                        Circle().fill(circleFill).frame(width: 44, height: 44)
                         Image(systemName: iconName)
                             .font(.system(size: 17, weight: iconWeight))
                             .foregroundStyle(iconColor)
@@ -377,14 +402,9 @@ private struct POIDiscoveryResultCard: View {
                     .animation(.spring(duration: 0.25), value: isAdded)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(item.name)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
+                        Text(item.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                         if let address = item.address {
-                            Text(address)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         if !reason.isEmpty {
                             Text(reason)
@@ -394,20 +414,14 @@ private struct POIDiscoveryResultCard: View {
                                 .transition(.opacity)
                         }
                     }
-
                     Spacer()
-
-                    Text(addLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(addColor)
+                    Text(addLabel).font(.caption.weight(.semibold)).foregroundStyle(addColor)
                 }
             }
             .buttonStyle(.plain)
 
             if let mapsURL = item.mapsURL {
-                Button {
-                    openURL(mapsURL)
-                } label: {
+                Button { openURL(mapsURL) } label: {
                     Image(systemName: "map")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
