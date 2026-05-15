@@ -61,6 +61,8 @@ struct PlanView: View {
             if let route = routeToLoad {
                 plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
+                // Compute the segments so the route polyline appears
+                await engine.recomputeAll(in: plan)
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
                 }
@@ -71,6 +73,8 @@ struct PlanView: View {
             Task {
                 plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
+                // Compute the segments so the route polyline appears
+                await engine.recomputeAll(in: plan)
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
                 }
