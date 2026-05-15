@@ -123,6 +123,9 @@ public struct GPXExporter {
         case .campsite:      return "Campground"
         case .pharmacy:      return "Medical Facility"
         case .custom:        return "Waypoint"
+        case .restroom:      return "Restroom"
+        case .bikeshop:      return "Car Repair"
+        case .scenic:        return "Scenic Area"
         }
     }
 }
