@@ -4,6 +4,8 @@
 //
 
 import Foundation
+import Combine
+import SwiftUI
 
 @MainActor
 final class RideHistoryStore: ObservableObject {
