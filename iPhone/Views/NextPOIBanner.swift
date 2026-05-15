@@ -4,10 +4,11 @@ import MapKit
 struct NextPOIBanner: View {
     let item: MKMapItem
     let distance: CLLocationDistance
+    let category: POICategory?
 
     var body: some View {
         HStack {
-            Image(systemName: "mappin.circle.fill")
+            Image(systemName: category?.systemImage ?? "mappin.circle.fill")
                 .foregroundStyle(.blue)
                 .font(.title2)
             VStack(alignment: .leading, spacing: 2) {

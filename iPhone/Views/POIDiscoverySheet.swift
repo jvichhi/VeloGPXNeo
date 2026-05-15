@@ -20,9 +20,11 @@ struct POIDiscoverySheet: View {
     private let categories: [(label: String, icon: String)] = [
         ("Café",       "cup.and.saucer.fill"),
         ("Water",      "drop.fill"),
-        ("Bike Shop",  "wrench.and.screwdriver"),
+        ("Bike Shop",  "storefront.fill"),
         ("Restaurant", "fork.knife"),
-        ("Pharmacy",   "cross.case.fill")
+        ("Pharmacy",   "cross.fill"),
+        ("Restroom",   "figure.walk"),
+        ("Scenic",     "photo.on.rectangle")
     ]
 
     var body: some View {
@@ -131,7 +133,7 @@ struct POIDiscoverySheet: View {
                                         item: ranked.poi,
                                         isAdded: isAdded,
                                         reason: sortOrder == .suggested ? ranked.reason : "",
-                                        categoryIcon: categories.first(where: { $0.label == selectedCategory })?.icon ?? "mappin",
+                                        categoryIcon: ranked.poi.category.systemImage,
                                         onTap: { if let mi = mapItem { addPOI(from: mi) } else { addPOI(from: ranked.poi) } }
                                     )
                                 }
