@@ -175,7 +175,12 @@ struct POIDiscoverySheet: View {
                 latitude:  start.coordinate.latitude,
                 longitude: start.coordinate.longitude
             )
-            // Explicit types help the compiler resolve this closure in reasonable time
+            // ⚠️ REGRESSION GUARD — DO NOT REMOVE EXPLICIT TYPES ⚠️
+            // This closure has regressed 3 times (commits e8e7b25, c0ff0b5, 870227b).
+            // The Swift type-checker cannot infer types for CLLocation distance calls
+            // inside a .sorted closure without explicit annotations. Removing the
+            // explicit `(a: POIModel, b: POIModel) -> Bool` types will cause:
+            // "The compiler is unable to type-check this expression in reasonable time"
             let sorted: [POIModel] = asPOIs.sorted { (a: POIModel, b: POIModel) -> Bool in
                 let distA = CLLocation(latitude: a.coordinate.latitude, longitude: a.coordinate.longitude)
                     .distance(from: originLocation)
