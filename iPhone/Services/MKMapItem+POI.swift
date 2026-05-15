@@ -3,7 +3,9 @@
 //  VeloGPX
 //
 //  Shared helpers for converting MKMapItem → POI primitives.
-//  Previously duplicated verbatim in NearbySearchSheet and POIDiscoverySheet.
+//  Deployment target is iOS 26 — all #available branches removed per PROJECT.md.
+//  Uses iOS 26 APIs exclusively: item.location, item.address (MKAddress).
+//  MKMapItem.placemark is deprecated iOS 26.
 //
 
 import MapKit
@@ -11,34 +13,24 @@ import CoreLocation
 
 extension MKMapItem {
 
-    // MARK: - Coordinate (iOS 26 compat)
+    // MARK: - Coordinate
 
-    /// Returns the item's coordinate in a backward-compatible way.
-    /// iOS 26 made `CLLocation` non-optional on `MKMapItem`; older OS uses the placemark.
+    /// The item's coordinate via item.location (non-optional on iOS 26).
     var poiCoordinate: CLLocationCoordinate2D {
-        if #available(iOS 26.0, *) {
-            return location.coordinate
-        } else {
-            return placemark.coordinate
-        }
+        location.coordinate
     }
 
     // MARK: - Address
 
-    /// Short single-line address, backward-compatible.
+    /// Short single-line address from MKAddress (iOS 26+).
     var shortAddress: String? {
-        if #available(iOS 26.0, *) {
-            return address?.shortAddress
-        } else {
-            return placemark.thoroughfare
-        }
+        address?.formattedAddress
     }
 
     // MARK: - Deterministic UUID
 
-    /// Produces a stable UUID derived from the item's coordinate (6 decimal places).
-    /// Two searches returning the same physical place always yield the same ID,
-    /// eliminating name-collision bugs when checking `isAdded` across sheets.
+    /// Stable UUID derived from coordinate (6 decimal places).
+    /// Same physical place always yields the same ID across searches.
     var deterministicPOIID: UUID {
         let coord = poiCoordinate
         let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000

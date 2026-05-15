@@ -7,9 +7,9 @@
 //  FoundationModels session seeded with reverse-geocoded place names from
 //  the route's start and midpoint.
 //
-//  Note: @available(iOS 26,*) removed — deployment target is iOS 26 (PROJECT.md).
-//  Note: CLGeocoder replaced with MKReverseGeocodingRequest (iOS 18+ API, PROJECT.md rule).
-//  Note: MKMapItem.placemark deprecated iOS 26 — use addressRepresentations instead.
+//  Deployment target: iOS 26. No @available guards needed.
+//  CLGeocoder replaced with MKReverseGeocodingRequest.
+//  Locality resolved via MKMapItem.address (MKAddress) — .placemark deprecated iOS 26.
 //
 
 import Foundation
@@ -21,8 +21,6 @@ struct RouteNameSuggester {
 
     // MARK: - Public API
 
-    /// Returns up to 3 suggested route names for `route`.
-    /// Throws if the language model session fails.
     func suggest(for route: RouteModel) async throws -> [String] {
         let points = sampledPoints(from: route)
 
@@ -45,17 +43,16 @@ struct RouteNameSuggester {
         let session  = LanguageModelSession()
         let response = try await session.respond(to: prompt)
 
-        let names = response.content
+        return response.content
             .split(separator: "\n")
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-
-        return Array(names.prefix(3))
+            .prefix(3)
+            .map { $0 }
     }
 
     // MARK: - Private helpers
 
-    /// Returns up to 5 evenly-spaced coordinates from the route's track points.
     private func sampledPoints(from route: RouteModel) -> [Coordinate] {
         let count = route.trackPoints.count
         guard count > 0 else { return [] }
@@ -63,20 +60,16 @@ struct RouteNameSuggester {
         return stride(from: 0, to: count, by: step).map { route.trackPoints[$0].coordinate }
     }
 
-    /// Reverse-geocodes a `Coordinate` to a locality string.
-    /// Uses MKReverseGeocodingRequest — init is failable, .mapItems is async throws.
-    /// Falls back to addressRepresentations.locality (MKMapItem.placemark deprecated iOS 26).
-    /// Returns `nil` silently on failure — names degrade gracefully.
+    /// Reverse-geocodes a Coordinate using MKReverseGeocodingRequest.
+    /// init is failable; .mapItems is async throws.
+    /// Locality read from MKMapItem.address (MKAddress) — .placemark is deprecated iOS 26.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         guard let items = try? await request.mapItems,
               let first = items.first else { return nil }
-        // .placemark is deprecated on iOS 26; use addressRepresentations
-        if let rep = first.addressRepresentations.first {
-            return rep.locality ?? rep.subLocality
-        }
-        return nil
+        // MKMapItem.address is MKAddress? on iOS 26 — direct properties, not a collection
+        return first.address?.locality ?? first.address?.subLocality
     }
 }

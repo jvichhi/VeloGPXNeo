@@ -3,10 +3,9 @@
 //  VeloGPX
 //
 //  Resolves GPX waypoint coordinates into rich MKMapItem.
-//
 //  iOS 26+ only: MKReverseGeocodingRequest (primary) + MKLocalSearch (fallback).
-//  CLGeocoder and MKPlacemark(placemark:) are deprecated in iOS 26 and
-//  have been fully removed — VeloGPX targets iOS 26+ exclusively.
+//  @available(iOS 26,*) annotation removed — deployment target is iOS 26 (PROJECT.md).
+//  CLGeocoder and MKPlacemark(placemark:) fully removed.
 //
 
 import Foundation
@@ -20,7 +19,6 @@ struct ResolvedWaypoint {
     let resolvedViaPlaceDescriptor: Bool
 }
 
-@available(iOS 26.0, *)
 actor PlaceDescriptorService {
 
     static let shared = PlaceDescriptorService()
@@ -29,7 +27,7 @@ actor PlaceDescriptorService {
     func resolve(_ waypoint: WaypointPoint) async -> ResolvedWaypoint {
         let lat = waypoint.coordinate.latitude
         let lon = waypoint.coordinate.longitude
-        let coord = await MainActor.run { CLLocationCoordinate2D(latitude: lat, longitude: lon) }
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
 
         if let resolved = await resolveViaReverseGeocoding(waypoint: waypoint, coordinate: coord) {
             return resolved
@@ -48,7 +46,7 @@ actor PlaceDescriptorService {
         }
     }
 
-    // MARK: - MKReverseGeocodingRequest (iOS 26+)
+    // MARK: - MKReverseGeocodingRequest
 
     private func resolveViaReverseGeocoding(
         waypoint: WaypointPoint,
@@ -78,10 +76,11 @@ actor PlaceDescriptorService {
         waypoint: WaypointPoint,
         coordinate: CLLocationCoordinate2D
     ) async -> ResolvedWaypoint {
-        let lat = coordinate.latitude
-        let lon = coordinate.longitude
-        let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 100, longitudinalMeters: 100)
-
+        let region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: 100,
+            longitudinalMeters: 100
+        )
         let request = MKLocalSearch.Request()
         request.region = region
         request.pointOfInterestFilter = .includingAll
@@ -89,8 +88,8 @@ actor PlaceDescriptorService {
 
         do {
             let response = try await MKLocalSearch(request: request).start()
-            let ref = CLLocation(latitude: lat, longitude: lon)
-            // Use item.location (CLLocation) — MKMapItem.placemark is deprecated in iOS 26
+            let ref = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            // item.location is CLLocation (non-optional iOS 26) — .placemark deprecated
             let closest = response.mapItems.min(by: {
                 $0.location.distance(from: ref) < $1.location.distance(from: ref)
             })
@@ -101,8 +100,7 @@ actor PlaceDescriptorService {
                 resolvedViaPlaceDescriptor: false
             )
         } catch {
-            // Build a bare MKMapItem using iOS 26 API
-            let location = CLLocation(latitude: lat, longitude: lon)
+            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
             let fallbackItem = MKMapItem(location: location, address: nil)
             fallbackItem.name = waypoint.name ?? "Waypoint"
             return ResolvedWaypoint(
