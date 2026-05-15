@@ -20,6 +20,59 @@ final class RideHistoryStore: ObservableObject {
         load()
     }
 
+    // MARK: - Alias
+
+    /// Convenience alias used by RideHistoryView and other callsites.
+    var rides: [PersistedRideSummary] { summaries }
+
+    // MARK: - Personal Records
+
+    var longestRide: PersistedRideSummary? {
+        summaries.max(by: { $0.totalDistance < $1.totalDistance })
+    }
+
+    var fastestRide: PersistedRideSummary? {
+        summaries.max(by: { $0.avgSpeedKmh < $1.avgSpeedKmh })
+    }
+
+    var climbingRide: PersistedRideSummary? {
+        summaries.max(by: { $0.elevationGain < $1.elevationGain })
+    }
+
+    // MARK: - Monthly Sections
+
+    struct MonthSection: Identifiable {
+        /// Human-readable month label, e.g. "May 2026". Used as section ID.
+        let id: String
+        let rides: [PersistedRideSummary]
+
+        var rideCount: Int { rides.count }
+        var totalDistance: Double { rides.reduce(0) { $0 + $1.totalDistance } }
+        var totalElevation: Double { rides.reduce(0) { $0 + $1.elevationGain } }
+    }
+
+    var monthlySections: [MonthSection] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        // Group by "Month YYYY" string, preserving insertion order (summaries
+        // are already newest-first so groups naturally appear newest-first too).
+        var seen: [String: Int] = [:]        // label → index into `sections`
+        var sections: [MonthSection] = []
+
+        for ride in summaries {
+            let label = formatter.string(from: ride.startDate)
+            if let idx = seen[label] {
+                let existing = sections[idx]
+                sections[idx] = MonthSection(id: existing.id, rides: existing.rides + [ride])
+            } else {
+                seen[label] = sections.count
+                sections.append(MonthSection(id: label, rides: [ride]))
+            }
+        }
+        return sections
+    }
+
     // MARK: - Save new ride
 
     func save(_ summary: RideSummary) {
