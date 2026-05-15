@@ -65,12 +65,12 @@ struct RouteNameSuggester {
     /// Reverse-geocodes a `Coordinate` to a locality/subLocality string using
     /// MKReverseGeocodingRequest (CLGeocoder is deprecated on iOS 18+).
     /// Returns `nil` silently on failure — names degrade gracefully.
+    /// MKReverseGeocodingRequest(location:) is failable; .mapItems is async throws.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        let request  = MKReverseGeocodingRequest(location: location)
-        // .mapItems is async (not throws) — no try needed
-        let items    = await request.mapItems
+        guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
+        guard let items = try? await request.mapItems else { return nil }
         return items.first?.placemark.locality ?? items.first?.placemark.subLocality
     }
 }
