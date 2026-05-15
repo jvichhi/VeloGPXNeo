@@ -124,26 +124,16 @@ struct POIDiscoverySheet: View {
                             }
 
                             LazyVStack(spacing: 10) {
+                                // ✅ Each row is its own View struct — no let bindings
+                                // or overloaded closures inside the result builder.
+                                // See POIDiscoveryRow below.
                                 ForEach(displayItems) { ranked in
-                                    let mapItem = results.first(where: { $0.deterministicPOIID == ranked.poi.id })
-                                    let isAdded = routeStore.selectedPOIs.contains { $0.id == ranked.poi.id }
-                                    // ⚠️ REGRESSION GUARD — DO NOT INLINE THIS BACK INTO onTap ⚠️
-                                    // The overloaded addPOI(from:) calls inside a ForEach closure
-                                    // cause "compiler unable to type-check" (line 128) when inlined.
-                                    // Keep the action extracted as a local let binding.
-                                    let action: () -> Void = {
-                                        if let mi = mapItem {
-                                            addPOI(from: mi)
-                                        } else {
-                                            addPOI(from: ranked.poi)
-                                        }
-                                    }
-                                    POIDiscoveryResultCard(
-                                        item: ranked.poi,
-                                        isAdded: isAdded,
-                                        reason: sortOrder == .suggested ? ranked.reason : "",
-                                        categoryIcon: ranked.poi.category.systemImage,
-                                        onTap: action
+                                    POIDiscoveryRow(
+                                        ranked: ranked,
+                                        mapItem: results.first(where: { $0.deterministicPOIID == ranked.poi.id }),
+                                        isAdded: routeStore.selectedPOIs.contains(where: { $0.id == ranked.poi.id }),
+                                        showReason: sortOrder == .suggested,
+                                        onAdd: addPOI
                                     )
                                 }
                             }
@@ -165,7 +155,6 @@ struct POIDiscoverySheet: View {
     // MARK: - Computed display items
 
     private var displayItems: [RankedPOI] {
-        // Convert MKMapItem results → POIModel for display
         let asPOIs = results.map { item in
             item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
         }
@@ -185,11 +174,8 @@ struct POIDiscoverySheet: View {
                 longitude: start.coordinate.longitude
             )
             // ⚠️ REGRESSION GUARD — DO NOT REMOVE EXPLICIT TYPES ⚠️
-            // This closure has regressed 3 times (commits e8e7b25, c0ff0b5, 870227b).
             // The Swift type-checker cannot infer types for CLLocation distance calls
-            // inside a .sorted closure without explicit annotations. Removing the
-            // explicit `(a: POIModel, b: POIModel) -> Bool` types will cause:
-            // "The compiler is unable to type-check this expression in reasonable time"
+            // inside a .sorted closure without explicit annotations.
             let sorted: [POIModel] = asPOIs.sorted { (a: POIModel, b: POIModel) -> Bool in
                 let distA = CLLocation(latitude: a.coordinate.latitude, longitude: a.coordinate.longitude)
                     .distance(from: originLocation)
@@ -242,20 +228,17 @@ struct POIDiscoverySheet: View {
         isRanking = false
     }
 
-    // MARK: - Helpers
+    // MARK: - Add POI dispatcher (single entry point passed to POIDiscoveryRow)
 
-    private func routeDifficulty() -> String {
-        switch route.elevationGain {
-        case ..<200:     return "easy"
-        case 200..<500:  return "moderate"
-        case 500..<1000: return "hard"
-        default:         return "epic"
+    private func addPOI(ranked: RankedPOI, mapItem: MKMapItem?) {
+        if let mi = mapItem {
+            addPOIFromMapItem(mi)
+        } else {
+            addPOIFromModel(ranked.poi)
         }
     }
 
-    // MARK: - Add POI (from MKMapItem)
-
-    private func addPOI(from item: MKMapItem) {
+    private func addPOIFromMapItem(_ item: MKMapItem) {
         let id = item.deterministicPOIID
         guard !routeStore.selectedPOIs.contains(where: { $0.id == id }) else { return }
         let poi = item.toPOIModel(
@@ -265,9 +248,7 @@ struct POIDiscoverySheet: View {
         routeStore.selectedPOIs.append(poi)
     }
 
-    // MARK: - Add POI (from POIModel — fallback when MKMapItem not found)
-
-    private func addPOI(from poi: POIModel) {
+    private func addPOIFromModel(_ poi: POIModel) {
         guard !routeStore.selectedPOIs.contains(where: { $0.id == poi.id }) else { return }
         routeStore.selectedPOIs.append(poi)
     }
@@ -295,6 +276,29 @@ struct POIDiscoverySheet: View {
         if name.contains("hotel") || name.contains("hostel") || name.contains("inn") { return .accommodation }
         if name.contains("camp") { return .campsite }
         return .custom
+    }
+}
+
+// MARK: - POIDiscoveryRow
+// Dedicated row struct so the ForEach body stays clean.
+// All per-row logic lives here as stored properties / computed vars,
+// not as `let` bindings in the result builder.
+
+private struct POIDiscoveryRow: View {
+    let ranked: RankedPOI
+    let mapItem: MKMapItem?
+    let isAdded: Bool
+    let showReason: Bool
+    let onAdd: (RankedPOI, MKMapItem?) -> Void
+
+    var body: some View {
+        POIDiscoveryResultCard(
+            item: ranked.poi,
+            isAdded: isAdded,
+            reason: showReason ? ranked.reason : "",
+            categoryIcon: ranked.poi.category.systemImage,
+            onTap: { onAdd(ranked, mapItem) }
+        )
     }
 }
 
