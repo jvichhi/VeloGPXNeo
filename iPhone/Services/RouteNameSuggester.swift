@@ -69,8 +69,8 @@ struct RouteNameSuggester {
         guard let coord else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let request  = MKReverseGeocodingRequest(location: location)
-        guard let items = try? await request.mapItems,
-              let placemark = items.first?.placemark else { return nil }
-        return placemark.locality ?? placemark.subLocality
+        // .mapItems is async (not throws) — no try needed
+        let items    = await request.mapItems
+        return items.first?.placemark.locality ?? items.first?.placemark.subLocality
     }
 }
