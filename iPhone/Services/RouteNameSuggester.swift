@@ -18,30 +18,28 @@
 // CLGeocoder is deprecated on iOS 18+ (PROJECT.md rule MK-3).
 // MKReverseGeocodingRequest is the MapKit-native replacement introduced in iOS 18.
 // It uses structured concurrency (async/await) with no completion handler.
-// API: MKReverseGeocodingRequest(location: CLLocation) is a failable init returning
-// MKReverseGeocodingRequest? — always guard/if-let before calling .mapItems.
-// .mapItems is async throws — returns [MKMapItem].
+// API: guard let request = MKReverseGeocodingRequest(location: CLLocation) (failable init)
+//      try await request.mapItems → [MKMapItem]
+//
+// iOS 26 ADDRESS API:
+// MKMapItem.placemark is deprecated in iOS 26.
+// Use mapItem.address (MKAddress) instead:
+//   mapItem.address?.subLocality  → neighbourhood (e.g. "Plateau-Mont-Royal")
+//   mapItem.address?.locality     → city (e.g. "Montreal")
 //
 // WHY session.respond(to:) and NOT session.generate(from:):
 // respond(to:) takes a plain String prompt and returns a plain String.
 // generate(from:) takes a @Generable schema and returns a structured type.
 // We want plain text names (not structured data), so respond(to:) is correct here.
-// Sprint 3's PlanAssistantEngine will use generate(from:) for RidePlanIntent.
 //
 // DEPRECATIONS TO AVOID:
-// ❌ CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in ... }
-//    — completion-handler style, deprecated iOS 18+. Never use.
-// ❌ CLGeocoder().reverseGeocodeLocation(_:) async — still CLGeocoder, still deprecated.
-// ✅ guard let request = MKReverseGeocodingRequest(location: CLLocation) — failable init
-// ✅ try await request.mapItems.first — async throws, unwrapped request
-// ❌ session.stream(from:onPartial:) — removed in iOS 26 beta.
-// ✅ session.respond(to: prompt) — correct for plain String output.
-//
-// ERROR HANDLING:
-// suggest(for:) throws. The caller (RouteRenameSheet.fetchSuggestions) catches and
-// sets suggestionState = .failed("..."). The user can tap Retry.
-// FoundationModels throws LanguageModelError on model unavailability, prompt rejection,
-// or safety filtering. We propagate the error without wrapping so the caller can inspect.
+// ❌ CLGeocoder — deprecated iOS 18+
+// ❌ MKMapItem.placemark — deprecated iOS 26, use .address instead
+// ❌ session.stream(from:onPartial:) — removed in iOS 26 beta
+// ✅ guard let request = MKReverseGeocodingRequest(location:) — failable init
+// ✅ try await request.mapItems — async throws on unwrapped request
+// ✅ mapItem.address?.subLocality / .locality — iOS 26 API
+// ✅ session.respond(to: prompt) — correct for plain String output
 
 import Foundation
 import MapKit
@@ -64,18 +62,10 @@ struct RouteNameSuggester {
     /// - Returns: An array of exactly 3 (or fewer, if the model returns fewer) name strings.
     /// - Throws: `LanguageModelError` if the session fails, or any error from geocoding.
     func suggest(for route: RouteModel) async throws -> [String] {
-        // Step 1: Geocode the route's start coordinate to get a location name.
-        // Uses MKReverseGeocodingRequest — the iOS 18+ replacement for deprecated CLGeocoder.
         let locationName = await geocodeStartName(for: route)
-
-        // Step 2: Build the prompt string.
         let prompt = buildPrompt(route: route, locationName: locationName)
-
-        // Step 3: Create a fresh session and call respond(to:).
         let session = VeloAI.makeSession()
         let response = try await session.respond(to: prompt)
-
-        // Step 4: Parse the response into individual name strings.
         return parseNames(from: response.content)
     }
 
@@ -83,10 +73,9 @@ struct RouteNameSuggester {
 
     /// Reverse-geocodes the first trackpoint of the route to get a human-readable location name.
     ///
-    /// Uses `MKReverseGeocodingRequest` (iOS 18+ API, required by PROJECT.md).
-    /// NOTE: MKReverseGeocodingRequest(location:) is a failable initialiser — it returns
-    /// MKReverseGeocodingRequest? and must be unwrapped before calling .mapItems.
-    /// Falls back to `nil` gracefully on empty route or geocoding failure.
+    /// Uses `MKReverseGeocodingRequest` (iOS 18+ API) with the iOS 26 address API.
+    /// MKReverseGeocodingRequest(location:) is a failable init — guard before calling .mapItems.
+    /// MKMapItem.placemark is deprecated in iOS 26; use .address (MKAddress) instead.
     private func geocodeStartName(for route: RouteModel) async -> String? {
         guard let first = route.trackPoints.first else { return nil }
 
@@ -95,11 +84,11 @@ struct RouteNameSuggester {
             longitude: first.coordinate.longitude
         )
 
-        // MKReverseGeocodingRequest(location:) is failable — guard-unwrap before use.
-        // .mapItems is async throws — returns [MKMapItem].
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         guard let mapItem = try? await request.mapItems.first else { return nil }
-        return mapItem.placemark.subLocality ?? mapItem.placemark.locality
+
+        // Use .address (iOS 26 API) — .placemark is deprecated in iOS 26
+        return mapItem.address?.subLocality ?? mapItem.address?.locality
     }
 
     /// Builds the prompt string sent to the language model.
