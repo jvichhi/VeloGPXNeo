@@ -231,7 +231,9 @@ actor POIRankingEngine {
 // MARK: - Supporting Types
 
 /// A POI with a relevance score and AI-generated reason, ready for display.
-struct RankedPOI {
+/// Conforms to Identifiable by forwarding poi.id so ForEach can use it directly.
+struct RankedPOI: Identifiable {
+    var id: UUID { poi.id }
     let poi: POIModel
     /// Relevance score in [0, 1]. Higher = more relevant to current ride context.
     let score: Float
