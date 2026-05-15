@@ -9,6 +9,7 @@
 //
 //  Note: @available(iOS 26,*) removed — deployment target is iOS 26 (PROJECT.md).
 //  Note: CLGeocoder replaced with MKReverseGeocodingRequest (iOS 18+ API, PROJECT.md rule).
+//  Note: MKMapItem.placemark deprecated iOS 26 — use addressRepresentations instead.
 //
 
 import Foundation
@@ -62,15 +63,20 @@ struct RouteNameSuggester {
         return stride(from: 0, to: count, by: step).map { route.trackPoints[$0].coordinate }
     }
 
-    /// Reverse-geocodes a `Coordinate` to a locality/subLocality string using
-    /// MKReverseGeocodingRequest (CLGeocoder is deprecated on iOS 18+).
+    /// Reverse-geocodes a `Coordinate` to a locality string.
+    /// Uses MKReverseGeocodingRequest — init is failable, .mapItems is async throws.
+    /// Falls back to addressRepresentations.locality (MKMapItem.placemark deprecated iOS 26).
     /// Returns `nil` silently on failure — names degrade gracefully.
-    /// MKReverseGeocodingRequest(location:) is failable; .mapItems is async throws.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
-        guard let items = try? await request.mapItems else { return nil }
-        return items.first?.placemark.locality ?? items.first?.placemark.subLocality
+        guard let items = try? await request.mapItems,
+              let first = items.first else { return nil }
+        // .placemark is deprecated on iOS 26; use addressRepresentations
+        if let rep = first.addressRepresentations.first {
+            return rep.locality ?? rep.subLocality
+        }
+        return nil
     }
 }

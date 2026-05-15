@@ -8,7 +8,7 @@ struct POIDiscoverySheet: View {
 
     @State private var searchQuery = ""
     @State private var results: [MKMapItem] = []
-    @State private var rankedResults: [RankedPOIResult] = []
+    @State private var rankedResults: [RankedPOI] = []
     @State private var isLoading = false
     @State private var isRanking = false
     @State private var selectedCategory: String? = nil
@@ -122,17 +122,17 @@ struct POIDiscoverySheet: View {
                             }
 
                             LazyVStack(spacing: 10) {
-                                ForEach(displayItems, id: \.poi) { ranked in
-                                    let item = ranked.poi
+                                ForEach(displayItems) { ranked in
+                                    let mapItem = results.first(where: { $0.deterministicPOIID == ranked.poi.id })
                                     let isAdded = routeStore.selectedPOIs.contains {
-                                        $0.id == item.deterministicPOIID
+                                        $0.id == ranked.poi.id
                                     }
                                     POIDiscoveryResultCard(
-                                        item: item,
+                                        item: ranked.poi,
                                         isAdded: isAdded,
                                         reason: sortOrder == .suggested ? ranked.reason : "",
                                         categoryIcon: categories.first(where: { $0.label == selectedCategory })?.icon ?? "mappin",
-                                        onTap: { addPOI(from: item) }
+                                        onTap: { if let mi = mapItem { addPOI(from: mi) } else { addPOI(from: ranked.poi) } }
                                     )
                                 }
                             }
@@ -153,39 +153,38 @@ struct POIDiscoverySheet: View {
 
     // MARK: - Computed display items
 
-    private var displayItems: [RankedPOIResult] {
+    private var displayItems: [RankedPOI] {
+        // Convert MKMapItem results → POIModel for display
+        let asPOIs = results.map { item in
+            item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
+        }
+
         switch sortOrder {
         case .suggested:
             return rankedResults.isEmpty
-                ? results.map { RankedPOIResult(poi: $0, reason: "") }
+                ? asPOIs.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
                 : rankedResults
 
         case .nearest:
             guard let start = route.trackPoints.first else {
-                return results.map { RankedPOIResult(poi: $0, reason: "") }
+                return asPOIs.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
             }
-            // Break the sort into explicit sub-expressions to avoid type-checker timeout
-            let origin = CLLocationCoordinate2D(
+            let originLocation = CLLocation(
                 latitude:  start.coordinate.latitude,
                 longitude: start.coordinate.longitude
             )
-            let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
-            let sorted = results.sorted { a, b in
-                let coordA = a.poiCoordinate
-                let coordB = b.poiCoordinate
-                let distA = CLLocation(latitude: coordA.latitude, longitude: coordA.longitude)
+            let sorted = asPOIs.sorted { a, b in
+                let distA = CLLocation(latitude: a.coordinate.latitude, longitude: a.coordinate.longitude)
                     .distance(from: originLocation)
-                let distB = CLLocation(latitude: coordB.latitude, longitude: coordB.longitude)
+                let distB = CLLocation(latitude: b.coordinate.latitude, longitude: b.coordinate.longitude)
                     .distance(from: originLocation)
                 return distA < distB
             }
-            return sorted.map { RankedPOIResult(poi: $0, reason: "") }
+            return sorted.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
 
         case .byCategory:
-            let sorted = results.sorted {
-                ($0.pointOfInterestCategory?.rawValue ?? "") < ($1.pointOfInterestCategory?.rawValue ?? "")
-            }
-            return sorted.map { RankedPOIResult(poi: $0, reason: "") }
+            let sorted = asPOIs.sorted { $0.category.rawValue < $1.category.rawValue }
+            return sorted.map { RankedPOI(poi: $0, score: 0.5, reason: "") }
         }
     }
 
@@ -212,41 +211,32 @@ struct POIDiscoverySheet: View {
     private func rankResults() async {
         guard VeloAI.isAvailable && aiEnabled && !results.isEmpty else { return }
         isRanking = true
-        let context = buildRideContext()
-        rankedResults = await POIRankingEngine.shared.rank(results, context: context)
+        let pois = results.map { item in
+            item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
+        }
+        let context = RideContext(
+            difficulty:      routeDifficulty(),
+            elevationGain:   route.elevationGain,
+            distanceSoFar:   0,
+            timeOfDay:       .current,
+            historyCount:    0
+        )
+        rankedResults = await POIRankingEngine.shared.rank(pois, context: context)
         isRanking = false
     }
 
-    private func buildRideContext() -> RideContext {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let timeOfDay: String
-        switch hour {
-        case 5..<12:  timeOfDay = "morning"
-        case 12..<17: timeOfDay = "afternoon"
-        default:      timeOfDay = "evening"
-        }
+    // MARK: - Helpers
 
-        let gain = route.elevationGain
-        let difficulty: String
-        switch gain {
-        case ..<200:    difficulty = "easy"
-        case 200..<500: difficulty = "moderate"
-        case 500..<1000: difficulty = "hard"
-        default:         difficulty = "epic"
+    private func routeDifficulty() -> String {
+        switch route.elevationGain {
+        case ..<200:     return "easy"
+        case 200..<500:  return "moderate"
+        case 500..<1000: return "hard"
+        default:         return "epic"
         }
-
-        return RideContext(
-            routeName:         route.name,
-            difficulty:        difficulty,
-            elevationGainM:    route.elevationGain,
-            distanceTotalKm:   route.totalDistance / 1000,
-            distanceSoFarKm:   0,
-            timeOfDay:         timeOfDay,
-            topPastCategories: []
-        )
     }
 
-    // MARK: - Add POI
+    // MARK: - Add POI (from MKMapItem)
 
     private func addPOI(from item: MKMapItem) {
         let id = item.deterministicPOIID
@@ -255,6 +245,13 @@ struct POIDiscoverySheet: View {
             category: categoryFromMapItem(item),
             distanceFromRoute: 0
         )
+        routeStore.selectedPOIs.append(poi)
+    }
+
+    // MARK: - Add POI (from POIModel — fallback when MKMapItem not found)
+
+    private func addPOI(from poi: POIModel) {
+        guard !routeStore.selectedPOIs.contains(where: { $0.id == poi.id }) else { return }
         routeStore.selectedPOIs.append(poi)
     }
 
@@ -313,16 +310,13 @@ enum POISortOrder: String, CaseIterable, Identifiable {
 // MARK: - Discovery Result Card
 
 private struct POIDiscoveryResultCard: View {
-    let item: MKMapItem
+    let item: POIModel
     let isAdded: Bool
     let reason: String
     let categoryIcon: String
     let onTap: () -> Void
 
     @Environment(\.openURL) private var openURL
-
-    // Compute once to avoid calling toPOIModel() twice
-    private var poiModel: POIModel { item.toPOIModel(category: .custom) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -339,10 +333,10 @@ private struct POIDiscoveryResultCard: View {
                     .animation(.spring(duration: 0.25), value: isAdded)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(item.name ?? "Unknown")
+                        Text(item.name)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                        if let address = item.shortAddress {
+                        if let address = item.address {
                             Text(address)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -366,7 +360,7 @@ private struct POIDiscoveryResultCard: View {
             }
             .buttonStyle(.plain)
 
-            if let mapsURL = poiModel.mapsURL {
+            if let mapsURL = item.mapsURL {
                 Button {
                     openURL(mapsURL)
                 } label: {
