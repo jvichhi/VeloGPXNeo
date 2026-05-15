@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 14, 2026 — Sprint 2 complete
+> Last updated: May 15, 2026 — Sprint 2 complete, Sprint 3 queued
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -37,24 +37,36 @@
 ---
 
 ## ✅ Sprint 2 — On-Device AI (FoundationModels, iOS 26)
-> **COMPLETE** as of May 14, 2026. All items verified in source code.
+> **COMPLETE** as of May 15, 2026. All items shipped, clean build confirmed.
+> FlowLayout regression introduced in `2f426ba` and fixed in `aa6c614` — see DEVLOG for details.
 
-- [x] **F-A Shared · Add `FoundationModels` framework + `VeloAISession` wrapper**
-  `VeloAI.swift` — shared `isAvailable` gate + `enabledKey` AppStorage key. AI Features toggle in `SettingsView` gated behind `VeloAI.isAvailable`.
+- [x] **F-A Shared · Add `FoundationModels` framework + `VeloAI` wrapper**
+  `VeloAI.swift` — `nonisolated static var isAvailable` gates the entire AI feature set.
+  `static let enabledKey` is the `@AppStorage` key used by Settings toggle and all AI views.
+  FoundationModels.framework must be added manually in Xcode: Build Phases → Link Binary With Libraries.
   → `FEATURES.md § F-A (Shared Implementation Notes)`
+  **New file:** `iPhone/Services/VeloAI.swift`
 
 - [x] **F-A1 · Ride Summary Generation**
-  Post-ride natural language summary from `RideSummary` data. Full idle/generating/done/failed state machine in `RideSummaryView`. Editable before sharing. Caption persisted to `RideHistoryStore`.
+  Post-ride natural language summary from `RideSummary` data. Full idle/generating/done/failed
+  state machine in `RideSummaryView`. Editable before sharing. Caption persisted to `RideHistoryStore`
+  via `saveCaption(id:caption:)`. Uses `session.respond(to: prompt)` — plain string I/O, not `@Generable`.
   → `FEATURES.md § F-A1`
   **New file:** `iPhone/Services/RideSummaryGenerator.swift`
 
 - [x] **F-A2 · Smart Route Naming**
-  Rename swipe action + context menu item in `RouteLibraryView`. `RouteRenameSheet` with auto-fetched pill suggestions from `RouteNameSuggester`. Tapping a pill fills the text field; user can edit freely before saving. Wrapping `FlowLayout` using `Layout` protocol.
+  Rename swipe action (yellow, trailing) + "Rename" context menu item in `RouteLibraryView`.
+  `RouteRenameSheet` auto-fetches 3 pill suggestions via `RouteNameSuggester`. Tapping a pill
+  fills the text field; user can edit freely before saving. `FlowLayout` (View wrapper) +
+  `_FlowLayout` (pure `Layout` — no `@ViewBuilder` storage) implements the pill wrapping.
+  Geocodes route start coordinate with `MKReverseGeocodingRequest` — **not** `CLGeocoder` (deprecated iOS 18+).
   → `FEATURES.md § F-A2`
   **New file:** `iPhone/Services/RouteNameSuggester.swift`
 
 - [x] **F-A3 · POI Relevance Ranking**
-  Context-aware "Suggested" / "Nearest" / "Category" segmented sort in `POIDiscoverySheet`. `POIRankingEngine` actor ranks by ride difficulty, elevation, distance, time-of-day. Reason subtitle shown per card. Auto-ranks on search when AI enabled.
+  Context-aware "Suggested" / "Nearest" / "Category" segmented sort in `POIDiscoverySheet`.
+  `POIRankingEngine` (`actor`) scores each POI by ride difficulty, elevation gain, distance,
+  and time-of-day. Reason subtitle shown per card. Auto-ranks when AI enabled on search.
   → `FEATURES.md § F-A3`
   **New file:** `iPhone/Services/POIRankingEngine.swift`
 
@@ -62,18 +74,27 @@
 
 ## Sprint 3 — RidePlanAssistant (FoundationModels + MKLocalSearch, iOS 26)
 > Goal: natural language → multi-stop route in the Routes tab. Targets v1.4.
-> Requires F-A shared session wrapper from Sprint 2.
+> Requires F-A shared session wrapper from Sprint 2 ✅
 >
-> **F-3 (`RideView` split) — do incrementally here.** F-C2 polish requires touching `RideView` anyway for stop-type icon rendering. When we open `RideView` for F-C2, extract `RideMapLayer` and `RideHUDPanel` at the same time.
+> **F-3 (`RideView` split) — do incrementally here.** F-C2 polish requires touching `RideView` anyway
+> for stop-type icon rendering. When we open `RideView` for F-C2, extract `RideMapLayer` and
+> `RideHUDPanel` at the same time.
 
 - [ ] **F-C1 · RidePlanAssistant — Core**
-  `PlanAssistantEngine` orchestrates: model parses `RidePlanIntent` → `MKLocalSearch` resolves stops → `PlanState` + `PlanRouteEngine` computes geometry. `RidePlanAssistantView` inline expandable input in Routes tab. `DisambiguationSheet` for ambiguous place names.
+  `PlanAssistantEngine` orchestrates: model parses `RidePlanIntent` via `session.generate(from:)`
+  (structured `@Generable` output) → `MKLocalSearch` resolves stops → `PlanState` + `PlanRouteEngine`
+  computes geometry. `RidePlanAssistantView` inline expandable input in Routes tab.
+  `DisambiguationSheet` for ambiguous place names.
   → `FEATURES.md § F-C1`
-  **New files:** `iPhone/Services/PlanAssistantEngine.swift`, `iPhone/Services/RidePlanIntent+Generable.swift`, `iPhone/Views/RidePlanAssistantView.swift`, `iPhone/Views/DisambiguationSheet.swift`
+  **New files:** `iPhone/Services/PlanAssistantEngine.swift`, `iPhone/Services/RidePlanIntent+Generable.swift`,
+  `iPhone/Views/RidePlanAssistantView.swift`, `iPhone/Views/DisambiguationSheet.swift`
   **Modified:** `RouteLibraryView.swift`, `RouteStore.swift`
+  **Watch target:** None of these files may be added to the Watch target — `FoundationModels` is iPhone-only.
 
 - [ ] **F-C2 · RidePlanAssistant — Polish + partial F-3 `RideView` split**
-  Stop-type icons in `WaypointListSheet`. Dwell time estimation per stop intent. Total outing time in `WaypointListSheet` header. "AI Planned" temp section in Routes tab (Save / Discard / Start).
+  Stop-type icons in `WaypointListSheet`. Dwell time estimation per stop intent.
+  Total outing time in `WaypointListSheet` header. "AI Planned" temp section in Routes tab
+  (Save / Discard / Start).
   While touching `RideView` for this: extract `RideMapLayer` and `RideHUDPanel` as separate views.
   → `FEATURES.md § F-C2` · `TECH_DEBT.md § F-3`
   **Modified:** `WaypointListSheet.swift`, `PlanState.swift`, `RouteStore.swift`, `RideView.swift`
@@ -83,7 +104,8 @@
 ## Sprint 4 — Stability & Pre-1.5 Polish
 > Goal: everything needed before the next major App Store submission. No net-new features.
 >
-> **F-4 (`RideSessionStore` split) — do incrementally here.** P2 perf fixes require opening `RideSessionStore` anyway. Extract `POITrackingEngine` while making those fixes.
+> **F-4 (`RideSessionStore` split) — do incrementally here.** P2 perf fixes require opening
+> `RideSessionStore` anyway. Extract `POITrackingEngine` while making those fixes.
 
 - [ ] **P2 · `updateNextPOI` hot-path — pre-compute snap indices + partial F-4 `RideSessionStore` split**
   Pre-compute POI snap indices once when POIs change. While in `RideSessionStore`: extract `POITrackingEngine`.
@@ -96,10 +118,12 @@
   `RouteDetailView.swift:236–252`. Cache result; invalidate only when `trackPoints` changes.
 
 - [ ] **P2 · Surface empty `catch` blocks**
-  `RideSummaryView.swift:296`, `RideHistoryView.swift:231`, `RideHistoryDetailView.swift:266,346`. Log + surface via toast.
+  `RideSummaryView.swift:296`, `RideHistoryView.swift:231`, `RideHistoryDetailView.swift:266,346`.
+  Log + surface via toast.
 
 - [ ] **P2 · `RouteNoticeView` — wire or delete**
-  Wire into `CyclingRouteService` result + `topBanners`, or delete. Decide alongside `CyclingRouteOverlay`.
+  Wire into `CyclingRouteService` result + `topBanners`, or delete.
+  Decide alongside `CyclingRouteOverlay`.
 
 - [ ] **P2 · Merge `POIDiscoverySheet` + `NearbySearchSheet`**
   One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before submission.
@@ -134,7 +158,7 @@
 Sprint 1: ✅ COMPLETE
 Sprint 2: ✅ COMPLETE
 
-Sprint 3: F-A (Sprint 2 done) ──► F-C1 ──► F-C2 + partial F-3 RideView split
+Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ──► F-C2 + partial F-3 RideView split
 
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
           Pre-submission polish items (no feature dependencies)
@@ -147,9 +171,13 @@ Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackin
 The following must **never** be added to the Watch target in Build Phases:
 
 - `POIModel+MapKit.swift` — uses `MKMapItem.identifier` (iOS only)
-- `PlanAssistantEngine.swift` — `FoundationModels` is iOS only
-- `RidePlanIntent+Generable.swift` — same
-- `RidePlanAssistantView.swift` — same
-- Any `FoundationModels` import
+- `VeloAI.swift` — `FoundationModels` is iOS only
+- `RouteNameSuggester.swift` — `FoundationModels` + `MKReverseGeocodingRequest` (iOS only)
+- `RideSummaryGenerator.swift` — `FoundationModels` (iOS only)
+- `POIRankingEngine.swift` — `FoundationModels` (iOS only)
+- `PlanAssistantEngine.swift` — `FoundationModels` (iOS only, Sprint 3)
+- `RidePlanIntent+Generable.swift` — same (Sprint 3)
+- `RidePlanAssistantView.swift` — same (Sprint 3)
+- Any file with `import FoundationModels`
 
 The Watch target always uses the coordinate-based `deterministicID` fallback for POI identity.
