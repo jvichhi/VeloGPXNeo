@@ -63,7 +63,6 @@ struct POIDiscoverySheet: View {
                     Divider()
                     Picker("Sort", selection: $sortOrder) {
                         ForEach(POISortOrder.allCases) { order in
-                            // Hide Suggested option if AI is not available/enabled
                             if order == .suggested && !(VeloAI.isAvailable && aiEnabled) {
                                 EmptyView()
                             } else {
@@ -105,7 +104,7 @@ struct POIDiscoverySheet: View {
                                 .foregroundStyle(.blue.opacity(0.6))
                             Text("Pick a category above")
                                 .font(.subheadline.weight(.medium))
-                            Text("We’ll search near the route start.")
+                            Text("We'll search near the route start.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -154,32 +153,39 @@ struct POIDiscoverySheet: View {
 
     // MARK: - Computed display items
 
-    /// Returns items in the correct order for the active sort.
     private var displayItems: [RankedPOIResult] {
         switch sortOrder {
         case .suggested:
-            // Use ranked results if available, fall back to raw order
             return rankedResults.isEmpty
                 ? results.map { RankedPOIResult(poi: $0, reason: "") }
                 : rankedResults
+
         case .nearest:
             guard let start = route.trackPoints.first else {
                 return results.map { RankedPOIResult(poi: $0, reason: "") }
             }
+            // Break the sort into explicit sub-expressions to avoid type-checker timeout
             let origin = CLLocationCoordinate2D(
                 latitude:  start.coordinate.latitude,
                 longitude: start.coordinate.longitude
             )
-            return results
-                .sorted {
-                    ($0.location?.coordinate.distance(to: origin) ?? .infinity) <
-                    ($1.location?.coordinate.distance(to: origin) ?? .infinity)
-                }
-                .map { RankedPOIResult(poi: $0, reason: "") }
+            let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+            let sorted = results.sorted { a, b in
+                let coordA = a.poiCoordinate
+                let coordB = b.poiCoordinate
+                let distA = CLLocation(latitude: coordA.latitude, longitude: coordA.longitude)
+                    .distance(from: originLocation)
+                let distB = CLLocation(latitude: coordB.latitude, longitude: coordB.longitude)
+                    .distance(from: originLocation)
+                return distA < distB
+            }
+            return sorted.map { RankedPOIResult(poi: $0, reason: "") }
+
         case .byCategory:
-            return results
-                .sorted { ($0.pointOfInterestCategory?.rawValue ?? "") < ($1.pointOfInterestCategory?.rawValue ?? "") }
-                .map { RankedPOIResult(poi: $0, reason: "") }
+            let sorted = results.sorted {
+                ($0.pointOfInterestCategory?.rawValue ?? "") < ($1.pointOfInterestCategory?.rawValue ?? "")
+            }
+            return sorted.map { RankedPOIResult(poi: $0, reason: "") }
         }
     }
 
@@ -196,7 +202,6 @@ struct POIDiscoverySheet: View {
         results = (try? await POISearchService.shared.search(query: searchQuery, near: origin)) ?? []
         isLoading = false
 
-        // Auto-rank on first load if Suggested is active and AI is available
         if sortOrder == .suggested && VeloAI.isAvailable && aiEnabled && !results.isEmpty {
             Task { await rankResults() }
         }
@@ -221,14 +226,13 @@ struct POIDiscoverySheet: View {
         default:      timeOfDay = "evening"
         }
 
-        // Infer difficulty from elevation gain
         let gain = route.elevationGain
         let difficulty: String
         switch gain {
-        case ..<200:   difficulty = "easy"
+        case ..<200:    difficulty = "easy"
         case 200..<500: difficulty = "moderate"
         case 500..<1000: difficulty = "hard"
-        default:        difficulty = "epic"
+        default:         difficulty = "epic"
         }
 
         return RideContext(
@@ -238,7 +242,7 @@ struct POIDiscoverySheet: View {
             distanceTotalKm:   route.totalDistance / 1000,
             distanceSoFarKm:   0,
             timeOfDay:         timeOfDay,
-            topPastCategories: [] // RideHistoryStore integration deferred to Sprint 3
+            topPastCategories: []
         )
     }
 
@@ -283,8 +287,8 @@ struct POIDiscoverySheet: View {
 // MARK: - Sort Order
 
 enum POISortOrder: String, CaseIterable, Identifiable {
-    case suggested = "suggested"
-    case nearest   = "nearest"
+    case suggested  = "suggested"
+    case nearest    = "nearest"
     case byCategory = "byCategory"
 
     var id: String { rawValue }
@@ -306,15 +310,6 @@ enum POISortOrder: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - CLLocationCoordinate2D distance helper
-
-private extension CLLocationCoordinate2D {
-    func distance(to other: CLLocationCoordinate2D) -> CLLocationDistance {
-        CLLocation(latitude: latitude, longitude: longitude)
-            .distance(from: CLLocation(latitude: other.latitude, longitude: other.longitude))
-    }
-}
-
 // MARK: - Discovery Result Card
 
 private struct POIDiscoveryResultCard: View {
@@ -326,7 +321,7 @@ private struct POIDiscoveryResultCard: View {
 
     @Environment(\.openURL) private var openURL
 
-    // Compute the POI model once to avoid calling toPOIModel() twice
+    // Compute once to avoid calling toPOIModel() twice
     private var poiModel: POIModel { item.toPOIModel(category: .custom) }
 
     var body: some View {
@@ -353,7 +348,6 @@ private struct POIDiscoveryResultCard: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
-                        // F-A3: relevance reason
                         if !reason.isEmpty {
                             Text(reason)
                                 .font(.caption)
