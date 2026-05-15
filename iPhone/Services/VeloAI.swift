@@ -15,9 +15,10 @@ enum VeloAI {
     static let enabledKey = "veloai_enabled"
 
     /// True when Apple Intelligence is available on this device.
+    /// nonisolated so it can be read from any actor context (Swift 6 compat).
     /// Views gate AI UI behind this check so nothing AI-related renders on
     /// unsupported hardware.
-    static var isAvailable: Bool {
+    nonisolated static var isAvailable: Bool {
         SystemLanguageModel.default.availability == .available
     }
 }

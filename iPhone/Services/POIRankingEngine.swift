@@ -9,6 +9,8 @@
 //  Usage:
 //    let ranked = await POIRankingEngine.shared.rank(pois, context: context)
 //
+//  Note: @available(iOS 26,*) removed from the actor — deployment target is iOS 26 (PROJECT.md).
+//
 
 import Foundation
 import FoundationModels
@@ -58,7 +60,6 @@ struct RankedPOI: Identifiable {
 
 // MARK: - Engine
 
-@available(iOS 26, *)
 actor POIRankingEngine {
 
     static let shared = POIRankingEngine()

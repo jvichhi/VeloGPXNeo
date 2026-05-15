@@ -7,15 +7,16 @@
 //  FoundationModels session seeded with reverse-geocoded place names from
 //  the route's start and midpoint.
 //
+//  Note: @available(iOS 26,*) removed — deployment target is iOS 26 (PROJECT.md).
+//  Note: CLGeocoder replaced with MKReverseGeocodingRequest (iOS 18+ API, PROJECT.md rule).
+//
 
 import Foundation
 import FoundationModels
 import CoreLocation
+import MapKit
 
-@available(iOS 26, *)
 struct RouteNameSuggester {
-
-    private let geocoder = CLGeocoder()
 
     // MARK: - Public API
 
@@ -53,7 +54,7 @@ struct RouteNameSuggester {
 
     // MARK: - Private helpers
 
-    /// Returns 5 evenly-spaced coordinates from the route's track points.
+    /// Returns up to 5 evenly-spaced coordinates from the route's track points.
     private func sampledPoints(from route: RouteModel) -> [Coordinate] {
         let count = route.trackPoints.count
         guard count > 0 else { return [] }
@@ -61,12 +62,14 @@ struct RouteNameSuggester {
         return stride(from: 0, to: count, by: step).map { route.trackPoints[$0].coordinate }
     }
 
-    /// Reverse-geocodes a `Coordinate` to a locality/subLocality string.
+    /// Reverse-geocodes a `Coordinate` to a locality/subLocality string using
+    /// MKReverseGeocodingRequest (CLGeocoder is deprecated on iOS 18+).
     /// Returns `nil` silently on failure — names degrade gracefully.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
-        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        guard let placemarks = try? await geocoder.reverseGeocodeLocation(location) else { return nil }
-        return placemarks.first?.locality ?? placemarks.first?.subLocality
+        let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
+        let request = MKReverseGeocodingRequest(coordinate: clCoord)
+        guard let result = try? await request.response else { return nil }
+        return result.placemark.locality ?? result.placemark.subLocality
     }
 }

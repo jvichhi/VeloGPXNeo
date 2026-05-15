@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import FoundationModels
+// FoundationModels import removed — this view delegates all AI calls to VeloAI.swift
+// and RouteNameSuggester.swift. A bare import here would risk accidental Watch target inclusion.
 
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
@@ -278,7 +279,7 @@ private struct RouteRenameSheet: View {
                                         ProgressView()
                                             .controlSize(.small)
                                             .tint(.purple)
-                                        Text("Finding route names\u{2026}")
+                                        Text("Finding route names…")
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
@@ -388,8 +389,6 @@ private struct FlowLayout<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        // iOS 16+ Layout protocol. Falls back gracefully to HStack wrap for older OS
-        // but since we target iOS 26+ this is fine.
         _FlowLayout(spacing: spacing, content: content)
     }
 }
@@ -398,7 +397,6 @@ private struct _FlowLayout<Content: View>: Layout {
     let spacing: CGFloat
     @ViewBuilder var content: Content
 
-    // Required boilerplate — Layout expects a Body associatedtype
     struct Cache {}
     func makeCache(subviews: Subviews) -> Cache { Cache() }
 
@@ -411,14 +409,17 @@ private struct _FlowLayout<Content: View>: Layout {
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
             if x + size.width > width, x > 0 {
+                // End of row: record width without the trailing spacing gap
+                maxWidth = max(maxWidth, x - spacing)
                 y += rowHeight + spacing
                 x = 0
                 rowHeight = 0
             }
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
-            maxWidth = max(maxWidth, x)
         }
+        // Final row: subtract trailing spacing
+        maxWidth = max(maxWidth, x - spacing)
         y += rowHeight
         return CGSize(width: maxWidth, height: y)
     }

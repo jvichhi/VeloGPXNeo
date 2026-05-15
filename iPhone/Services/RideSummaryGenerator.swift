@@ -6,11 +6,12 @@
 //  Generates a short, shareable natural-language ride summary from a
 //  completed `RideSummary` using an on-device FoundationModels session.
 //
+//  Note: @available(iOS 26,*) removed — deployment target is iOS 26 (PROJECT.md).
+//
 
 import Foundation
 import FoundationModels
 
-@available(iOS 26, *)
 struct RideSummaryGenerator {
 
     // MARK: - Public API
