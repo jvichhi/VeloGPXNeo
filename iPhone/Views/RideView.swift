@@ -721,34 +721,51 @@ struct RideView: View {
 
     // MARK: - Map
 
+    // Route polyline stroke style — using explicit StrokeStyle suppresses MapKit's
+    // built-in direction-arrow overlay that appears on the shorthand .stroke(color, lineWidth:) API.
+    private let routeStrokeOuter = StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)
+    private let routeStrokeInner = StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
+    private let riddenStrokeOuter = StrokeStyle(lineWidth: 14, lineCap: .round, lineJoin: .round)
+    private let riddenStrokeInner = StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
+    private let rerouteStrokeOuter = StrokeStyle(lineWidth: 16, lineCap: .round, lineJoin: .round)
+    private let rerouteStrokeInner = StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
+
     @ViewBuilder
     private func mapLayer(route: RouteModel, topControlInset: CGFloat) -> some View {
         let activePOIs = rideStore.rideState.isActive ? rideStore.pois : routeStore.selectedPOIs
+        // Use flat elevation during an active ride so road-level polylines are
+        // never obscured by extruded 3D buildings. Birds-eye preview keeps
+        // realistic elevation for visual richness.
+        let mapStyle: MapStyle = rideStore.rideState.isActive
+            ? .standard(elevation: .flat)
+            : .standard(elevation: .realistic)
 
         Map(position: $position) {
             // ── Route polylines ─────────────────────────────────────────────────────────────
+            // StrokeStyle(lineCap:lineJoin:) suppresses MapKit's auto direction-arrow overlay
+            // which appears when using the shorthand .stroke(color, lineWidth:) API.
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
-                    .stroke(.white, lineWidth: 14)
+                    .stroke(.white, style: riddenStrokeOuter)
                 MapPolyline(coordinates: progress.ridden)
-                    .stroke(.blue.opacity(0.45), lineWidth: 8)
+                    .stroke(.blue.opacity(0.45), style: riddenStrokeInner)
 
                 MapPolyline(coordinates: progress.remaining)
-                    .stroke(.white, lineWidth: 18)
+                    .stroke(.white, style: routeStrokeOuter)
                 MapPolyline(coordinates: progress.remaining)
-                    .stroke(.blue, lineWidth: 12)
+                    .stroke(.blue, style: routeStrokeInner)
             } else {
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
-                    .stroke(.white, lineWidth: 18)
+                    .stroke(.white, style: routeStrokeOuter)
                 MapPolyline(coordinates: route.trackPoints.map { $0.coordinate.clCoordinate })
-                    .stroke(.blue, lineWidth: 12)
+                    .stroke(.blue, style: routeStrokeInner)
             }
 
             if !rideStore.reroutePolyline.isEmpty {
                 MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.white, lineWidth: 16)
+                    .stroke(.white, style: rerouteStrokeOuter)
                 MapPolyline(coordinates: rideStore.reroutePolyline)
-                    .stroke(.orange, lineWidth: 10)
+                    .stroke(.orange, style: rerouteStrokeInner)
             }
 
             // ── POI spurs ──────────────────────────────────────────────────────────────────
@@ -845,7 +862,7 @@ struct RideView: View {
                 suppressNextCameraChange = false
             }
         }
-        .mapStyle(.standard(elevation: .realistic))
+        .mapStyle(mapStyle)
         .mapControls {
             MapUserLocationButton()
             MapCompass()
