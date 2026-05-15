@@ -31,7 +31,7 @@
 - [x] **MISC-2** Spurious `await` on `plan.loadFrom(route:)` — `cc8f2fc`
 - [x] **MISC-3** `AccentColor` missing from Assets catalog — `a587b44`
 - [x] **MISC-4** Unused `windowMeters` immutable value — verified in code (zero hits)
-- [x] **MISC-5** Duplicate `bearing()` haversine — verified in code (consolidated)
+- [ ] **MISC-5** Duplicate `bearing()` haversine — ⚠️ **REOPENED** — `bearing()` confirmed present in both `RideSessionStore.swift` and `RideView.swift` as of May 15 source search. Was incorrectly marked complete. Extract to `Shared/Extensions/CLLocationCoordinate2D+Bearing.swift` before Sprint 4.
 - [x] **MISC-6** Notification auth result gating — verified in code
 
 ---
@@ -131,6 +131,11 @@
 - [ ] **P2 · Elevation gain noise smoothing**
   Threshold gate (only accumulate deltas > 2 m) in `RideSessionStore` altitude stream.
 
+- [ ] **MISC-5 · Extract duplicate `bearing()` haversine**
+  `bearing()` confirmed still present in both `RideSessionStore.swift` and `RideView.swift` (May 15 source search).
+  Extract to `Shared/Extensions/CLLocationCoordinate2D+Bearing.swift`. Use `GPXCueEngine`’s `nonisolated` version as the canonical one; delete the duplicate from `RideSessionStore`.
+  → `TECH_DEBT.md § MISC-5`
+
 - [ ] **P3 · `MapStyle` cycling overlay toggle in Settings**
   Expose `.standard` / `.hybrid(elevation: .realistic)` / cycling lane style.
 
@@ -162,6 +167,7 @@ Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ──► F-C2 + partial F-3 RideVie
 
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
           Pre-submission polish items (no feature dependencies)
+          MISC-5 bearing() consolidation (do while in RideSessionStore for F-4)
 ```
 
 ---
