@@ -190,23 +190,13 @@ struct RideSummaryView: View {
                     .padding(14)
 
                 case .generating:
-                    VStack(alignment: .leading, spacing: 8) {
-                        if !aiSummaryText.isEmpty {
-                            Text(aiSummaryText)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .animation(.default, value: aiSummaryText)
-                        } else {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(.purple)
-                                Text("Generating…")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.purple)
+                        Text("Generating\u{2026}")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
@@ -217,6 +207,8 @@ struct RideSummaryView: View {
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                            .animation(.easeIn(duration: 0.3), value: aiSummaryText)
 
                         HStack(spacing: 10) {
                             Button {
@@ -301,7 +293,7 @@ struct RideSummaryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("GPS Track")
                         .font(.subheadline.weight(.medium))
-                    Text("Your actual ride path — \(summary.actualTrack.count) points recorded")
+                    Text("Your actual ride path \u{2014} \(summary.actualTrack.count) points recorded")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -368,14 +360,13 @@ struct RideSummaryView: View {
         aiSummaryText = ""
         aiState = .generating
         do {
-            try await RideSummaryGenerator().stream(from: summary) { partial in
-                aiSummaryText = partial
-            }
+            let text = try await RideSummaryGenerator().generate(from: summary)
+            aiSummaryText = text
             aiState = .done
         } catch let error as LanguageModelSession.GenerationError {
-            aiState = .failed(error.displayMessage)
+            aiState = .failed(error.localizedDescription)
         } catch {
-            aiState = .failed("Couldn’t generate a response. Try again.")
+            aiState = .failed("Couldn't generate a response. Try again.")
         }
     }
 
@@ -411,7 +402,6 @@ struct RideSummaryView: View {
     }
 
     // MARK: - Map Snapshot
-    // MK-4: containerWidth passed in from GeometryReader; displayScale from @Environment.
 
     private func generateMapSnapshot(containerWidth: CGFloat) async {
         guard !summary.actualTrack.isEmpty else { return }
