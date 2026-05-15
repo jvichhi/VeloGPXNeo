@@ -1,44 +1,66 @@
-//
-//  VeloAI.swift
-//  VeloGPX
-//
-//  Availability gate and shared constants for all on-device AI features (F-A).
-//  Does NOT hold a shared LanguageModelSession — each feature creates its own
-//  one-shot session to avoid context leakage between unrelated tasks.
-//
-
 import Foundation
 import FoundationModels
 
-// MARK: - Availability
-
+/// Shared AI configuration + availability gate.
+///
+/// Usage:
+/// ```swift
+/// guard VeloAI.isAvailable else { return }
+/// let session = try VeloAI.makeSession(instructions: "…")
+/// ```
 enum VeloAI {
-    /// True when Apple Intelligence is available on this device.
+    /// `AppStorage` key used by every AI feature.
+    static let enabledKey = "velogpx.aiEnabled"
+
+    // MARK: - Availability
+
+    /// `true` if Apple Intelligence / FoundationModels is available on this device.
     static var isAvailable: Bool {
         SystemLanguageModel.default.isAvailable
     }
 
-    /// UserDefaults key for the user's AI Features toggle in Settings.
-    static let enabledKey = "veloai.featuresEnabled"
+    // MARK: - Session factory
 
-    /// Returns true when AI is both available and enabled by the user.
-    static func isEnabled() -> Bool {
-        guard isAvailable else { return false }
-        // Default true — opt-in by default when hardware supports it.
-        return UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true
+    /// Creates a new `LanguageModelSession` with the given system instruction.
+    /// Always check `isAvailable` first.
+    static func makeSession(instructions: String) throws -> LanguageModelSession {
+        let model = SystemLanguageModel.default
+        guard model.isAvailable else {
+            throw VeloAIError.modelUnavailable
+        }
+        return LanguageModelSession(
+            model: model,
+            instructions: Instructions(instructions)
+        )
     }
 }
 
-// MARK: - Error Presentation
+// MARK: - Errors
+
+enum VeloAIError: LocalizedError {
+    case modelUnavailable
+    case emptyResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .modelUnavailable:
+            return "Apple Intelligence is not available on this device."
+        case .emptyResponse:
+            return "The AI returned an empty response."
+        }
+    }
+}
+
+// MARK: - GenerationError display helper
 
 extension LanguageModelSession.GenerationError {
-    /// User-facing message for common generation errors.
+    /// User-facing one-liner for toast/inline error display.
     var displayMessage: String {
         switch self {
-        case .guardrailViolation:
-            return "The model couldn't generate a response for this content."
         case .exceededContextWindowSize:
-            return "Too much data for the model — try a shorter route or fewer POIs."
+            return "Route data is too large to summarise."
+        case .guardrailViolation:
+            return "Content couldn't be generated."
         default:
             return "Couldn't generate a response. Try again."
         }

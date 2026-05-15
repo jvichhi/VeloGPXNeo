@@ -1,74 +1,58 @@
-//
-//  RideSummaryGenerator.swift
-//  VeloGPX
-//
-//  F-A1 — On-device ride summary generation.
-//  Creates a short, shareable natural-language description of a completed ride.
-//  Streams the response so the UI can show text appearing word by word.
-//
-
 import Foundation
 import FoundationModels
 
+/// F-A1 — Streams a shareable, social-media-ready ride summary using
+/// Apple Intelligence (FoundationModels) entirely on-device.
+///
+/// Output length target: 2–3 sentences, emoji welcome.
 struct RideSummaryGenerator {
 
-    /// Streams a 2–3 sentence ride summary, yielding partial strings as they arrive.
-    /// Caller should replace displayed text with each yielded value.
-    ///
-    /// - Parameters:
-    ///   - summary: The completed `RideSummary` to describe.
-    ///   - onChunk: Called on the main actor with each partial response string.
+    // MARK: - Public API
+
+    /// Streams partial text back to `onPartial` as tokens arrive.
+    /// Throws `VeloAIError` or `LanguageModelSession.GenerationError`.
     func stream(
         from summary: RideSummary,
-        onChunk: @MainActor @escaping (String) -> Void
+        onPartial: @escaping @Sendable (String) -> Void
     ) async throws {
-        let session = LanguageModelSession()
-        let prompt = buildPrompt(from: summary)
+        let session = try VeloAI.makeSession(instructions: systemInstruction)
+        let prompt  = buildPrompt(from: summary)
+
+        var accumulated = ""
         let stream = session.streamResponse(to: prompt)
         for try await partial in stream {
-            await onChunk(partial.content)
+            accumulated += partial
+            let copy = accumulated
+            await MainActor.run { onPartial(copy) }
+        }
+
+        if accumulated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw VeloAIError.emptyResponse
         }
     }
 
     // MARK: - Prompt
 
-    private func buildPrompt(from summary: RideSummary) -> String {
-        let distKm   = String(format: "%.1f", summary.distanceKm)
-        let gainM    = Int(summary.elevationGain)
-        let lossM    = Int(summary.elevationLoss)
-        let moving   = summary.movingTime.formatted
-        let maxSpeed = String(format: "%.1f", summary.maxSpeedKmh)
-        let date     = summary.startDate.formatted(date: .long, time: .omitted)
-
-        var poiLine = ""
-        let poiNames = summary.pois.prefix(4).map(\.name)
-        if !poiNames.isEmpty {
-            poiLine = "Notable stops: \(poiNames.joined(separator: ", "))."
-        }
-
-        return """
-        Write a 2–3 sentence summary for a cycling ride, suitable for sharing on social media or Strava.
-        Route name: \(summary.routeName)
-        Date: \(date)
-        Distance: \(distKm) km
-        Elevation gain: \(gainM) m | Loss: \(lossM) m
-        Moving time: \(moving)
-        Max speed: \(maxSpeed) km/h
-        \(poiLine)
-        Tone: enthusiastic but factual. Mention the route name and at least one specific stat.
-        No hashtags. No emojis. No markdown. Plain sentences only.
+    private let systemInstruction = """
+        You are a cycling coach who writes punchy, encouraging ride summaries.
+        Write 2–3 sentences only. No bullet points. Use emojis sparingly.
+        Mention the distance and one other standout stat.
+        Keep it conversational and shareable on Strava or Instagram.
         """
-    }
-}
 
-// MARK: - TimeInterval formatting helper
-
-private extension TimeInterval {
-    /// e.g. "1h 23m" or "47m"
-    var formatted: String {
-        let h = Int(self) / 3600
-        let m = (Int(self) % 3600) / 60
-        if h > 0 { return "\(h)h \(m)m" }
-        return "\(m)m"
+    private func buildPrompt(from s: RideSummary) -> String {
+        var parts: [String] = []
+        parts.append("Ride: \(s.routeName)")
+        parts.append("Date: \(s.startDate.formatted(date: .abbreviated, time: .omitted))")
+        parts.append("Distance: \(String(format: "%.2f", s.distanceKm)) km")
+        parts.append("Moving time: \(s.movingTime.hhmm)\(s.movingTime.unit)")
+        parts.append("Avg speed: \(String(format: "%.1f", s.avgSpeedKmh)) km/h")
+        parts.append("Max speed: \(String(format: "%.1f", s.maxSpeedKmh)) km/h")
+        parts.append("Elevation gain: \(String(format: "%.0f", s.elevationGain)) m")
+        if !s.pois.isEmpty {
+            let names = s.pois.prefix(3).map(\.name).joined(separator: ", ")
+            parts.append("Stops: \(names)")
+        }
+        return parts.joined(separator: "\n")
     }
 }
