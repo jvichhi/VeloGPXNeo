@@ -6,15 +6,15 @@ import FoundationModels
 ///
 /// Output length target: 2–3 sentences, emoji welcome.
 ///
-/// Note: `session.streamResponse(to:)` returns a `ResponseStream<String>`
-/// whose async elements are `LanguageModelSession.ResponseStream<String>.Snapshot`.
-/// Each snapshot carries `.text` — the full accumulated output so far — so we
-/// simply forward the latest snapshot's text rather than manually concatenating.
+/// API note: `session.streamResponse(to: String)` yields plain `String` chunks
+/// (each chunk is the new delta token). `Snapshot` is only emitted when using
+/// the `@Generable` structured-output overload. We accumulate deltas manually.
 struct RideSummaryGenerator {
 
     // MARK: - Public API
 
     /// Streams partial text back to `onPartial` as tokens arrive.
+    /// Each call to `onPartial` receives the **full accumulated string** so far.
     /// Throws `VeloAIError` or `LanguageModelSession.GenerationError`.
     func stream(
         from summary: RideSummary,
@@ -23,16 +23,16 @@ struct RideSummaryGenerator {
         let session = try VeloAI.makeSession(instructions: systemInstruction)
         let prompt  = buildPrompt(from: summary)
 
-        var lastText = ""
+        var accumulated = ""
         let responseStream = session.streamResponse(to: prompt)
-        for try await snapshot in responseStream {
-            // snapshot.text is the full accumulated string up to this token
-            lastText = snapshot.text
-            let copy = lastText
-            await MainActor.run { onPartial(copy) }
+        for try await chunk in responseStream {
+            // chunk: String — the new delta token(s) appended this iteration
+            accumulated += chunk
+            let snapshot = accumulated
+            await MainActor.run { onPartial(snapshot) }
         }
 
-        if lastText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if accumulated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw VeloAIError.emptyResponse
         }
     }
