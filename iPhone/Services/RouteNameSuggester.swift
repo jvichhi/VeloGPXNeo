@@ -1,60 +1,72 @@
+//
+//  RouteNameSuggester.swift
+//  VeloGPX
+//
+//  F-A2 — Smart Route Naming.
+//  Suggests three short, evocative cycling route names using an on-device
+//  FoundationModels session seeded with reverse-geocoded place names from
+//  the route's start and midpoint.
+//
+
 import Foundation
 import FoundationModels
+import CoreLocation
 
-/// F-A2 — Generates 3 short, evocative names for a route using on-device AI.
-///
-/// Returns an empty array (not an error) when the model is unavailable or
-/// the response can't be parsed, so callers don't need error handling.
+@available(iOS 26, *)
 struct RouteNameSuggester {
+
+    private let geocoder = CLGeocoder()
 
     // MARK: - Public API
 
-    /// Returns up to 3 name suggestions, or `[]` on failure.
+    /// Returns up to 3 suggested route names for `route`.
+    /// Throws if the language model session fails.
     func suggest(for route: RouteModel) async throws -> [String] {
-        let session = try VeloAI.makeSession(instructions: systemInstruction)
-        let prompt  = buildPrompt(for: route)
+        let points = sampledPoints(from: route)
 
-        let response = try await session.respond(to: prompt)
-        return parse(response.content)
-    }
+        let startName  = await geocodeName(points.first)
+        let middleName = await geocodeName(points.count > 1 ? points[points.count / 2] : nil)
 
-    // MARK: - Prompt
+        let distKm = String(format: "%.0f", route.totalDistance / 1000)
+        let gainM  = Int(route.elevationGain)
 
-    private let systemInstruction = """
-        You are a creative route-naming assistant for cyclists.
-        Reply with exactly 3 short route names, one per line, no numbering, no extra text.
-        Each name should be 2–5 words. Evocative, poetic, or local-landmark-inspired.
+        let prompt = """
+        Suggest 3 short, evocative names for a cycling route.
+        Start area: \(startName ?? "unknown")
+        Midpoint area: \(middleName ?? "unknown")
+        Distance: \(distKm) km | Elevation gain: \(gainM) m
+        Style: specific place names, use words like loop/circuit/climb/ridge if applicable.
+        Length: 3 to 6 words max per name. No numbering. No punctuation at end.
+        Return exactly 3 names, one per line.
         """
 
-    private func buildPrompt(for route: RouteModel) -> String {
-        var parts: [String] = []
-        parts.append("Distance: \(String(format: "%.1f", route.totalDistance / 1000)) km")
-        parts.append("Elevation gain: \(String(format: "%.0f", route.elevationGain)) m")
-        parts.append("Elevation loss: \(String(format: "%.0f", route.elevationLoss)) m")
-        if route.trackPoints.count > 0 {
-            let start = route.trackPoints.first!
-            parts.append("Start: \(String(format: "%.4f", start.coordinate.latitude)), \(String(format: "%.4f", start.coordinate.longitude))")
-        }
-        if let filename = route.originalFilename {
-            let hint = (filename as NSString).deletingPathExtension
-                .replacingOccurrences(of: "_", with: " ")
-                .replacingOccurrences(of: "-", with: " ")
-            parts.append("Original filename hint: \(hint)")
-        }
-        return parts.joined(separator: "\n")
+        let session  = LanguageModelSession()
+        let response = try await session.respond(to: prompt)
+
+        let names = response.content
+            .split(separator: "\n")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return Array(names.prefix(3))
     }
 
-    // MARK: - Parse
+    // MARK: - Private helpers
 
-    private func parse(_ raw: String) -> [String] {
-        raw
-            .components(separatedBy: .newlines)
-            .map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                  .trimmingCharacters(in: CharacterSet(charactersIn: "1234567890.-) "))
-            }
-            .filter { !$0.isEmpty && $0.count >= 3 }
-            .prefix(3)
-            .map { String($0) }
+    /// Returns 5 evenly-spaced coordinates from the route's track points.
+    private func sampledPoints(from route: RouteModel) -> [Coordinate] {
+        let count = route.trackPoints.count
+        guard count > 0 else { return [] }
+        let step = max(1, count / 5)
+        return stride(from: 0, to: count, by: step).map { route.trackPoints[$0].coordinate }
+    }
+
+    /// Reverse-geocodes a `Coordinate` to a locality/subLocality string.
+    /// Returns `nil` silently on failure — names degrade gracefully.
+    private func geocodeName(_ coord: Coordinate?) async -> String? {
+        guard let coord else { return nil }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        guard let placemarks = try? await geocoder.reverseGeocodeLocation(location) else { return nil }
+        return placemarks.first?.locality ?? placemarks.first?.subLocality
     }
 }
