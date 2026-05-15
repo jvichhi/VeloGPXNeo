@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9718C64D2FB6B142005E6AC8 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9718C64C2FB6B142005E6AC8 /* FoundationModels.framework */; };
+		9718C6522FB6B1B9005E6AC8 /* POIRankingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9718C64E2FB6B1B9005E6AC8 /* POIRankingEngine.swift */; };
+		9718C6532FB6B1B9005E6AC8 /* RouteNameSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9718C6502FB6B1B9005E6AC8 /* RouteNameSuggester.swift */; };
+		9718C6542FB6B1B9005E6AC8 /* RideSummaryGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9718C64F2FB6B1B9005E6AC8 /* RideSummaryGenerator.swift */; };
+		9718C6552FB6B1B9005E6AC8 /* VeloAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9718C6512FB6B1B9005E6AC8 /* VeloAI.swift */; };
 		972D58E92FA6F99D00B5BD63 /* PreRidePOISheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */; };
 		972D58F12FB3F98300B5BD63 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F02FB3F98300B5BD63 /* WidgetKit.framework */; };
 		972D58F32FB3F98300B5BD63 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 972D58F22FB3F98300B5BD63 /* SwiftUI.framework */; };
@@ -118,6 +123,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		9718C64C2FB6B142005E6AC8 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk/System/Library/Frameworks/FoundationModels.framework; sourceTree = DEVELOPER_DIR; };
+		9718C64E2FB6B1B9005E6AC8 /* POIRankingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIRankingEngine.swift; sourceTree = "<group>"; };
+		9718C64F2FB6B1B9005E6AC8 /* RideSummaryGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideSummaryGenerator.swift; sourceTree = "<group>"; };
+		9718C6502FB6B1B9005E6AC8 /* RouteNameSuggester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteNameSuggester.swift; sourceTree = "<group>"; };
+		9718C6512FB6B1B9005E6AC8 /* VeloAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VeloAI.swift; sourceTree = "<group>"; };
 		972D58E82FA6F99D00B5BD63 /* PreRidePOISheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreRidePOISheet.swift; sourceTree = "<group>"; };
 		972D58EE2FB3F98300B5BD63 /* VeloGPXLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VeloGPXLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		972D58F02FB3F98300B5BD63 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -232,6 +242,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				972D59552FB4247200B5BD63 /* CoreMotion.framework in Frameworks */,
+				9718C64D2FB6B142005E6AC8 /* FoundationModels.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -248,6 +259,7 @@
 		972D58EF2FB3F98300B5BD63 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9718C64C2FB6B142005E6AC8 /* FoundationModels.framework */,
 				972D59542FB4247200B5BD63 /* CoreMotion.framework */,
 				972D58F02FB3F98300B5BD63 /* WidgetKit.framework */,
 				972D58F22FB3F98300B5BD63 /* SwiftUI.framework */,
@@ -266,6 +278,10 @@
 		9789157C2F9DF86B0047D8F7 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				9718C64E2FB6B1B9005E6AC8 /* POIRankingEngine.swift */,
+				9718C64F2FB6B1B9005E6AC8 /* RideSummaryGenerator.swift */,
+				9718C6502FB6B1B9005E6AC8 /* RouteNameSuggester.swift */,
+				9718C6512FB6B1B9005E6AC8 /* VeloAI.swift */,
 				97974C1C2FB43A5C007E330B /* MKMapItem+POI.swift */,
 				978915A52F9EF24F0047D8F7 /* PlanRouteEngine.swift */,
 				978915782F9DF86B0047D8F7 /* CyclingRouteService.swift */,
@@ -595,6 +611,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9718C6522FB6B1B9005E6AC8 /* POIRankingEngine.swift in Sources */,
+				9718C6532FB6B1B9005E6AC8 /* RouteNameSuggester.swift in Sources */,
+				9718C6542FB6B1B9005E6AC8 /* RideSummaryGenerator.swift in Sources */,
+				9718C6552FB6B1B9005E6AC8 /* VeloAI.swift in Sources */,
 				97F812862F9468CE0068A42A /* GeoJSONParser.swift in Sources */,
 				97F812872F9468CE0068A42A /* RootView.swift in Sources */,
 				978915562F9DC81A0047D8F7 /* PersistedRideSummary.swift in Sources */,
