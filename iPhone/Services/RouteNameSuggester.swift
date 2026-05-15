@@ -67,9 +67,10 @@ struct RouteNameSuggester {
     /// Returns `nil` silently on failure — names degrade gracefully.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
-        let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-        let request = MKReverseGeocodingRequest(coordinate: clCoord)
-        guard let result = try? await request.response else { return nil }
-        return result.placemark.locality ?? result.placemark.subLocality
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let request  = MKReverseGeocodingRequest(location: location)
+        guard let items = try? await request.mapItems,
+              let placemark = items.first?.placemark else { return nil }
+        return placemark.locality ?? placemark.subLocality
     }
 }
