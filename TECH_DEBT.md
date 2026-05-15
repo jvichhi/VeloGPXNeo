@@ -1,5 +1,5 @@
 # VeloGPXNeo — Tech Debt Checkpoint
-> Last reviewed: May 13, 2026 (end of night — synced to actual code state)
+> Last reviewed: May 15, 2026 (synced to Sprint 2 completions)
 
 ---
 
@@ -173,7 +173,9 @@ Either use it or replace with `_`.
 
 ### MISC-5 — Duplicated `bearing()` haversine function [ 🔲 Open ]
 
-**Affects:** `RideSessionStore.swift` · `GPXCueEngine` (both implement identically)
+**Affects:** `RideSessionStore.swift` · `RideView.swift` (confirmed via source search May 15, 2026)
+
+> ⚠️ **Was incorrectly marked resolved in ROADMAP.md** — reopened after source search confirmed `bearing()` present in both files.
 
 Extract to:
 ```swift
@@ -185,7 +187,8 @@ extension CLLocationCoordinate2D {
 }
 ```
 `GPXCueEngine` already has a `nonisolated` version — use that as the canonical one.
-Delete the duplicate from `RideSessionStore`.
+Delete the duplicate from `RideSessionStore` and `RideView`.
+Scheduled for Sprint 4 alongside `RideSessionStore` F-4 split.
 
 ---
 
@@ -353,3 +356,10 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 | **MISC-2** Spurious `await` on `plan.loadFrom(route:)` | May 13, 2026 |
 | **MISC-3** `AccentColor` added to Assets catalog | May 13, 2026 |
 | **DOCS** `ROADMAP.md` created — 4-sprint prioritised work order | May 13, 2026 |
+| **F-A Shared** `VeloAI.swift` — `isAvailable` gate + `enabledKey` AppStorage key | May 15, 2026 |
+| **F-A1** `RideSummaryGenerator.swift` — `respond(to:)` pattern, caption persistence | May 15, 2026 |
+| **F-A2** `RouteNameSuggester.swift` — `MKReverseGeocodingRequest`, 3 pill suggestions | May 15, 2026 |
+| **F-A3** `POIRankingEngine.swift` — actor-isolated, multi-signal scoring | May 15, 2026 |
+| **F-A2** `RouteLibraryView.swift` rewrite — rename swipe + context menu + `RouteRenameSheet` + `FlowLayout` | May 15, 2026 |
+| **Bug** FlowLayout regression fixed — `_FlowLayout: Layout` must never hold `@ViewBuilder` storage | May 15, 2026 |
+| **Sprint 2** All F-A items complete, clean build confirmed (zero warnings, zero errors) | May 15, 2026 |
