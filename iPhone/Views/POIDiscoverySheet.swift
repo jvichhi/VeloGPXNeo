@@ -30,30 +30,20 @@ struct POIDiscoverySheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+
                 // Category filter chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.label) { cat in
-                            Button {
+                            CategoryChip(
+                                label: cat.label,
+                                icon: cat.icon,
+                                isSelected: selectedCategory == cat.label
+                            ) {
                                 selectedCategory = cat.label
                                 searchQuery = cat.label
                                 Task { await search() }
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: cat.icon)
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text(cat.label)
-                                        .font(.system(size: 13, weight: .medium))
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    selectedCategory == cat.label ? Color.blue : Color(.systemGray5),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(selectedCategory == cat.label ? .white : .primary)
                             }
-                            .animation(.spring(duration: 0.2), value: selectedCategory)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -124,9 +114,6 @@ struct POIDiscoverySheet: View {
                             }
 
                             LazyVStack(spacing: 10) {
-                                // ✅ Each row is its own View struct — no let bindings
-                                // or overloaded closures inside the result builder.
-                                // See POIDiscoveryRow below.
                                 ForEach(displayItems) { ranked in
                                     POIDiscoveryRow(
                                         ranked: ranked,
@@ -228,7 +215,7 @@ struct POIDiscoverySheet: View {
         isRanking = false
     }
 
-    // MARK: - Add POI dispatcher (single entry point passed to POIDiscoveryRow)
+    // MARK: - Add POI dispatcher
 
     private func addPOI(ranked: RankedPOI, mapItem: MKMapItem?) {
         if let mi = mapItem {
@@ -241,10 +228,7 @@ struct POIDiscoverySheet: View {
     private func addPOIFromMapItem(_ item: MKMapItem) {
         let id = item.deterministicPOIID
         guard !routeStore.selectedPOIs.contains(where: { $0.id == id }) else { return }
-        let poi = item.toPOIModel(
-            category: categoryFromMapItem(item),
-            distanceFromRoute: 0
-        )
+        let poi = item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
         routeStore.selectedPOIs.append(poi)
     }
 
@@ -258,31 +242,62 @@ struct POIDiscoverySheet: View {
     private func categoryFromMapItem(_ item: MKMapItem) -> POICategory {
         if let poiCat = item.pointOfInterestCategory {
             switch poiCat {
-            case .cafe:                             return .cafe
-            case .restaurant, .foodMarket:         return .restaurant
-            case .pharmacy:                         return .pharmacy
-            case .hotel:                            return .accommodation
-            case .campground:                       return .campsite
-            case .nationalPark, .park:              return .water
-            default:                                return .custom
+            case .cafe:                    return .cafe
+            case .restaurant, .foodMarket: return .restaurant
+            case .pharmacy:                return .pharmacy
+            case .hotel:                   return .accommodation
+            case .campground:              return .campsite
+            case .nationalPark, .park:     return .water
+            default:                       return .custom
             }
         }
         let name = item.name?.lowercased() ?? ""
         if name.contains("café") || name.contains("cafe") || name.contains("coffee") { return .cafe }
         if name.contains("bike") || name.contains("cycle") { return .bikeRepair }
         if name.contains("restaurant") || name.contains("food") { return .restaurant }
-        if name.contains("pharmacy") { return .pharmacy }
+        if name.contains("pharmacy")   { return .pharmacy }
         if name.contains("water") || name.contains("fountain") { return .water }
         if name.contains("hotel") || name.contains("hostel") || name.contains("inn") { return .accommodation }
-        if name.contains("camp") { return .campsite }
+        if name.contains("camp")       { return .campsite }
         return .custom
     }
 }
 
+// MARK: - CategoryChip
+// Extracted from the ForEach body to avoid chained ternary type-check timeouts.
+
+private struct CategoryChip: View {
+    let label: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(chipBackground, in: Capsule())
+            .foregroundStyle(chipForeground)
+        }
+        .animation(.spring(duration: 0.2), value: isSelected)
+    }
+
+    private var chipBackground: Color {
+        isSelected ? .blue : Color(.systemGray5)
+    }
+
+    private var chipForeground: Color {
+        isSelected ? .white : Color(.label)
+    }
+}
+
 // MARK: - POIDiscoveryRow
-// Dedicated row struct so the ForEach body stays clean.
-// All per-row logic lives here as stored properties / computed vars,
-// not as `let` bindings in the result builder.
 
 private struct POIDiscoveryRow: View {
     let ranked: RankedPOI
@@ -339,17 +354,25 @@ private struct POIDiscoveryResultCard: View {
 
     @Environment(\.openURL) private var openURL
 
+    // Pre-computed to avoid chained ternaries in the result builder
+    private var iconName: String    { isAdded ? "checkmark" : categoryIcon }
+    private var iconWeight: Font.Weight { isAdded ? .bold : .regular }
+    private var iconColor: Color    { isAdded ? .green : .blue }
+    private var circleFill: Color   { isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1) }
+    private var addLabel: String    { isAdded ? "Added" : "Add" }
+    private var addColor: Color     { isAdded ? .green : .blue }
+
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onTap) {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(isAdded ? Color.green.opacity(0.15) : Color.blue.opacity(0.1))
+                            .fill(circleFill)
                             .frame(width: 44, height: 44)
-                        Image(systemName: isAdded ? "checkmark" : categoryIcon)
-                            .font(.system(size: 17, weight: isAdded ? .bold : .regular))
-                            .foregroundStyle(isAdded ? .green : .blue)
+                        Image(systemName: iconName)
+                            .font(.system(size: 17, weight: iconWeight))
+                            .foregroundStyle(iconColor)
                     }
                     .animation(.spring(duration: 0.25), value: isAdded)
 
@@ -374,9 +397,9 @@ private struct POIDiscoveryResultCard: View {
 
                     Spacer()
 
-                    Text(isAdded ? "Added" : "Add")
+                    Text(addLabel)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(isAdded ? .green : .blue)
+                        .foregroundStyle(addColor)
                 }
             }
             .buttonStyle(.plain)
