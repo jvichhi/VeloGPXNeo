@@ -22,12 +22,13 @@
 //      try await request.mapItems → [MKMapItem]
 //
 // iOS 26 ADDRESS API:
-// MKAddress (mapItem.address) only exposes fullAddress and shortAddress.
-// It does NOT have subLocality or locality — those are CLPlacemark properties.
-// Use mapItem.placemark (MKPlacemark, which inherits CLPlacemark) for fine-grained
-// address fields:
-//   mapItem.placemark.subLocality  → neighbourhood (e.g. "Plateau-Mont-Royal")
-//   mapItem.placemark.locality     → city (e.g. "Montreal")
+// mapItem.placemark is deprecated in iOS 26. Use the new address APIs instead:
+//   mapItem.addressRepresentations?.cityName        → "Montréal" (preferred)
+//   mapItem.addressRepresentations?.cityWithContext  → "Montréal, QC"
+//   mapItem.address?.shortAddress                   → "Montréal, QC"
+//   mapItem.name                                    → last resort (may be street address)
+//   mapItem.address?.fullAddress                    → full formatted address string
+// Note: MKAddress does NOT have subLocality or locality — those were CLPlacemark properties.
 //
 // WHY session.respond(to:) and NOT session.generate(from:):
 // respond(to:) takes a plain String prompt and returns a plain String.
@@ -36,10 +37,11 @@
 //
 // DEPRECATIONS TO AVOID:
 // ❌ CLGeocoder — deprecated iOS 18+
+// ❌ mapItem.placemark — deprecated iOS 26, use .address and .addressRepresentations
 // ❌ session.stream(from:onPartial:) — removed in iOS 26 beta
 // ✅ guard let request = MKReverseGeocodingRequest(location:) — failable init
 // ✅ try await request.mapItems — async throws on unwrapped request
-// ✅ mapItem.placemark.subLocality / .locality — CLPlacemark properties via MKPlacemark
+// ✅ mapItem.addressRepresentations?.cityName — iOS 26 API
 // ✅ session.respond(to: prompt) — correct for plain String output
 
 import Foundation
@@ -75,9 +77,11 @@ struct RouteNameSuggester {
     /// Reverse-geocodes the first trackpoint of the route to get a human-readable location name.
     ///
     /// Uses `MKReverseGeocodingRequest` (iOS 18+ API).
-    /// MKReverseGeocodingRequest(location:) is a failable init — guard before calling .mapItems.
-    /// Uses mapItem.placemark (MKPlacemark inherits CLPlacemark) for subLocality/locality.
-    /// Note: mapItem.address (MKAddress) only has fullAddress/shortAddress — not suitable here.
+    /// Priority chain for location name (all iOS 26 non-deprecated):
+    ///   1. addressRepresentations?.cityName        — clean city name, best for route names
+    ///   2. addressRepresentations?.cityWithContext  — "City, Region" fallback
+    ///   3. address?.shortAddress                   — "City, Region" via MKAddress
+    ///   4. name                                    — last resort, may be a street address
     private func geocodeStartName(for route: RouteModel) async -> String? {
         guard let first = route.trackPoints.first else { return nil }
 
@@ -89,8 +93,10 @@ struct RouteNameSuggester {
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         guard let mapItem = try? await request.mapItems.first else { return nil }
 
-        // MKPlacemark inherits subLocality/locality from CLPlacemark
-        return mapItem.placemark.subLocality ?? mapItem.placemark.locality
+        return mapItem.addressRepresentations?.cityName
+            ?? mapItem.addressRepresentations?.cityWithContext
+            ?? mapItem.address?.shortAddress
+            ?? mapItem.name
     }
 
     /// Builds the prompt string sent to the language model.
