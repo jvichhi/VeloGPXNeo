@@ -8,6 +8,9 @@ import FoundationModels
 struct RideSummaryView: View {
     let summary: RideSummary
     var onDismiss: () -> Void
+    /// Passed in so generated captions can be written back to disk.
+    var persistedID: UUID? = nil
+    var historyStore: RideHistoryStore? = nil
 
     @State private var mapSnapshot: UIImage?
     @State private var exportPOIs = true
@@ -56,8 +59,21 @@ struct RideSummaryView: View {
                     )
                 }
                 .task { await generateMapSnapshot(containerWidth: geo.size.width) }
+                .onAppear { restorePersistedCaption() }
             }
         }
+    }
+
+    // MARK: - Restore persisted caption
+
+    private func restorePersistedCaption() {
+        guard let pid = persistedID,
+              let store = historyStore,
+              let entry = store.summaries.first(where: { $0.id == pid }),
+              let saved = entry.aiCaption,
+              !saved.isEmpty else { return }
+        aiSummaryText = saved
+        aiState = .done
     }
 
     // MARK: - Map Snapshot
@@ -363,6 +379,10 @@ struct RideSummaryView: View {
             let text = try await RideSummaryGenerator().generate(from: summary)
             aiSummaryText = text
             aiState = .done
+            // Persist the caption so re-opening this ride shows it immediately
+            if let pid = persistedID, let store = historyStore {
+                store.saveCaption(id: pid, caption: text)
+            }
         } catch let error as LanguageModelSession.GenerationError {
             aiState = .failed(error.localizedDescription)
         } catch {
