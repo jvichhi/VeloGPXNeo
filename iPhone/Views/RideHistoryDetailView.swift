@@ -22,6 +22,8 @@ struct RideHistoryDetailView: View {
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
     @State private var containerWidth: CGFloat = 390   // safe default until GeometryReader fires
+    // Tracks whether a share-card render is in progress so the button can show a spinner.
+    @State private var isRenderingCard = false
 
     var body: some View {
         GeometryReader { geo in
@@ -196,15 +198,25 @@ struct RideHistoryDetailView: View {
         VStack(spacing: 0) {
             DetailSectionHeader(title: "Share Ride", systemImage: "square.and.arrow.up")
             Button {
-                renderShareCard()
+                Task { await renderShareCard() }
             } label: {
-                Label("Share as Image Card", systemImage: "photo.on.rectangle")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(.blue, in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(.white)
+                Group {
+                    if isRenderingCard {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 20)
+                    } else {
+                        Label("Share as Image Card", systemImage: "photo.on.rectangle")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.vertical, 14)
+                .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                .foregroundStyle(.white)
             }
+            .disabled(isRenderingCard)
             .padding(14)
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
@@ -274,9 +286,30 @@ struct RideHistoryDetailView: View {
 
     // MARK: - Share Card Render
     // MK-4: ImageRenderer.scale uses displayScale from @Environment, not UIScreen.main.scale
+    //
+    // FIX: On the first tap, mapSnapshot may still be nil because generateSnapshot() is async.
+    // We now await the snapshot explicitly before handing it to ImageRenderer, so the
+    // card always renders with the map image regardless of how fast the user taps Share.
 
-    private func renderShareCard() {
-        let cardView = ShareableRideCard(ride: ride, snapshot: mapSnapshot)
+    @MainActor
+    private func renderShareCard() async {
+        guard !isRenderingCard else { return }
+        isRenderingCard = true
+        defer { isRenderingCard = false }
+
+        // Use the already-computed snapshot if available; otherwise generate it now.
+        // This is the core fix: ImageRenderer is synchronous — if mapSnapshot is nil
+        // when it runs, the card renders blank. Awaiting here ensures we always have
+        // a valid image before rendering.
+        let snapshot: UIImage?
+        if let existing = mapSnapshot {
+            snapshot = existing
+        } else {
+            await generateSnapshot()
+            snapshot = mapSnapshot
+        }
+
+        let cardView = ShareableRideCard(ride: ride, snapshot: snapshot)
         let renderer = ImageRenderer(content: cardView)
         renderer.scale = displayScale
         if let img = renderer.uiImage {
