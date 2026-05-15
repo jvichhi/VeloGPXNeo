@@ -5,6 +5,11 @@ import FoundationModels
 /// Apple Intelligence (FoundationModels) entirely on-device.
 ///
 /// Output length target: 2–3 sentences, emoji welcome.
+///
+/// Note: `session.streamResponse(to:)` returns a `ResponseStream<String>`
+/// whose async elements are `LanguageModelSession.ResponseStream<String>.Snapshot`.
+/// Each snapshot carries `.text` — the full accumulated output so far — so we
+/// simply forward the latest snapshot's text rather than manually concatenating.
 struct RideSummaryGenerator {
 
     // MARK: - Public API
@@ -18,15 +23,16 @@ struct RideSummaryGenerator {
         let session = try VeloAI.makeSession(instructions: systemInstruction)
         let prompt  = buildPrompt(from: summary)
 
-        var accumulated = ""
-        let stream = session.streamResponse(to: prompt)
-        for try await partial in stream {
-            accumulated += partial
-            let copy = accumulated
+        var lastText = ""
+        let responseStream = session.streamResponse(to: prompt)
+        for try await snapshot in responseStream {
+            // snapshot.text is the full accumulated string up to this token
+            lastText = snapshot.text
+            let copy = lastText
             await MainActor.run { onPartial(copy) }
         }
 
-        if accumulated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if lastText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw VeloAIError.emptyResponse
         }
     }
