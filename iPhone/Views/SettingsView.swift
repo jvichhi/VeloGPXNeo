@@ -1,8 +1,10 @@
 import SwiftUI
+import FoundationModels
 
 struct SettingsView: View {
     @ObservedObject private var lm = LocalizationManager.shared
     @State private var showLanguagePicker = false
+    @AppStorage(VeloAI.enabledKey) private var aiEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -39,6 +41,29 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
 
+                    // MARK: - Apple Intelligence
+                    if VeloAI.isAvailable {
+                        SettingsCard {
+                            HStack(alignment: .top, spacing: 14) {
+                                settingsIcon("sparkles", color: .purple)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("AI Features")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("Ride summaries, route name suggestions, and smart POI ranking. All processed on-device — your data never leaves your iPhone.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer()
+                                Toggle("", isOn: $aiEnabled)
+                                    .labelsHidden()
+                                    .tint(.purple)
+                            }
+                            .padding(14)
+                        }
+                    }
+
                     // MARK: - Import
                     SettingsCard {
                         SettingsRow(icon: "square.and.arrow.down", iconColor: .blue,
@@ -53,7 +78,7 @@ struct SettingsView: View {
                                     subtitle: "Apple Maps standard with realistic elevation")
                         Divider().padding(.leading, 54)
                         SettingsRow(icon: "safari.fill", iconColor: .blue,
-                                    title: "Bird's Eye View",
+                                    title: "Bird’s Eye View",
                                     subtitle: "Overview mode before starting a ride")
                     }
 

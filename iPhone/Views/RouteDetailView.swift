@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import MapKit
+import FoundationModels
 
 struct RouteDetailView: View {
     @EnvironmentObject private var routeStore: RouteStore
@@ -10,6 +11,11 @@ struct RouteDetailView: View {
     @State private var pendingName = ""
     @State private var showPOIDiscovery = false
     @State private var showReverseConfirm = false
+
+    // F-A2
+    @AppStorage(VeloAI.enabledKey) private var aiEnabled = true
+    @State private var nameSuggestions: [String] = []
+    @State private var nameSuggestState: NameSuggestState = .idle
 
     var body: some View {
         ScrollView {
@@ -73,21 +79,81 @@ struct RouteDetailView: View {
                     DetailSectionHeader(title: "Route", systemImage: "map")
 
                     if isRenaming {
-                        HStack {
-                            TextField("Route name", text: $pendingName)
-                                .onSubmit { commitRename() }
-                            Button("Save", action: commitRename)
-                                .buttonStyle(.borderedProminent)
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                TextField("Route name", text: $pendingName)
+                                    .onSubmit { commitRename() }
+                                Button("Save", action: commitRename)
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                Button("Cancel") {
+                                    isRenaming = false
+                                    nameSuggestions = []
+                                    nameSuggestState = .idle
+                                }
                                 .controlSize(.small)
-                            Button("Cancel") { isRenaming = false }
-                                .controlSize(.small)
+                            }
+
+                            // F-A2: AI name suggestion pills
+                            if VeloAI.isAvailable && aiEnabled {
+                                Group {
+                                    switch nameSuggestState {
+                                    case .idle:
+                                        EmptyView()
+                                    case .loading:
+                                        HStack(spacing: 6) {
+                                            ProgressView().controlSize(.mini).tint(.purple)
+                                            Text("Suggesting names…")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    case .loaded:
+                                        ScrollView(.horizontal, showsIndicators: false) {
+                                            HStack(spacing: 8) {
+                                                ForEach(nameSuggestions, id: \.self) { name in
+                                                    Button {
+                                                        pendingName = name
+                                                    } label: {
+                                                        HStack(spacing: 4) {
+                                                            Image(systemName: "sparkles")
+                                                                .font(.system(size: 10, weight: .semibold))
+                                                            Text(name)
+                                                                .font(.system(size: 13, weight: .medium))
+                                                        }
+                                                        .padding(.horizontal, 12)
+                                                        .padding(.vertical, 7)
+                                                        .background(
+                                                            pendingName == name
+                                                                ? Color.purple
+                                                                : Color.purple.opacity(0.1),
+                                                            in: Capsule()
+                                                        )
+                                                        .foregroundStyle(
+                                                            pendingName == name ? .white : .purple
+                                                        )
+                                                    }
+                                                    .animation(.spring(duration: 0.2), value: pendingName)
+                                                }
+                                            }
+                                            .padding(.vertical, 2)
+                                        }
+                                    case .failed:
+                                        EmptyView()
+                                    }
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
                         }
                         .padding(14)
+                        .animation(.spring(duration: 0.3), value: nameSuggestState)
                     } else {
                         DetailRow(label: "Name", value: route.name)
                             .onTapGesture {
                                 pendingName = route.name
                                 isRenaming = true
+                                if VeloAI.isAvailable && aiEnabled {
+                                    Task { await loadNameSuggestions() }
+                                }
                             }
                             .overlay(alignment: .trailing) {
                                 Image(systemName: "pencil")
@@ -224,6 +290,31 @@ struct RouteDetailView: View {
         }
     }
 
+    // MARK: - F-A2: Load name suggestions
+
+    private func loadNameSuggestions() async {
+        nameSuggestions = []
+        nameSuggestState = .loading
+        do {
+            let suggestions = try await RouteNameSuggester().suggest(for: route)
+            nameSuggestions = suggestions
+            nameSuggestState = suggestions.isEmpty ? .idle : .loaded
+        } catch {
+            nameSuggestState = .failed
+        }
+    }
+
+    private func commitRename() {
+        let trimmed = pendingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        routeStore.renameRoute(route, to: trimmed)
+        isRenaming = false
+        nameSuggestions = []
+        nameSuggestState = .idle
+    }
+
+    // MARK: - Elevation helpers
+
     private var hasElevationData: Bool {
         route.trackPoints.contains { $0.elevation != nil }
     }
@@ -250,13 +341,12 @@ struct RouteDetailView: View {
         }
         return samples
     }
+}
 
-    private func commitRename() {
-        let trimmed = pendingName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        routeStore.renameRoute(route, to: trimmed)
-        isRenaming = false
-    }
+// MARK: - Name suggest state
+
+private enum NameSuggestState: Equatable {
+    case idle, loading, loaded, failed
 }
 
 // MARK: - Shared Sub-components

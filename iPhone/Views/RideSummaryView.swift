@@ -1,9 +1,10 @@
 import SwiftUI
 import MapKit
+import FoundationModels
 
 /// Full-screen sheet shown after a ride ends.
 /// Displays stats, a map snapshot of the actual track, visited POIs,
-/// and a one-tap GPX export of the ride.
+/// a one-tap GPX export of the ride, and an AI-generated shareable summary (F-A1).
 struct RideSummaryView: View {
     let summary: RideSummary
     var onDismiss: () -> Void
@@ -11,6 +12,12 @@ struct RideSummaryView: View {
     @State private var mapSnapshot: UIImage?
     @State private var exportPOIs = true
     @State private var gpxFileURL: ShareableURL?
+
+    // F-A1
+    @AppStorage(VeloAI.enabledKey) private var aiEnabled = true
+    @State private var aiSummaryText: String = ""
+    @State private var aiState: AIGenerationState = .idle
+    @State private var showEditSheet = false
 
     // MK-4: capture display scale from environment before async boundary
     @Environment(\.displayScale) private var displayScale
@@ -23,6 +30,7 @@ struct RideSummaryView: View {
                         mapSnapshotSection
                         heroStatsSection
                         statsGridSection
+                        if VeloAI.isAvailable && aiEnabled { aiSummarySection }
                         if !summary.pois.isEmpty { poisSection }
                         exportSection
                     }
@@ -40,6 +48,12 @@ struct RideSummaryView: View {
                 }
                 .sheet(item: $gpxFileURL) { item in
                     ShareSheet(items: [item.url])
+                }
+                .sheet(isPresented: $showEditSheet) {
+                    AISummaryEditSheet(
+                        text: $aiSummaryText,
+                        routeName: summary.routeName
+                    )
                 }
                 .task { await generateMapSnapshot(containerWidth: geo.size.width) }
             }
@@ -127,6 +141,129 @@ struct RideSummaryView: View {
                 .padding(.top, 2)
             }
         }
+    }
+
+    // MARK: - F-A1: AI Summary
+
+    @ViewBuilder
+    private var aiSummarySection: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.purple)
+                Text("Ride Summary")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if case .done = aiState {
+                    Button {
+                        Task { await generateAISummary() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("Regenerate summary")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color(.systemGray6).opacity(0.6))
+
+            Divider()
+
+            // Body
+            VStack(spacing: 12) {
+                switch aiState {
+                case .idle:
+                    Button {
+                        Task { await generateAISummary() }
+                    } label: {
+                        Label("Generate Summary", systemImage: "sparkles")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(.purple.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                            .foregroundStyle(.purple)
+                    }
+                    .padding(14)
+
+                case .generating:
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !aiSummaryText.isEmpty {
+                            Text(aiSummaryText)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .animation(.default, value: aiSummaryText)
+                        } else {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.purple)
+                                Text("Generating…")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+
+                case .done:
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(aiSummaryText)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(spacing: 10) {
+                            Button {
+                                showEditSheet = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Color(.systemGray5), in: Capsule())
+                                    .foregroundStyle(.primary)
+                            }
+                            Button {
+                                shareSummary()
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(.purple, in: Capsule())
+                                    .foregroundStyle(.white)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(14)
+
+                case .failed(let message):
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") {
+                            Task { await generateAISummary() }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.purple)
+                    }
+                    .padding(14)
+                }
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
     // MARK: - POIs
@@ -225,6 +362,32 @@ struct RideSummaryView: View {
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 
+    // MARK: - F-A1 Actions
+
+    private func generateAISummary() async {
+        aiSummaryText = ""
+        aiState = .generating
+        do {
+            try await RideSummaryGenerator().stream(from: summary) { partial in
+                aiSummaryText = partial
+            }
+            aiState = .done
+        } catch let error as LanguageModelSession.GenerationError {
+            aiState = .failed(error.displayMessage)
+        } catch {
+            aiState = .failed("Couldn’t generate a response. Try again.")
+        }
+    }
+
+    private func shareSummary() {
+        guard !aiSummaryText.isEmpty else { return }
+        let av = UIActivityViewController(activityItems: [aiSummaryText], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            root.present(av, animated: true)
+        }
+    }
+
     // MARK: - Export Action
 
     private func exportGPX() {
@@ -249,7 +412,6 @@ struct RideSummaryView: View {
 
     // MARK: - Map Snapshot
     // MK-4: containerWidth passed in from GeometryReader; displayScale from @Environment.
-    // Neither UIScreen.main.bounds nor UIScreen.main.scale are used.
 
     private func generateMapSnapshot(containerWidth: CGFloat) async {
         guard !summary.actualTrack.isEmpty else { return }
@@ -297,6 +459,51 @@ struct RideSummaryView: View {
             }
             mapSnapshot = image
         } catch {}
+    }
+}
+
+// MARK: - AI Generation State
+
+private enum AIGenerationState {
+    case idle
+    case generating
+    case done
+    case failed(String)
+}
+
+// MARK: - AI Summary Edit Sheet
+
+private struct AISummaryEditSheet: View {
+    @Binding var text: String
+    let routeName: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                TextEditor(text: $draft)
+                    .font(.body)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(routeName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        text = draft
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .onAppear { draft = text }
     }
 }
 
