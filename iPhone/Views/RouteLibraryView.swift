@@ -1,14 +1,13 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import FoundationModels
 
 struct RouteLibraryView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @State private var isImporterPresented = false
-    // FIX (.constant binding): replace .constant(routeStore.lastImportMessage != nil)
-    // with a proper @State flag so the system-generated dismiss write (setting
-    // isPresented = false) is accepted. The old .constant() swallowed those writes,
-    // meaning the alert could never be programmatically or system-dismissed correctly.
     @State private var showImportAlert = false
+    // F-A2: rename sheet
+    @State private var routeToRename: RouteModel? = nil
 
     var body: some View {
         NavigationStack {
@@ -44,7 +43,6 @@ struct RouteLibraryView: View {
                     Task { await routeStore.importRoute(from: url) }
                 }
             }
-            // Sync the @State flag whenever the store's message changes.
             .onChange(of: routeStore.lastImportMessage) { _, newValue in
                 showImportAlert = newValue != nil
             }
@@ -58,6 +56,13 @@ struct RouteLibraryView: View {
                    }
                },
                message: { Text(routeStore.lastImportMessage ?? "") })
+        // F-A2: Rename sheet
+        .sheet(item: $routeToRename) { route in
+            RouteRenameSheet(route: route) { newName in
+                routeStore.renameRoute(route, to: newName)
+            }
+            .environmentObject(routeStore)
+        }
     }
 
     // MARK: - Route List
@@ -83,11 +88,16 @@ struct RouteLibraryView: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
+                    // F-A2: Rename swipe action
+                    Button {
+                        routeToRename = route
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                    .tint(.yellow)
                 }
 
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    // Use pendingRideRoute so RootView handles selectedRoute +
-                    // POI load + tab switch atomically (mirrors routeToEditInPlan).
                     Button {
                         routeStore.pendingRideRoute = route
                     } label: {
@@ -117,6 +127,12 @@ struct RouteLibraryView: View {
                         } label: {
                             Label("Edit in Plan", systemImage: "pencil.and.map")
                         }
+                    }
+                    // F-A2: Rename in contextMenu
+                    Button {
+                        routeToRename = route
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
                     }
                     Divider()
                     Button(role: .destructive) {
@@ -165,6 +181,263 @@ struct RouteLibraryView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+// MARK: - F-A2: Route Rename Sheet
+
+private struct RouteRenameSheet: View {
+    let route: RouteModel
+    let onSave: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(VeloAI.enabledKey) private var aiEnabled = true
+
+    @State private var draftName: String
+    @State private var suggestionState: SuggestionState = .idle
+    @State private var suggestions: [String] = []
+
+    private enum SuggestionState {
+        case idle, loading, done, failed(String)
+    }
+
+    init(route: RouteModel, onSave: @escaping (String) -> Void) {
+        self.route  = route
+        self.onSave = onSave
+        _draftName  = State(initialValue: route.name)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+
+                    // MARK: Name field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Route Name")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+
+                        TextField("Route name", text: $draftName)
+                            .font(.body)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color(.secondarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 12))
+                            .autocorrectionDisabled()
+                    }
+
+                    // MARK: AI Suggestions (F-A2)
+                    if VeloAI.isAvailable && aiEnabled {
+                        VStack(spacing: 0) {
+                            // Header
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.purple)
+                                Text("Suggested Names")
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                if case .done = suggestionState {
+                                    Button {
+                                        Task { await fetchSuggestions() }
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .accessibilityLabel("Regenerate suggestions")
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6).opacity(0.6))
+
+                            Divider()
+
+                            // Body
+                            Group {
+                                switch suggestionState {
+                                case .idle:
+                                    Button {
+                                        Task { await fetchSuggestions() }
+                                    } label: {
+                                        Label("Suggest Names from Route", systemImage: "sparkles")
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 13)
+                                            .background(.purple.opacity(0.12),
+                                                        in: RoundedRectangle(cornerRadius: 12))
+                                            .foregroundStyle(.purple)
+                                    }
+                                    .padding(14)
+
+                                case .loading:
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .tint(.purple)
+                                        Text("Finding route names\u{2026}")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+
+                                case .done:
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("Tap a suggestion to use it — you can still edit before saving.")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+
+                                        FlowLayout(spacing: 8) {
+                                            ForEach(suggestions, id: \.self) { name in
+                                                Button {
+                                                    draftName = name
+                                                } label: {
+                                                    Text(name)
+                                                        .font(.subheadline.weight(.medium))
+                                                        .padding(.horizontal, 14)
+                                                        .padding(.vertical, 9)
+                                                        .background(
+                                                            draftName == name
+                                                                ? Color.purple
+                                                                : Color(.systemGray5),
+                                                            in: Capsule()
+                                                        )
+                                                        .foregroundStyle(
+                                                            draftName == name ? .white : .primary
+                                                        )
+                                                        .animation(.spring(duration: 0.2),
+                                                                   value: draftName)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(14)
+
+                                case .failed(let msg):
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .foregroundStyle(.orange)
+                                        Text(msg)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Button("Retry") {
+                                            Task { await fetchSuggestions() }
+                                        }
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.purple)
+                                    }
+                                    .padding(14)
+                                }
+                            }
+                        }
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Rename Route")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        onSave(trimmed)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            // Auto-fetch on appear when AI is available
+            .task {
+                guard VeloAI.isAvailable && aiEnabled else { return }
+                await fetchSuggestions()
+            }
+        }
+    }
+
+    private func fetchSuggestions() async {
+        suggestionState = .loading
+        do {
+            let names = try await RouteNameSuggester().suggest(for: route)
+            suggestions = names
+            suggestionState = .done
+        } catch {
+            suggestionState = .failed("Couldn't generate suggestions. Try again.")
+        }
+    }
+}
+
+// MARK: - FlowLayout (wrapping pill row)
+
+/// A simple left-to-right wrapping layout for the suggestion pills.
+private struct FlowLayout<Content: View>: View {
+    let spacing: CGFloat
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        // iOS 16+ Layout protocol. Falls back gracefully to HStack wrap for older OS
+        // but since we target iOS 26+ this is fine.
+        _FlowLayout(spacing: spacing, content: content)
+    }
+}
+
+private struct _FlowLayout<Content: View>: Layout {
+    let spacing: CGFloat
+    @ViewBuilder var content: Content
+
+    // Required boilerplate — Layout expects a Body associatedtype
+    struct Cache {}
+    func makeCache(subviews: Subviews) -> Cache { Cache() }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > width, x > 0 {
+                y += rowHeight + spacing
+                x = 0
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxWidth = max(maxWidth, x)
+        }
+        y += rowHeight
+        return CGSize(width: maxWidth, height: y)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                y += rowHeight + spacing
+                x = bounds.minX
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 13, 2026 (late night — Sprint 1 verified complete via code search)
+> Last updated: May 14, 2026 — Sprint 2 complete
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -36,29 +36,25 @@
 
 ---
 
-## 🔲 Sprint 2 — On-Device AI (FoundationModels, iOS 26)
-> **NEXT — start here next session.**
-> Goal: ship the three standalone AI features. Targets v1.3.
-> Add `FoundationModels` to Build Phases + `VeloAISession` shared wrapper first, then the three features can be built in any order.
->
-> **F-A3 touches `POIDiscoverySheet` / `NearbySearchSheet`.** While in those files, opportunistically begin the sheet merge (see Backlog). Don't block shipping F-A3 on it — but if the merge is small, do it in the same commit.
+## ✅ Sprint 2 — On-Device AI (FoundationModels, iOS 26)
+> **COMPLETE** as of May 14, 2026. All items verified in source code.
 
-- [ ] **F-A Shared · Add `FoundationModels` framework + `VeloAISession` wrapper**
-  Single shared session wrapper. Add user toggle in `SettingsView` — "AI Features (Apple Intelligence)" — with on-device explanation. Gate all AI UI on `ModelAvailability.isAvailable`.
+- [x] **F-A Shared · Add `FoundationModels` framework + `VeloAISession` wrapper**
+  `VeloAI.swift` — shared `isAvailable` gate + `enabledKey` AppStorage key. AI Features toggle in `SettingsView` gated behind `VeloAI.isAvailable`.
   → `FEATURES.md § F-A (Shared Implementation Notes)`
 
-- [ ] **F-A1 · Ride Summary Generation**
-  Post-ride natural language summary from `RideSummary` data. "Generate Summary" button in `RideSummaryView` below stats grid. Editable before sharing.
+- [x] **F-A1 · Ride Summary Generation**
+  Post-ride natural language summary from `RideSummary` data. Full idle/generating/done/failed state machine in `RideSummaryView`. Editable before sharing. Caption persisted to `RideHistoryStore`.
   → `FEATURES.md § F-A1`
   **New file:** `iPhone/Services/RideSummaryGenerator.swift`
 
-- [ ] **F-A2 · Smart Route Naming**
-  On GPX import or rename tap, suggest 3 names via reverse geocode + model. Pill picker in rename sheet in `RouteLibraryView`. Uses `MKReverseGeocodingRequest` (MK-3 already done).
+- [x] **F-A2 · Smart Route Naming**
+  Rename swipe action + context menu item in `RouteLibraryView`. `RouteRenameSheet` with auto-fetched pill suggestions from `RouteNameSuggester`. Tapping a pill fills the text field; user can edit freely before saving. Wrapping `FlowLayout` using `Layout` protocol.
   → `FEATURES.md § F-A2`
   **New file:** `iPhone/Services/RouteNameSuggester.swift`
 
-- [ ] **F-A3 · POI Relevance Ranking**
-  Context-aware "Suggested" sort in `POIDiscoverySheet` / `NearbySearchSheet`. Uses ride difficulty, elevation gain, elapsed distance, time-of-day, and `RideHistoryStore` category frequency.
+- [x] **F-A3 · POI Relevance Ranking**
+  Context-aware "Suggested" / "Nearest" / "Category" segmented sort in `POIDiscoverySheet`. `POIRankingEngine` actor ranks by ride difficulty, elevation, distance, time-of-day. Reason subtitle shown per card. Auto-ranks on search when AI enabled.
   → `FEATURES.md § F-A3`
   **New file:** `iPhone/Services/POIRankingEngine.swift`
 
@@ -136,10 +132,7 @@
 
 ```
 Sprint 1: ✅ COMPLETE
-
-Sprint 2: F-A Shared wrapper ──► F-A1, F-A2, F-A3 (any order)
-          F-A1 validates VeloAISession pattern ──► Sprint 3 reuses it
-          F-A3 in POI sheets ──► opportunistic sheet merge if small
+Sprint 2: ✅ COMPLETE
 
 Sprint 3: F-A (Sprint 2 done) ──► F-C1 ──► F-C2 + partial F-3 RideView split
 
