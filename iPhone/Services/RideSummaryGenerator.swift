@@ -97,7 +97,7 @@ struct RideSummaryGenerator {
         let distKm    = String(format: "%.1f", summary.totalDistance / 1000)
         let durationM = Int(summary.elapsedTime / 60)
         let elevGain  = String(format: "%.0f", summary.elevationGain)
-        let avgSpeed  = String(format: "%.1f", summary.averageSpeed * 3.6) // m/s → km/h
+        let avgSpeed  = String(format: "%.1f", summary.avgSpeedKmh * 3.6) // m/s → km/h
 
         // Format duration as "1h 23m" or "45m" depending on length.
         let hours = durationM / 60
