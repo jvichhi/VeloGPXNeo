@@ -18,7 +18,7 @@
 // CLGeocoder is deprecated on iOS 18+ (PROJECT.md rule MK-3).
 // MKReverseGeocodingRequest is the MapKit-native replacement introduced in iOS 18.
 // It uses structured concurrency (async/await) with no completion handler.
-// API: MKReverseGeocodingRequest(coordinate:) → await req.response → .placemark.locality
+// API: MKReverseGeocodingRequest(location: CLLocation) → try await req.mapItems → first.placemark.locality
 //
 // WHY session.respond(to:) and NOT session.generate(from:):
 // respond(to:) takes a plain String prompt and returns a plain String.
@@ -30,7 +30,7 @@
 // ❌ CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in ... }
 //    — completion-handler style, deprecated iOS 18+. Never use.
 // ❌ CLGeocoder().reverseGeocodeLocation(_:) async — still CLGeocoder, still deprecated.
-// ✅ MKReverseGeocodingRequest(coordinate: coord) + await req.response
+// ✅ MKReverseGeocodingRequest(location: CLLocation) + try await req.mapItems → first.placemark
 // ❌ session.stream(from:onPartial:) — removed in iOS 26 beta.
 // ✅ session.respond(to: prompt) — correct for plain String output.
 //
@@ -97,15 +97,20 @@ struct RouteNameSuggester {
         // Guard: route must have at least one trackpoint to geocode.
         guard let first = route.trackPoints.first else { return nil }
 
-        let coord = CLLocationCoordinate2D(latitude: first.latitude, longitude: first.longitude)
+        // TrackPoint.coordinate is a Coordinate struct — access latitude/longitude through it.
+        // CLLocation is required by MKReverseGeocodingRequest(location:) on iOS 18+.
+        let location = CLLocation(
+            latitude: first.coordinate.latitude,
+            longitude: first.coordinate.longitude
+        )
 
-        // MKReverseGeocodingRequest — iOS 18+ structured-concurrency geocoding.
-        // Returns MKReverseGeocodingResponse with a .placemark property.
-        // .locality = city name (e.g., "Montreal")
-        // .subLocality = neighbourhood (e.g., "Plateau-Mont-Royal") — more specific, prefer it.
-        let request = MKReverseGeocodingRequest(coordinate: coord)
-        guard let result = try? await request.response else { return nil }
-        return result.placemark.subLocality ?? result.placemark.locality
+        // MKReverseGeocodingRequest(location:) — iOS 18+ structured-concurrency geocoding.
+        // .mapItems is async throws — returns [MKMapItem].
+        // .placemark.subLocality = neighbourhood (e.g., "Plateau-Mont-Royal") — more specific, prefer it.
+        // .placemark.locality    = city name    (e.g., "Montreal") — fallback.
+        let request = MKReverseGeocodingRequest(location: location)
+        guard let mapItem = try? await request.mapItems.first else { return nil }
+        return mapItem.placemark.subLocality ?? mapItem.placemark.locality
     }
 
     /// Builds the prompt string sent to the language model.

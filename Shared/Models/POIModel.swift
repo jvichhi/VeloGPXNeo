@@ -69,13 +69,17 @@ public enum POICategory: String, Codable, CaseIterable, Sendable {
     case cafe
     case restaurant
     case water
-    case bikeRepair = "bike_repair"
-    case bikeRental = "bike_rental"
+    case bikeRepair    = "bike_repair"
+    case bikeRental    = "bike_rental"
     case accommodation
     case viewpoint
     case campsite
     case pharmacy
     case custom
+    // Added to match POIRankingEngine usage
+    case restroom      = "restroom"
+    case bikeshop      = "bike_shop"
+    case scenic        = "scenic"
 
     public var displayName: String {
         switch self {
@@ -89,6 +93,9 @@ public enum POICategory: String, Codable, CaseIterable, Sendable {
         case .campsite:      return "Campsite"
         case .pharmacy:      return "Pharmacy"
         case .custom:        return "Waypoint"
+        case .restroom:      return "Restroom"
+        case .bikeshop:      return "Bike Shop"
+        case .scenic:        return "Scenic"
         }
     }
 
@@ -104,6 +111,9 @@ public enum POICategory: String, Codable, CaseIterable, Sendable {
         case .campsite:      return "tent.fill"
         case .pharmacy:      return "cross.fill"
         case .custom:        return "mappin.circle.fill"
+        case .restroom:      return "figure.walk"
+        case .bikeshop:      return "storefront.fill"
+        case .scenic:        return "photo.on.rectangle"
         }
     }
 }
