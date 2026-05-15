@@ -279,7 +279,7 @@ private struct RouteRenameSheet: View {
                                         ProgressView()
                                             .controlSize(.small)
                                             .tint(.purple)
-                                        Text("Finding route names…")
+                                        Text("Finding route names\u{2026}")
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
@@ -384,18 +384,21 @@ private struct RouteRenameSheet: View {
 // MARK: - FlowLayout (wrapping pill row)
 
 /// A simple left-to-right wrapping layout for the suggestion pills.
+/// FlowLayout is a View that owns the @ViewBuilder content storage.
+/// _FlowLayout is a pure Layout — it must NOT hold any view storage.
+/// The SwiftUI engine passes subviews to _FlowLayout automatically via
+/// sizeThatFits/placeSubviews; no @ViewBuilder property is needed or allowed.
 private struct FlowLayout<Content: View>: View {
     let spacing: CGFloat
     @ViewBuilder let content: Content
 
     var body: some View {
-        _FlowLayout(spacing: spacing, content: content)
+        _FlowLayout(spacing: spacing) { content }
     }
 }
 
-private struct _FlowLayout<Content: View>: Layout {
+private struct _FlowLayout: Layout {
     let spacing: CGFloat
-    @ViewBuilder var content: Content
 
     struct Cache {}
     func makeCache(subviews: Subviews) -> Cache { Cache() }
@@ -409,19 +412,16 @@ private struct _FlowLayout<Content: View>: Layout {
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
             if x + size.width > width, x > 0 {
-                // End of row: record width without the trailing spacing gap
-                maxWidth = max(maxWidth, x - spacing)
                 y += rowHeight + spacing
                 x = 0
                 rowHeight = 0
             }
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
+            maxWidth = max(maxWidth, x)
         }
-        // Final row: subtract trailing spacing
-        maxWidth = max(maxWidth, x - spacing)
         y += rowHeight
-        return CGSize(width: maxWidth, height: y)
+        return CGSize(width: max(0, maxWidth - spacing), height: y)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
