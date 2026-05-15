@@ -126,15 +126,24 @@ struct POIDiscoverySheet: View {
                             LazyVStack(spacing: 10) {
                                 ForEach(displayItems) { ranked in
                                     let mapItem = results.first(where: { $0.deterministicPOIID == ranked.poi.id })
-                                    let isAdded = routeStore.selectedPOIs.contains {
-                                        $0.id == ranked.poi.id
+                                    let isAdded = routeStore.selectedPOIs.contains { $0.id == ranked.poi.id }
+                                    // ⚠️ REGRESSION GUARD — DO NOT INLINE THIS BACK INTO onTap ⚠️
+                                    // The overloaded addPOI(from:) calls inside a ForEach closure
+                                    // cause "compiler unable to type-check" (line 128) when inlined.
+                                    // Keep the action extracted as a local let binding.
+                                    let action: () -> Void = {
+                                        if let mi = mapItem {
+                                            addPOI(from: mi)
+                                        } else {
+                                            addPOI(from: ranked.poi)
+                                        }
                                     }
                                     POIDiscoveryResultCard(
                                         item: ranked.poi,
                                         isAdded: isAdded,
                                         reason: sortOrder == .suggested ? ranked.reason : "",
                                         categoryIcon: ranked.poi.category.systemImage,
-                                        onTap: { if let mi = mapItem { addPOI(from: mi) } else { addPOI(from: ranked.poi) } }
+                                        onTap: action
                                     )
                                 }
                             }
