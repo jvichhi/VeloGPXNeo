@@ -1,40 +1,27 @@
 import Foundation
 import FoundationModels
 
-/// F-A1 — Streams a shareable, social-media-ready ride summary using
+/// F-A1 — Generates a shareable, social-media-ready ride summary using
 /// Apple Intelligence (FoundationModels) entirely on-device.
 ///
 /// Output length target: 2–3 sentences, emoji welcome.
 ///
-/// API note: `session.streamResponse(to: String)` yields plain `String` chunks
-/// (each chunk is the new delta token). `Snapshot` is only emitted when using
-/// the `@Generable` structured-output overload. We accumulate deltas manually.
+/// API note: `LanguageModelSession.streamResponse` only supports `@Generable`
+/// structured types — there is no plain-String streaming overload.
+/// We use `respond(to:)` for a single complete response instead.
 struct RideSummaryGenerator {
 
     // MARK: - Public API
 
-    /// Streams partial text back to `onPartial` as tokens arrive.
-    /// Each call to `onPartial` receives the **full accumulated string** so far.
+    /// Returns the complete generated summary string.
     /// Throws `VeloAIError` or `LanguageModelSession.GenerationError`.
-    func stream(
-        from summary: RideSummary,
-        onPartial: @escaping @Sendable (String) -> Void
-    ) async throws {
+    func generate(from summary: RideSummary) async throws -> String {
         let session = try VeloAI.makeSession(instructions: systemInstruction)
         let prompt  = buildPrompt(from: summary)
-
-        var accumulated = ""
-        let responseStream = session.streamResponse(to: prompt)
-        for try await chunk in responseStream {
-            // chunk: String — the new delta token(s) appended this iteration
-            accumulated += chunk
-            let snapshot = accumulated
-            await MainActor.run { onPartial(snapshot) }
-        }
-
-        if accumulated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw VeloAIError.emptyResponse
-        }
+        let response = try await session.respond(to: prompt)
+        let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { throw VeloAIError.emptyResponse }
+        return text
     }
 
     // MARK: - Prompt
