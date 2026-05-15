@@ -94,9 +94,12 @@ struct RideView: View {
             Task { poiSpurs = await rideStore.computeSpurs() }
         }
         .sheet(item: $completedSummary) { summary in
-            RideSummaryView(summary: summary) {
-                completedSummary = nil
-            }
+            RideSummaryView(
+                summary: summary,
+                onDismiss: { completedSummary = nil },
+                persistedID: summary.id,
+                historyStore: historyStore
+            )
         }
     }
 
@@ -713,8 +716,6 @@ struct RideView: View {
 
         Map(position: $position) {
             // ── Route polylines ────────────────────────────────────────────
-            // Drawn FIRST (bottom-most z-order). Reroute polylines are drawn
-            // after so they appear ON TOP of the blue route line, not under it.
             if let progress = rideStore.routeProgress {
                 MapPolyline(coordinates: progress.ridden)
                     .stroke(.white, lineWidth: 14)
@@ -732,11 +733,6 @@ struct RideView: View {
                     .stroke(.blue, lineWidth: 12)
             }
 
-            // Bug 2 fix: reroute polylines drawn AFTER (above) route polylines.
-            // Previously they were rendered in the same block as the route lines,
-            // but SwiftUI MapKit composites all Map content in declaration order —
-            // the remaining-route blue line was drawn on top of the orange reroute
-            // line, making it invisible. Moving them here puts orange on top.
             if !rideStore.reroutePolyline.isEmpty {
                 MapPolyline(coordinates: rideStore.reroutePolyline)
                     .stroke(.white, lineWidth: 16)
@@ -788,17 +784,10 @@ struct RideView: View {
                             guard rideStore.rideState.isActive else { return }
 
                             if pendingDeletePOI?.id == poi.id {
-                                // Second long-press — confirm delete
                                 cameraPauseTask?.cancel()
                                 cameraPauseTask = nil
-                                // Bug 3 fix: delete from BOTH stores so the
-                                // onChange(of: routeStore.selectedPOIs) observer
-                                // in ridingLayout fires and calls rideStore.updatePOIs.
-                                // This is the single authoritative delete path.
                                 routeStore.selectedPOIs.removeAll { $0.id == poi.id }
                                 routeStore.savePOIs()
-                                // rideStore.pois is updated reactively via the
-                                // onChange(of: routeStore.selectedPOIs) observer.
                                 pendingDeletePOI = nil
                             } else {
                                 pendingDeletePOI = poi
