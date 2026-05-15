@@ -18,6 +18,8 @@ public struct PersistedRideSummary: Codable, Identifiable, Sendable {
     public let plannedTrackLats: [Double]
     public let plannedTrackLons: [Double]
     public let pois: [POIModel]
+    /// AI-generated caption saved after generation completes. nil until first generation.
+    public var aiCaption: String?
 
     // MARK: - Init from live RideSummary
     public init(from summary: RideSummary) {
@@ -35,6 +37,7 @@ public struct PersistedRideSummary: Codable, Identifiable, Sendable {
         self.plannedTrackLats = summary.plannedTrack.map(\.latitude)
         self.plannedTrackLons = summary.plannedTrack.map(\.longitude)
         self.pois = summary.pois
+        self.aiCaption = nil
     }
 
     // MARK: - Reconstitute coordinates
