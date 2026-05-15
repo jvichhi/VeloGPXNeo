@@ -4,6 +4,7 @@
 //
 //  iOS 26+ only. Uses MKReverseGeocodingRequest exclusively.
 //  CLGeocoder and #available branches removed — deployment target is iOS 26 (PROJECT.md).
+//  MKAddress only has shortAddress / fullAddress — no locality member.
 //
 
 import Foundation
@@ -25,10 +26,8 @@ actor ReverseGeocodingService {
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         do {
             let items = try await request.mapItems
-            // Prefer address.locality; fall back to item name
-            let result = items.first?.address?.locality
-                      ?? items.first?.address?.subLocality
-                      ?? items.first?.name
+            // MKAddress only exposes shortAddress/fullAddress; item.name gives the place name
+            let result = items.first?.name ?? items.first?.address?.shortAddress
             if let result { cache[key] = result }
             return result
         } catch {

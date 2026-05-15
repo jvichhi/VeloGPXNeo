@@ -4,8 +4,8 @@
 //
 //  Shared helpers for converting MKMapItem → POI primitives.
 //  Deployment target is iOS 26 — all #available branches removed per PROJECT.md.
-//  Uses iOS 26 APIs exclusively: item.location, item.address (MKAddress).
-//  MKMapItem.placemark is deprecated iOS 26.
+//  iOS 26 APIs: item.location (CLLocation, non-optional), item.address (MKAddress?).
+//  MKAddress members: shortAddress, fullAddress only — no locality/subLocality.
 //
 
 import MapKit
@@ -15,22 +15,21 @@ extension MKMapItem {
 
     // MARK: - Coordinate
 
-    /// The item's coordinate via item.location (non-optional on iOS 26).
+    /// The item's coordinate via item.location (non-optional CLLocation on iOS 26).
     var poiCoordinate: CLLocationCoordinate2D {
         location.coordinate
     }
 
     // MARK: - Address
 
-    /// Short single-line address from MKAddress (iOS 26+).
+    /// Short single-line address from MKAddress.shortAddress (iOS 26+).
     var shortAddress: String? {
-        address?.formattedAddress
+        address?.shortAddress
     }
 
     // MARK: - Deterministic UUID
 
     /// Stable UUID derived from coordinate (6 decimal places).
-    /// Same physical place always yields the same ID across searches.
     var deterministicPOIID: UUID {
         let coord = poiCoordinate
         let lat = (coord.latitude  * 1_000_000).rounded() / 1_000_000

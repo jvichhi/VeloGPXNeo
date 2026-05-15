@@ -3,13 +3,9 @@
 //  VeloGPX
 //
 //  F-A2 — Smart Route Naming.
-//  Suggests three short, evocative cycling route names using an on-device
-//  FoundationModels session seeded with reverse-geocoded place names from
-//  the route's start and midpoint.
-//
 //  Deployment target: iOS 26. No @available guards needed.
 //  CLGeocoder replaced with MKReverseGeocodingRequest.
-//  Locality resolved via MKMapItem.address (MKAddress) — .placemark deprecated iOS 26.
+//  Locality from MKAddress.shortAddress (only fields: shortAddress, fullAddress).
 //
 
 import Foundation
@@ -61,15 +57,14 @@ struct RouteNameSuggester {
     }
 
     /// Reverse-geocodes a Coordinate using MKReverseGeocodingRequest.
-    /// init is failable; .mapItems is async throws.
-    /// Locality read from MKMapItem.address (MKAddress) — .placemark is deprecated iOS 26.
+    /// MKAddress only exposes shortAddress and fullAddress — no locality/subLocality members.
     private func geocodeName(_ coord: Coordinate?) async -> String? {
         guard let coord else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         guard let items = try? await request.mapItems,
               let first = items.first else { return nil }
-        // MKMapItem.address is MKAddress? on iOS 26 — direct properties, not a collection
-        return first.address?.locality ?? first.address?.subLocality
+        // Prefer the item name (e.g. neighbourhood/district); fall back to short address
+        return first.name ?? first.address?.shortAddress
     }
 }
