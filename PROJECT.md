@@ -53,6 +53,35 @@ When the AI generates a call to a method or property not already present in the 
 
 ---
 
+## AI Tool File Size Warning
+
+> ⚠️ **Do not ask an AI tool to read and rewrite large `.md` files in a single operation.**
+
+Some documentation files in this repo are large and will cause AI coding tools to time out mid-write, potentially corrupting the file:
+
+| File | Size | Risk |
+|---|---|---|
+| `FEATURES.md` | ~39 KB | ⚠️ High — do not full-rewrite |
+| `TECH_DEBT.md` | ~16 KB | ⚠️ Medium |
+| `ROADMAP.md` | ~10 KB | ⚠️ Medium |
+| `DEVLOG.md` | ~9 KB | Low |
+
+### Safe Update Pattern
+Always make **targeted, section-specific edits** to large `.md` files:
+- Tell the AI exactly which section to update (e.g. *"mark F-A1 as complete in FEATURES.md"*)
+- Never ask an AI tool to "update the FEATURES.md file with the latest backlog and status notes" as a single instruction — this triggers a full file read + rewrite that times out after several minutes
+- If a full rewrite is truly needed, split it into multiple focused passes (one section at a time)
+
+### Recovery
+If an AI tool errors mid-write on a `.md` file:
+```bash
+git status           # check if file was partially written
+git diff <file>.md   # inspect the damage
+git checkout HEAD -- <file>.md   # restore from last clean commit
+```
+
+---
+
 ## File Organisation
 
 ```
