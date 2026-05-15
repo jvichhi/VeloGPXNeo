@@ -105,10 +105,10 @@ actor POIRankingEngine {
 
         // --- Distance score (0–0.40) ---
         // Linear decay: 0 m away = 0.40, 2000 m away = 0.0. Clipped at 2 km.
-        if let dist = poi.distanceFromRoute {
-            let proximity = max(0, 1 - Float(dist) / 2000)
-            score += proximity * 0.40
-        }
+        // distanceFromRoute is a non-optional Double — no optional binding needed.
+        let dist = poi.distanceFromRoute
+        let proximity = max(0, 1 - Float(dist) / 2000)
+        score += proximity * 0.40
 
         // --- Category fit (0–0.30) ---
         // Cafes/water/restrooms are always high priority mid-ride.
@@ -190,8 +190,9 @@ actor POIRankingEngine {
         let distCovered = String(format: "%.1f", context.distanceCovered / 1000)
         let elevGain    = String(format: "%.0f", context.totalElevationGain)
 
+        // distanceFromRoute is a non-optional Double — format directly.
         let poiLines = pois.enumerated().map { idx, sp in
-            let distStr = sp.poi.distanceFromRoute.map { String(format: "%.0f m away", $0) } ?? "nearby"
+            let distStr = String(format: "%.0f m away", sp.poi.distanceFromRoute)
             return "\(idx + 1). \(sp.poi.name) (\(sp.poi.category.rawValue), \(distStr))"
         }.joined(separator: "\n")
 

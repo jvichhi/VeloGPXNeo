@@ -18,7 +18,9 @@
 // CLGeocoder is deprecated on iOS 18+ (PROJECT.md rule MK-3).
 // MKReverseGeocodingRequest is the MapKit-native replacement introduced in iOS 18.
 // It uses structured concurrency (async/await) with no completion handler.
-// API: MKReverseGeocodingRequest(location: CLLocation) → try await req.mapItems → first.placemark.locality
+// API: MKReverseGeocodingRequest(location: CLLocation) is a failable init returning
+// MKReverseGeocodingRequest? — always guard/if-let before calling .mapItems.
+// .mapItems is async throws — returns [MKMapItem].
 //
 // WHY session.respond(to:) and NOT session.generate(from:):
 // respond(to:) takes a plain String prompt and returns a plain String.
@@ -30,7 +32,8 @@
 // ❌ CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in ... }
 //    — completion-handler style, deprecated iOS 18+. Never use.
 // ❌ CLGeocoder().reverseGeocodeLocation(_:) async — still CLGeocoder, still deprecated.
-// ✅ MKReverseGeocodingRequest(location: CLLocation) + try await req.mapItems → first.placemark
+// ✅ guard let request = MKReverseGeocodingRequest(location: CLLocation) — failable init
+// ✅ try await request.mapItems.first — async throws, unwrapped request
 // ❌ session.stream(from:onPartial:) — removed in iOS 26 beta.
 // ✅ session.respond(to: prompt) — correct for plain String output.
 //
@@ -62,24 +65,17 @@ struct RouteNameSuggester {
     /// - Throws: `LanguageModelError` if the session fails, or any error from geocoding.
     func suggest(for route: RouteModel) async throws -> [String] {
         // Step 1: Geocode the route's start coordinate to get a location name.
-        // This enriches the prompt so the model can produce geographically relevant names.
         // Uses MKReverseGeocodingRequest — the iOS 18+ replacement for deprecated CLGeocoder.
         let locationName = await geocodeStartName(for: route)
 
         // Step 2: Build the prompt string.
-        // The prompt is tightly scoped: "3 short cycling route names, one per line, no numbering."
-        // Tight scoping prevents the model from producing explanations, disclaimers, or markdown.
         let prompt = buildPrompt(route: route, locationName: locationName)
 
         // Step 3: Create a fresh session and call respond(to:).
-        // Sessions are lightweight — create one per request, don't cache them.
-        // respond(to:) returns a plain String (the model's full response).
         let session = VeloAI.makeSession()
         let response = try await session.respond(to: prompt)
 
         // Step 4: Parse the response into individual name strings.
-        // The model is instructed to return one name per line with no numbering.
-        // We split on newlines, trim whitespace, and take up to 3 non-empty results.
         return parseNames(from: response.content)
     }
 
@@ -88,39 +84,25 @@ struct RouteNameSuggester {
     /// Reverse-geocodes the first trackpoint of the route to get a human-readable location name.
     ///
     /// Uses `MKReverseGeocodingRequest` (iOS 18+ API, required by PROJECT.md).
-    /// Falls back to `nil` gracefully — the prompt still works without a location name,
-    /// it just produces slightly more generic suggestions.
-    ///
-    /// - Parameter route: The route whose start coordinate to geocode.
-    /// - Returns: A locality/neighbourhood string, or `nil` if geocoding fails or the route is empty.
+    /// NOTE: MKReverseGeocodingRequest(location:) is a failable initialiser — it returns
+    /// MKReverseGeocodingRequest? and must be unwrapped before calling .mapItems.
+    /// Falls back to `nil` gracefully on empty route or geocoding failure.
     private func geocodeStartName(for route: RouteModel) async -> String? {
-        // Guard: route must have at least one trackpoint to geocode.
         guard let first = route.trackPoints.first else { return nil }
 
-        // TrackPoint.coordinate is a Coordinate struct — access latitude/longitude through it.
-        // CLLocation is required by MKReverseGeocodingRequest(location:) on iOS 18+.
         let location = CLLocation(
             latitude: first.coordinate.latitude,
             longitude: first.coordinate.longitude
         )
 
-        // MKReverseGeocodingRequest(location:) — iOS 18+ structured-concurrency geocoding.
+        // MKReverseGeocodingRequest(location:) is failable — guard-unwrap before use.
         // .mapItems is async throws — returns [MKMapItem].
-        // .placemark.subLocality = neighbourhood (e.g., "Plateau-Mont-Royal") — more specific, prefer it.
-        // .placemark.locality    = city name    (e.g., "Montreal") — fallback.
-        let request = MKReverseGeocodingRequest(location: location)
+        guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         guard let mapItem = try? await request.mapItems.first else { return nil }
         return mapItem.placemark.subLocality ?? mapItem.placemark.locality
     }
 
     /// Builds the prompt string sent to the language model.
-    ///
-    /// Prompt design principles:
-    /// - Be explicit about format ("one per line", "no numbering") to avoid markdown/lists.
-    /// - Include concrete numeric context (distance, elevation) so the model can produce
-    ///   names that reflect ride character ("Epic Climb" vs. "Evening Spin").
-    /// - Keep the prompt short — on-device models have context window limits and
-    ///   shorter prompts produce faster, more focused responses.
     private func buildPrompt(route: RouteModel, locationName: String?) -> String {
         let distKm     = String(format: "%.1f", route.totalDistance / 1000)
         let elevGain   = String(format: "%.0f", route.elevationGain)
@@ -143,22 +125,16 @@ struct RouteNameSuggester {
     }
 
     /// Parses the model's plain-text response into an array of name strings.
-    ///
-    /// The model is instructed to return one name per line with no numbering.
-    /// This parser is defensive: it trims whitespace, filters blank lines,
-    /// and strips any accidental leading numbers ("1. ", "1) ").
     private func parseNames(from response: String) -> [String] {
         response
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            // Strip accidental numbering like "1. " or "1) "
             .map { line -> String in
-                let stripped = line.replacingOccurrences(
+                line.replacingOccurrences(
                     of: #"^\d+[.)\s]+"#,
                     with: "",
                     options: .regularExpression
                 )
-                return stripped
             }
             .filter { !$0.isEmpty }
             .prefix(3)
