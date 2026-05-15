@@ -15,15 +15,17 @@ enum VeloAI {
     // MARK: - Availability
 
     /// `true` if Apple Intelligence / FoundationModels is available on this device.
-    static var isAvailable: Bool {
+    /// `nonisolated` — safe to call from any actor; only queries SystemLanguageModel, no UI state.
+    nonisolated static var isAvailable: Bool {
         SystemLanguageModel.default.isAvailable
     }
 
     // MARK: - Session factory
 
     /// Creates a new `LanguageModelSession` with the given system instruction.
+    /// `nonisolated` — safe to call from any actor; no UI state involved.
     /// Always check `isAvailable` first.
-    static func makeSession(instructions: String) throws -> LanguageModelSession {
+    nonisolated static func makeSession(instructions: String) throws -> LanguageModelSession {
         let model = SystemLanguageModel.default
         guard model.isAvailable else {
             throw VeloAIError.modelUnavailable
