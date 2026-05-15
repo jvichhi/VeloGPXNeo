@@ -175,7 +175,8 @@ struct POIDiscoverySheet: View {
                 latitude:  start.coordinate.latitude,
                 longitude: start.coordinate.longitude
             )
-            let sorted = asPOIs.sorted { a, b in
+            // Explicit types help the compiler resolve this closure in reasonable time
+            let sorted: [POIModel] = asPOIs.sorted { (a: POIModel, b: POIModel) -> Bool in
                 let distA = CLLocation(latitude: a.coordinate.latitude, longitude: a.coordinate.longitude)
                     .distance(from: originLocation)
                 let distB = CLLocation(latitude: b.coordinate.latitude, longitude: b.coordinate.longitude)
@@ -217,13 +218,13 @@ struct POIDiscoverySheet: View {
             item.toPOIModel(category: categoryFromMapItem(item), distanceFromRoute: 0)
         }
         let context = RideContext(
-            difficulty:      routeDifficulty(),
-            elevationGain:   route.elevationGain,
-            distanceSoFar:   0,
-            timeOfDay:       .current,
-            historyCount:    0
+            distanceCovered:    0,
+            totalElevationGain: route.elevationGain,
+            completionRatio:    0,
+            currentTime:        Date()
         )
-        rankedResults = await POIRankingEngine.shared.rank(pois, context: context)
+        let engine = POIRankingEngine()
+        rankedResults = (try? await engine.ranking(pois: pois, context: context)) ?? []
         isRanking = false
     }
 
