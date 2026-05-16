@@ -2,11 +2,30 @@
 //  PlanState.swift
 //  VeloGPX
 //
+//  F-C2 (May 16 2026): PlanWaypoint gains intentKind and dwellMinutes.
+//  WaypointStopKind mirrors IntentStopKind but lives here with no
+//  FoundationModels dependency, keeping this file Watch-safe.
+//
 
 import SwiftUI
 import Combine
 import CoreLocation
 import MapKit
+
+// MARK: - WaypointStopKind
+//
+// Mirror of IntentStopKind (RidePlanIntent+Generable.swift).
+// Defined here independently so PlanState.swift has zero FoundationModels
+// dependency and can remain in the Watch target if needed in future.
+// PlanAssistantEngine maps IntentStopKind → WaypointStopKind on write.
+
+enum WaypointStopKind {
+    case cafe
+    case park
+    case town
+    case service
+    case other
+}
 
 // MARK: - Supporting Types
 
@@ -14,11 +33,22 @@ struct PlanWaypoint: Identifiable, Equatable {
     let id: UUID
     var coordinate: CLLocationCoordinate2D
     var name: String?
+    /// Set by PlanAssistantEngine for AI-planned stops. Nil for manually dropped pins.
+    var intentKind: WaypointStopKind?
+    /// Dwell time in minutes at this stop. Nil for manually dropped pins.
+    var dwellMinutes: Int?
 
-    init(coordinate: CLLocationCoordinate2D, name: String? = nil) {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        name: String? = nil,
+        intentKind: WaypointStopKind? = nil,
+        dwellMinutes: Int? = nil
+    ) {
         self.id = UUID()
         self.coordinate = coordinate
         self.name = name
+        self.intentKind = intentKind
+        self.dwellMinutes = dwellMinutes
     }
 
     static func == (lhs: PlanWaypoint, rhs: PlanWaypoint) -> Bool {

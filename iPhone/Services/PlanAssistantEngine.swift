@@ -11,7 +11,7 @@
 //           └─ each IntentStop resolved       (MKLocalSearch via POISearchService)
 //                └─ ambiguous stops flagged    (stopNeedsDisambiguation event)
 //                     └─ PlanState populated   (addWaypoint + optional loop toggle)
-//                          └─ PlanRouteEngine   (fires via PlanView’s .onChange as normal)
+//                          └─ PlanRouteEngine   (fires via PlanView's .onChange as normal)
 //
 //  CALLER PATTERN (RidePlanAssistantView):
 //    let engine = PlanAssistantEngine()
@@ -32,6 +32,10 @@
 //  ❌ mapItem.placemark — deprecated iOS 26
 //  ❌ CLGeocoder — deprecated iOS 18+
 //  ❌ session.stream(from:onPartial:) — removed iOS 26
+//
+//  F-C2 (May 16 2026): engine now passes kind + dwellMinutes through to
+//  PlanWaypoint so WaypointListSheet can show stop-type icons and dwell chips.
+//  IntentStopKind → WaypointStopKind mapping lives in waypointKind(from:).
 //
 
 import Foundation
@@ -97,7 +101,12 @@ final class PlanAssistantEngine {
         planState: PlanState
     ) -> String {
         let label = mapItem.name ?? "Stop"
-        planState.addWaypoint(mapItem.location.coordinate, name: label)
+        planState.addWaypoint(
+            mapItem.location.coordinate,
+            name: label,
+            intentKind: .other,
+            dwellMinutes: PlanAssistantEngine.defaultDwell(for: .other)
+        )
         return label
     }
 
@@ -115,7 +124,7 @@ final class PlanAssistantEngine {
         do {
             intent = try await parseIntent(from: prompt)
         } catch {
-            continuation.yield(.failed("Couldn’t understand your request. Try rephrasing."))
+            continuation.yield(.failed("Couldn't understand your request. Try rephrasing."))
             return
         }
         continuation.yield(.intentParsed(intent))
@@ -156,10 +165,16 @@ final class PlanAssistantEngine {
         }
 
         // 3. Populate PlanState on @MainActor
+        // Pass intentKind and dwellMinutes so WaypointListSheet can show icons + chips.
         await MainActor.run {
             planState.clearAll()
             for stop in resolved.compactMap({ $0 }) {
-                planState.addWaypoint(stop.coordinate, name: stop.label)
+                planState.addWaypoint(
+                    stop.coordinate,
+                    name: stop.label,
+                    intentKind: Self.waypointKind(from: stop.kind),
+                    dwellMinutes: stop.dwellMinutes > 0 ? stop.dwellMinutes : nil
+                )
             }
             if intent.isLoop && planState.waypoints.count >= 2 {
                 planState.isLoopClosed = true
@@ -213,15 +228,35 @@ final class PlanAssistantEngine {
         case .other:   return 0
         }
     }
+
+    /// Maps FoundationModels-dependent IntentStopKind → Watch-safe WaypointStopKind.
+    static func waypointKind(from kind: IntentStopKind) -> WaypointStopKind {
+        switch kind {
+        case .cafe:    return .cafe
+        case .park:    return .park
+        case .town:    return .town
+        case .service: return .service
+        case .other:   return .other
+        }
+    }
 }
 
 // MARK: - PlanState convenience
 
 private extension PlanState {
     @MainActor
-    func addWaypoint(_ coordinate: CLLocationCoordinate2D, name: String?) {
-        var wp = PlanWaypoint(coordinate: coordinate)
-        wp.name = name
+    func addWaypoint(
+        _ coordinate: CLLocationCoordinate2D,
+        name: String?,
+        intentKind: WaypointStopKind? = nil,
+        dwellMinutes: Int? = nil
+    ) {
+        let wp = PlanWaypoint(
+            coordinate: coordinate,
+            name: name,
+            intentKind: intentKind,
+            dwellMinutes: dwellMinutes
+        )
         waypoints.append(wp)
     }
 }
