@@ -55,6 +55,21 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 - Other still-valid `MKPlacemark` fields: `name`, `locality`, `subLocality`, `administrativeArea`, `postalCode`, `country`, `isoCountryCode`.
 - If you need a full formatted address, use `MKMapItem.placemark.formattedAddress` (available iOS 26+) in preference to manually assembling fields.
 
+### MKMapItem — Address Fields Live on the Placemark
+- `MKMapItem` itself has **no** address properties (`locality`, `administrativeArea`, `country`, etc.).
+- All address fields are on `MKMapItem.placemark` (`MKPlacemark`, a subclass of `CLPlacemark`).
+- **Always go via `.placemark`:**
+
+  ```swift
+  // WRONG — MKMapItem has no address properties
+  let city = item.locality
+
+  // CORRECT
+  let city = item.placemark.locality
+  let region = item.placemark.administrativeArea
+  let country = item.placemark.country
+  ```
+
 ### MKLocalSearch
 - Correct API for resolving named stops (cafés, parks, boroughs, cities).
 - Requires network connectivity. If offline, surface a friendly fallback.
@@ -84,6 +99,7 @@ Before writing a call to any framework method not already used in the codebase, 
 - `MKMapItem` has no `.placemark.coordinate` shortcut on iOS 18+ — use `.location?.coordinate`
 - `CLGeocoder` is deprecated on iOS 18+ — use `MKReverseGeocodingRequest`
 - `MKPlacemark.title` is deprecated in iOS 26 — compose a subtitle from `.locality`, `.administrativeArea`, `.country` instead (see Verified Platform Capabilities above)
+- `MKMapItem` has no address properties directly — always go via `item.placemark` (see MKMapItem — Address Fields Live on the Placemark above)
 
 ### No Force-Unwraps in New Code
 Use `guard let` or `if let`. If a value is truly guaranteed, add a comment explaining why.
