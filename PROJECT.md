@@ -42,6 +42,19 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 - Use `MKReverseGeocodingRequest(coordinate:)` → `req.response` (async/await).
 - Returns `MKReverseGeocodingResponse` with `.placemark: MKPlacemark`. Read `.locality` or `.subLocality`.
 
+### MKPlacemark / MKMapItem — Deprecated Properties (iOS 26)
+- **`MKPlacemark.title` is deprecated in iOS 26.** Do not use it for display strings.
+- To build a human-readable subtitle from a placemark, compose from the still-valid individual fields:
+
+  ```swift
+  let parts = [placemark.locality, placemark.administrativeArea, placemark.country]
+      .compactMap { $0 }.filter { !$0.isEmpty }
+  let subtitle = parts.joined(separator: ", ")
+  ```
+
+- Other still-valid `MKPlacemark` fields: `name`, `locality`, `subLocality`, `administrativeArea`, `postalCode`, `country`, `isoCountryCode`.
+- If you need a full formatted address, use `MKMapItem.placemark.formattedAddress` (available iOS 26+) in preference to manually assembling fields.
+
 ### MKLocalSearch
 - Correct API for resolving named stops (cafés, parks, boroughs, cities).
 - Requires network connectivity. If offline, surface a friendly fallback.
@@ -70,6 +83,7 @@ Before writing a call to any framework method not already used in the codebase, 
 - `MKMapItem` has no `openInMapsActionURL()` — use `maps://` URL scheme: `URL(string: "maps://?ll=\(lat),\(lon)&q=\(encodedName)")`
 - `MKMapItem` has no `.placemark.coordinate` shortcut on iOS 18+ — use `.location?.coordinate`
 - `CLGeocoder` is deprecated on iOS 18+ — use `MKReverseGeocodingRequest`
+- `MKPlacemark.title` is deprecated in iOS 26 — compose a subtitle from `.locality`, `.administrativeArea`, `.country` instead (see Verified Platform Capabilities above)
 
 ### No Force-Unwraps in New Code
 Use `guard let` or `if let`. If a value is truly guaranteed, add a comment explaining why.
