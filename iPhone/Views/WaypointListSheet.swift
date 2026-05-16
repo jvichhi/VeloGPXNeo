@@ -15,6 +15,10 @@
 //  PlaceDescriptorService wired May 13, 2026.
 //  fix: resolve(coordinate:) overload doesn't exist — bridge via WaypointPoint stub (May 13 2026).
 //
+//  F-C1 (May 2026): "Plan with AI" button added to emptyPrompt.
+//  Triggers showAssistant binding owned by PlanView, which presents
+//  RidePlanAssistantView as a .sheet.
+//
 
 import SwiftUI
 import CoreLocation
@@ -29,6 +33,8 @@ struct WaypointListSheet: View {
     let onRideNow: () -> Void
     let onGoToRoutes: () -> Void
     let onPlanAnother: () -> Void
+    /// Controls presentation of RidePlanAssistantView in PlanView.
+    @Binding var showAssistant: Bool
 
     @EnvironmentObject private var routeStore: RouteStore
 
@@ -128,8 +134,6 @@ struct WaypointListSheet: View {
 
         return List {
             ForEach(Array(plan.waypoints.enumerated()), id: \.element.id) { index, wp in
-                // Resolved name pulled into a helper so the type-checker
-                // doesn't time out on nested ?? inside a ForEach closure.
                 let label = displayName(for: wp)
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
@@ -176,9 +180,6 @@ struct WaypointListSheet: View {
         .frame(maxHeight: listHeight)
     }
 
-    /// Returns the best available display name for a waypoint.
-    /// Extracted from the view builder to avoid type-checker complexity timeouts.
-    /// PlanWaypoint.coordinate is already CLLocationCoordinate2D — no bridging needed.
     private func displayName(for wp: PlanWaypoint) -> String {
         if let resolved = resolvedNames[wp.id] { return resolved }
         if let name = wp.name { return name }
@@ -201,12 +202,36 @@ struct WaypointListSheet: View {
     // MARK: - Empty Prompt
 
     private var emptyPrompt: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "mappin.and.ellipse")
-                .foregroundStyle(.secondary)
-            Text("Tap the map to drop waypoints")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            // Original tap-the-map hint
+            HStack(spacing: 8) {
+                Image(systemName: "mappin.and.ellipse")
+                    .foregroundStyle(.secondary)
+                Text("Tap the map to drop waypoints")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            // AI planning entry point — only shown when waypoints are empty
+            Divider()
+
+            Button {
+                showAssistant = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.blue)
+                    Text("Plan with AI")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.blue)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
@@ -333,10 +358,6 @@ struct WaypointListSheet: View {
 
     // MARK: - PlaceDescriptorService Integration
 
-    // Called from .task{} which runs on @MainActor — safe for CLLocationCoordinate2D
-    // and WaypointPoint init on iOS 26+.
-    // Bridges PlanWaypoint → WaypointPoint stub so we can call resolve(_:) which
-    // takes WaypointPoint. PlaceDescriptorService has no resolve(coordinate:) overload.
     private func resolveNameIfNeeded(for wp: PlanWaypoint) async {
         guard resolvedNames[wp.id] == nil, wp.name == nil else { return }
         let stub = WaypointPoint(coordinate: wp.coordinate, name: nil)
@@ -393,6 +414,6 @@ struct WaypointListSheet: View {
     }
 
     private var elevationString: String {
-        String(format: "%.0f m↑", plan.totalElevationGain)
+        String(format: "%.0f m\u{2191}", plan.totalElevationGain)
     }
 }
