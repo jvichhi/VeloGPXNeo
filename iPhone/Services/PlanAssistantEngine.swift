@@ -19,9 +19,9 @@
 //        // update UI from AssistantEvent
 //    }
 //
-//  FoundationModels API (verified against RidePlanIntent+Generable.swift):
-//    session.respond(to:generating:)  → async throws → T   (returns T directly, NOT Response<T>)
-//    session.respond(to:)             → async throws → Response<String> with .content
+//  FoundationModels API (verified from Apple docs):
+//    session.respond(to:)             → async throws → Response<String>  — text via .content
+//    session.respond(to:generating:)  → async throws → Response<T>      — struct via .content
 //
 //  iOS 26 API NOTES:
 //  • MKMapItem.location is CLLocation (non-optional) — use .coordinate directly.
@@ -181,11 +181,12 @@ final class PlanAssistantEngine {
         If the user did not specify dwell time for a stop, set dwellMinutes to -1.
         """
         let session = VeloAI.makeSession()
-        // respond(to:generating:) returns T directly (async throws)
-        return try await session.respond(
+        // respond(to:generating:) returns Response<T> — unwrap the struct via .content
+        let response = try await session.respond(
             to: "\(systemPrompt)\n\nUser request: \(prompt)",
             generating: RidePlanIntent.self
         )
+        return response.content
     }
 
     // MARK: - MKLocalSearch
