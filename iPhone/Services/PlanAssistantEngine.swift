@@ -15,14 +15,16 @@
 //
 //  CALLER PATTERN (RidePlanAssistantView):
 //    let engine = PlanAssistantEngine()
-//    for await event in engine.plan(prompt: userText, near: mapCenter, planState: state) {
+//    for await event in engine.plan(prompt: userText, nearLat: lat, nearLon: lon, planState: state) {
 //        // update UI from AssistantEvent
 //    }
 //
+//  FoundationModels API (verified against RidePlanIntent+Generable.swift):
+//    session.respond(to:generating:)  → async throws → T   (returns T directly, NOT Response<T>)
+//    session.respond(to:)             → async throws → Response<String> with .content
+//
 //  iOS 26 API NOTES:
-//  • MKMapItem.location is CLLocation (non-optional) on iOS 26 — use .coordinate directly.
-//  • session.respond(to:generating:) returns LanguageModelSession.Response<T>;
-//    unwrap with .value to get the concrete @Generable type.
+//  • MKMapItem.location is CLLocation (non-optional) — use .coordinate directly.
 //  • CLLocationCoordinate2D is a plain C struct — safe to construct on any actor/thread.
 //  • PlanState.addWaypoint IS @MainActor — wrapped in MainActor.run below.
 //
@@ -30,8 +32,6 @@
 //  ❌ mapItem.placemark — deprecated iOS 26
 //  ❌ CLGeocoder — deprecated iOS 18+
 //  ❌ session.stream(from:onPartial:) — removed iOS 26
-//  ✅ session.respond(to:generating:).value — correct @Generable unwrap
-//  ✅ mapItem.location.coordinate — non-optional on iOS 26
 //
 
 import Foundation
@@ -97,7 +97,6 @@ final class PlanAssistantEngine {
         planState: PlanState
     ) -> String {
         let label = mapItem.name ?? "Stop"
-        // MKMapItem.location is non-optional on iOS 26
         planState.addWaypoint(mapItem.location.coordinate, name: label)
         return label
     }
@@ -141,7 +140,6 @@ final class PlanAssistantEngine {
                 let dwell = stop.dwellMinutes >= 0
                     ? stop.dwellMinutes
                     : Self.defaultDwell(for: stop.kind)
-                // .location is non-optional on iOS 26
                 resolved[idx] = ResolvedStop(
                     label: label,
                     kind: stop.kind,
@@ -183,11 +181,11 @@ final class PlanAssistantEngine {
         If the user did not specify dwell time for a stop, set dwellMinutes to -1.
         """
         let session = VeloAI.makeSession()
-        // .respond(to:generating:) returns Response<T> — unwrap with .value
+        // respond(to:generating:) returns T directly (async throws)
         return try await session.respond(
             to: "\(systemPrompt)\n\nUser request: \(prompt)",
             generating: RidePlanIntent.self
-        ).value
+        )
     }
 
     // MARK: - MKLocalSearch
