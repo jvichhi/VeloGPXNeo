@@ -36,13 +36,36 @@ struct RidePlanAssistantView: View {
     @Environment(\.dismiss) private var dismiss
 
     // MARK: - State
+    // NOTE: Phase is internal (not private) so the isPlanning helper below compiles.
 
-    private enum Phase {
+    enum Phase {
         case idle
         case planning
         case done
         case failed(String)
+
+        /// Convenience — avoids if-case boilerplate at every call site.
+        var isPlanning: Bool {
+            if case .planning = self { return true }
+            return false
+        }
     }
+
+    // MARK: - Supporting Types
+    // Declared here (internal, not private) so they are in scope for the whole file.
+
+    struct StopRow: Identifiable {
+        let id: Int
+        let name: String
+        var state: RowState
+
+        // Renamed from State → RowState to avoid collision with SwiftUI.State.
+        enum RowState: Equatable {
+            case pending, resolved, ambiguous, skipped
+        }
+    }
+
+    // MARK: - Stored properties
 
     private let engine = PlanAssistantEngine()
 
@@ -110,26 +133,24 @@ struct RidePlanAssistantView: View {
     // MARK: - Prompt Field
 
     private var promptField: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topLeading) {
-                if prompt.isEmpty {
-                    Text("e.g. 60 km loop with a café stop in Laval and a park near the end")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 8)
-                        .allowsHitTesting(false)
-                }
-                TextEditor(text: $prompt)
+        ZStack(alignment: .topLeading) {
+            if prompt.isEmpty {
+                Text("e.g. 60 km loop with a café stop in Laval and a park near the end")
                     .font(.subheadline)
-                    .frame(minHeight: 72, maxHeight: 120)
-                    .focused($fieldFocused)
-                    .scrollContentBackground(.hidden)
-                    .disabled(phase.isPlanning)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 8)
+                    .allowsHitTesting(false)
             }
-            .padding(10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            TextEditor(text: $prompt)
+                .font(.subheadline)
+                .frame(minHeight: 72, maxHeight: 120)
+                .focused($fieldFocused)
+                .scrollContentBackground(.hidden)
+                .disabled(phase.isPlanning)
         }
+        .padding(10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Plan Button
@@ -138,39 +159,36 @@ struct RidePlanAssistantView: View {
         Button {
             Task { await startPlanning() }
         } label: {
-            Group {
-                if phase.isPlanning {
-                    HStack(spacing: 8) {
-                        ProgressView().tint(.white)
-                        Text("Planning…")
-                    }
-                } else if case .done = phase {
-                    Label("Route ready", systemImage: "checkmark")
-                } else {
-                    Label("Plan this route", systemImage: "sparkles")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(
-                planButtonBackground,
-                in: RoundedRectangle(cornerRadius: 13)
-            )
+            planButtonLabel
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(planButtonColor, in: RoundedRectangle(cornerRadius: 13))
         }
         .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty || phase.isPlanning)
     }
 
     @ViewBuilder
-    private var planButtonBackground: some ShapeStyle {
-        if case .done = phase {
-            AnyShapeStyle(Color.green)
-        } else if prompt.trimmingCharacters(in: .whitespaces).isEmpty {
-            AnyShapeStyle(Color(.systemGray3))
+    private var planButtonLabel: some View {
+        if phase.isPlanning {
+            HStack(spacing: 8) {
+                ProgressView().tint(.white)
+                Text("Planning…")
+            }
+        } else if case .done = phase {
+            Label("Route ready", systemImage: "checkmark")
         } else {
-            AnyShapeStyle(Color.blue)
+            Label("Plan this route", systemImage: "sparkles")
         }
+    }
+
+    /// Returns the button background colour. Uses a plain Color (not AnyShapeStyle)
+    /// so it works directly as the `background(_:in:)` fill argument.
+    private var planButtonColor: Color {
+        if case .done = phase { return .green }
+        if prompt.trimmingCharacters(in: .whitespaces).isEmpty { return Color(.systemGray3) }
+        return .blue
     }
 
     // MARK: - Stops Section
@@ -203,7 +221,7 @@ struct RidePlanAssistantView: View {
     }
 
     @ViewBuilder
-    private func stopStateIcon(_ state: StopRow.State) -> some View {
+    private func stopStateIcon(_ state: StopRow.RowState) -> some View {
         switch state {
         case .pending:
             ProgressView().scaleEffect(0.7).frame(width: 20, height: 20)
@@ -248,7 +266,7 @@ struct RidePlanAssistantView: View {
                                 Text(item.name ?? "Unknown")
                                     .font(.subheadline)
                                     .foregroundStyle(.primary)
-                                if let subtitle = item.placemark.title {
+                                if let subtitle = placardSubtitle(for: item) {
                                     Text(subtitle)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -271,6 +289,17 @@ struct RidePlanAssistantView: View {
             }
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    /// Human-readable subtitle for a disambiguation candidate.
+    /// Uses locality/administrativeArea/country instead of the deprecated
+    /// placemark.title property on iOS 26.
+    private func placardSubtitle(for item: MKMapItem) -> String? {
+        let p = item.placemark
+        let parts = [p.locality, p.administrativeArea, p.country]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     // MARK: - Error Row
@@ -299,7 +328,12 @@ struct RidePlanAssistantView: View {
         let trimmed = prompt.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         fieldFocused = false
-        withAnimation { phase = .planning; resolvedStops = []; disambigIndex = nil; disambigCandidates = [] }
+        withAnimation {
+            phase = .planning
+            resolvedStops = []
+            disambigIndex = nil
+            disambigCandidates = []
+        }
 
         for await event in engine.plan(prompt: trimmed, nearLat: nearLat, nearLon: nearLon, planState: plan) {
             await handleEvent(event)
@@ -352,29 +386,7 @@ struct RidePlanAssistantView: View {
             disambigIndex = nil
             disambigCandidates = []
         }
-        // If all stops are now resolved, mark done
         let allDone = resolvedStops.allSatisfy { $0.state == .resolved || $0.state == .skipped }
         if allDone { withAnimation { phase = .done } }
-    }
-
-    // MARK: - Supporting Types
-
-    private struct StopRow: Identifiable {
-        let id: Int
-        let name: String
-        var state: State
-
-        enum State: Equatable {
-            case pending, resolved, ambiguous, skipped
-        }
-    }
-}
-
-// MARK: - Phase helpers
-
-private extension RidePlanAssistantView.Phase {
-    var isPlanning: Bool {
-        if case .planning = self { return true }
-        return false
     }
 }
