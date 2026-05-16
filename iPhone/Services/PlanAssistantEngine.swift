@@ -11,7 +11,7 @@
 //           └─ each IntentStop resolved       (MKLocalSearch via POISearchService)
 //                └─ ambiguous stops flagged    (stopNeedsDisambiguation event)
 //                     └─ PlanState populated   (addWaypoint + optional loop toggle)
-//                          └─ PlanRouteEngine   (fires via PlanView's .onChange as normal)
+//                          └─ PlanRouteEngine   (fires via PlanView’s .onChange as normal)
 //
 //  CALLER PATTERN (RidePlanAssistantView):
 //    let engine = PlanAssistantEngine()
@@ -19,21 +19,19 @@
 //        // update UI from AssistantEvent
 //    }
 //
-//  CLLocationCoordinate2D NOTE:
-//  CLLocationCoordinate2D is a plain C struct — safe to construct on any actor/thread.
-//  No @MainActor wrapping is needed or used here. This matches every other file in
-//  the codebase (PlanState, CyclingRouteService, POISearchService).
-//
-//  PlanState.addWaypoint IS @MainActor, so the PlanState population block
-//  in runPipeline is wrapped with MainActor.run as required.
+//  iOS 26 API NOTES:
+//  • MKMapItem.location is CLLocation (non-optional) on iOS 26 — use .coordinate directly.
+//  • session.respond(to:generating:) returns LanguageModelSession.Response<T>;
+//    unwrap with .value to get the concrete @Generable type.
+//  • CLLocationCoordinate2D is a plain C struct — safe to construct on any actor/thread.
+//  • PlanState.addWaypoint IS @MainActor — wrapped in MainActor.run below.
 //
 //  DEPRECATIONS TO AVOID:
-//  ❌ mapItem.placemark — deprecated iOS 26; use .name / .address / .location
+//  ❌ mapItem.placemark — deprecated iOS 26
 //  ❌ CLGeocoder — deprecated iOS 18+
 //  ❌ session.stream(from:onPartial:) — removed iOS 26
-//  ✅ session.respond(to:generating:) — @Generable structured output
-//  ✅ POISearchService.shared.search(query:near:) — existing MKLocalSearch wrapper
-//  ✅ mapItem.location?.coordinate — iOS 26-safe (MKMapItem.location is CLLocation)
+//  ✅ session.respond(to:generating:).value — correct @Generable unwrap
+//  ✅ mapItem.location.coordinate — non-optional on iOS 26
 //
 
 import Foundation
@@ -44,48 +42,34 @@ import FoundationModels
 // MARK: - Public event stream
 
 /// Events emitted by `PlanAssistantEngine.plan(prompt:nearLat:nearLon:planState:)`.
-/// RidePlanAssistantView drives its UI entirely from these events.
 enum AssistantEvent {
-    /// LLM has parsed the intent; caller can show "Resolving stops…" state.
+    /// LLM parsed the intent; caller can show “Resolving stops…” state.
     case intentParsed(RidePlanIntent)
-    /// One stop resolved successfully; `waypointName` is the label to show.
+    /// One stop resolved; `waypointName` is the label to show.
     case stopResolved(index: Int, waypointName: String)
     /// A stop matched multiple places; caller should present a picker.
     case stopNeedsDisambiguation(index: Int, candidates: [MKMapItem])
-    /// All stops resolved; PlanState has been populated.
-    /// PlanRouteEngine fires automatically via PlanView’s existing .onChange.
+    /// All stops resolved; PlanState populated.
     case completed
-    /// The pipeline failed with a user-readable message.
+    /// Pipeline failed with a user-readable message.
     case failed(String)
 }
 
 // MARK: - Resolved stop (internal)
 
-/// Fully resolved waypoint, held until we can write to PlanState on @MainActor.
 private struct ResolvedStop {
     let label: String
     let kind: IntentStopKind
     let dwellMinutes: Int
-    let coordinate: CLLocationCoordinate2D   // plain C struct — safe anywhere
+    let coordinate: CLLocationCoordinate2D
 }
 
 // MARK: - Engine
 
-/// Orchestrates natural-language route planning via FoundationModels + MKLocalSearch.
-///
-/// Not an actor — one instance per planning session; no persistent mutable state
-/// between `plan(...)` calls.
 final class PlanAssistantEngine {
 
     // MARK: - Public API
 
-    /// Runs the full AI → search → PlanState pipeline.
-    ///
-    /// - Parameters:
-    ///   - prompt: The user’s free-text route request.
-    ///   - nearLat/nearLon: Map centre used as MKLocalSearch anchor.
-    ///   - planState: The `PlanState` to populate (mutations on @MainActor).
-    /// - Returns: `AsyncStream<AssistantEvent>` to iterate with `for await`.
     func plan(
         prompt: String,
         nearLat: Double,
@@ -106,17 +90,15 @@ final class PlanAssistantEngine {
         }
     }
 
-    /// Resolves a stop the user picked from a disambiguation list,
-    /// appends it to PlanState, and returns its display label.
+    /// Appends a user-picked disambiguation result to PlanState.
     @MainActor
     func commitDisambiguatedStop(
         mapItem: MKMapItem,
         planState: PlanState
     ) -> String {
         let label = mapItem.name ?? "Stop"
-        if let coord = mapItem.location?.coordinate {
-            planState.addWaypoint(coord, name: label)
-        }
+        // MKMapItem.location is non-optional on iOS 26
+        planState.addWaypoint(mapItem.location.coordinate, name: label)
         return label
     }
 
@@ -129,7 +111,7 @@ final class PlanAssistantEngine {
         planState: PlanState,
         continuation: AsyncStream<AssistantEvent>.Continuation
     ) async {
-        // 1. Parse intent with on-device LLM
+        // 1. Parse intent
         let intent: RidePlanIntent
         do {
             intent = try await parseIntent(from: prompt)
@@ -144,7 +126,7 @@ final class PlanAssistantEngine {
             return
         }
 
-        // 2. Resolve each stop via MKLocalSearch
+        // 2. Resolve each stop
         let centre = CLLocationCoordinate2D(latitude: nearLat, longitude: nearLon)
         var resolved: [ResolvedStop?] = Array(repeating: nil, count: intent.stops.count)
 
@@ -152,34 +134,30 @@ final class PlanAssistantEngine {
             let candidates = await searchStop(stop, near: centre)
 
             if candidates.isEmpty {
-                continue  // skip — user can add manually
+                continue
             } else if candidates.count <= 2 {
-                // Single or near-certain result — auto-resolve
                 let item = candidates[0]
                 let label = item.name ?? stop.label
                 let dwell = stop.dwellMinutes >= 0
                     ? stop.dwellMinutes
                     : Self.defaultDwell(for: stop.kind)
-                if let coord = item.location?.coordinate {
-                    resolved[idx] = ResolvedStop(
-                        label: label,
-                        kind: stop.kind,
-                        dwellMinutes: dwell,
-                        coordinate: coord
-                    )
-                    continuation.yield(.stopResolved(index: idx, waypointName: label))
-                }
+                // .location is non-optional on iOS 26
+                resolved[idx] = ResolvedStop(
+                    label: label,
+                    kind: stop.kind,
+                    dwellMinutes: dwell,
+                    coordinate: item.location.coordinate
+                )
+                continuation.yield(.stopResolved(index: idx, waypointName: label))
             } else {
-                // Ambiguous — let the user pick
                 continuation.yield(.stopNeedsDisambiguation(
                     index: idx,
                     candidates: Array(candidates.prefix(5))
                 ))
-                // resolved[idx] stays nil; caller handles via commitDisambiguatedStop
             }
         }
 
-        // 3. Populate PlanState — @MainActor required for addWaypoint
+        // 3. Populate PlanState on @MainActor
         await MainActor.run {
             planState.clearAll()
             for stop in resolved.compactMap({ $0 }) {
@@ -193,7 +171,7 @@ final class PlanAssistantEngine {
         continuation.yield(.completed)
     }
 
-    // MARK: - LLM parsing
+    // MARK: - LLM
 
     private func parseIntent(from prompt: String) async throws -> RidePlanIntent {
         let systemPrompt = """
@@ -205,10 +183,11 @@ final class PlanAssistantEngine {
         If the user did not specify dwell time for a stop, set dwellMinutes to -1.
         """
         let session = VeloAI.makeSession()
+        // .respond(to:generating:) returns Response<T> — unwrap with .value
         return try await session.respond(
             to: "\(systemPrompt)\n\nUser request: \(prompt)",
             generating: RidePlanIntent.self
-        )
+        ).value
     }
 
     // MARK: - MKLocalSearch
@@ -226,7 +205,6 @@ final class PlanAssistantEngine {
 
     // MARK: - Helpers
 
-    /// Default dwell time in minutes when the user didn’t specify one.
     static func defaultDwell(for kind: IntentStopKind) -> Int {
         switch kind {
         case .cafe:    return 15
@@ -241,8 +219,6 @@ final class PlanAssistantEngine {
 // MARK: - PlanState convenience
 
 private extension PlanState {
-    /// Appends a waypoint with an optional name.
-    /// Wraps `PlanWaypoint(coordinate:)` to also set `.name`.
     @MainActor
     func addWaypoint(_ coordinate: CLLocationCoordinate2D, name: String?) {
         var wp = PlanWaypoint(coordinate: coordinate)
