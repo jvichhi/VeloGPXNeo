@@ -23,8 +23,9 @@
 //  — Present additional sheets on top of itself (disambiguation is inline)
 //
 //  iOS 26 NOTE:
-//  MKMapItem.placemark is deprecated iOS 26. Disambiguation subtitle is built
-//  by reading locality / administrativeArea / country directly off MKMapItem.
+//  Disambiguation subtitle is built via MKMapItem.placemark (CLPlacemark),
+//  which exposes locality, administrativeArea, and country. MKMapItem itself
+//  does NOT have these properties — they live on the placemark.
 //
 
 import SwiftUI
@@ -296,10 +297,11 @@ struct RidePlanAssistantView: View {
     }
 
     /// Human-readable subtitle for a disambiguation candidate.
-    /// Reads locality / administrativeArea / country directly off MKMapItem
-    /// (iOS 26+). Does NOT touch the deprecated .placemark property.
+    /// locality, administrativeArea, and country live on MKPlacemark (CLPlacemark),
+    /// accessed via MKMapItem.placemark — NOT directly on MKMapItem.
     private func placardSubtitle(for item: MKMapItem) -> String? {
-        let parts = [item.locality, item.administrativeArea, item.country]
+        let placemark = item.placemark
+        let parts = [placemark.locality, placemark.administrativeArea, placemark.country]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
