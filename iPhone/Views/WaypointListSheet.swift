@@ -19,6 +19,10 @@
 //  Triggers showAssistant binding owned by PlanView, which presents
 //  RidePlanAssistantView as a .sheet.
 //
+//  F-C2 (May 16 2026): stop-type SF Symbol icons per IntentStopKind.
+//  Dwell time chip shown under each AI-planned waypoint name.
+//  Total outing time (ride time + total dwell) added to header stats row.
+//
 
 import SwiftUI
 import CoreLocation
@@ -72,6 +76,9 @@ struct WaypointListSheet: View {
                     HStack(spacing: 10) {
                         Label(distanceString, systemImage: "arrow.left.and.right")
                         Label(elevationString, systemImage: "mountain.2")
+                        if let outing = outingTimeString {
+                            Label(outing, systemImage: "clock")
+                        }
                         if plan.isRouting {
                             HStack(spacing: 3) {
                                 ProgressView().scaleEffect(0.65)
@@ -137,13 +144,32 @@ struct WaypointListSheet: View {
                 let label = displayName(for: wp)
                 HStack(spacing: 10) {
                     waypointBadge(index: index, total: plan.waypoints.count)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(label)
-                            .font(.subheadline)
-                            .lineLimit(1)
-                        Text(coordinateLabel(wp.coordinate))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 5) {
+                            // F-C2: stop-type icon for AI-planned waypoints
+                            if let kind = wp.intentKind {
+                                Image(systemName: symbolName(for: kind))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(tintColor(for: kind))
+                            }
+                            Text(label)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                        }
+                        HStack(spacing: 6) {
+                            Text(coordinateLabel(wp.coordinate))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            // F-C2: dwell time chip
+                            if let dwell = wp.dwellMinutes, dwell > 0 {
+                                Text("\(dwell) min")
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(.quaternary, in: Capsule())
+                            }
+                        }
                     }
                     Spacer()
                     if resolvedNames[wp.id] == nil && wp.name == nil {
@@ -186,6 +212,30 @@ struct WaypointListSheet: View {
         return coordinateLabel(wp.coordinate)
     }
 
+    // MARK: - F-C2: Stop-Type Icon Helpers
+
+    /// SF Symbol name for each IntentStopKind.
+    private func symbolName(for kind: IntentStopKind) -> String {
+        switch kind {
+        case .cafe:    return "cup.and.saucer.fill"
+        case .park:    return "leaf.fill"
+        case .town:    return "building.2.fill"
+        case .service: return "wrench.and.screwdriver.fill"
+        case .other:   return "mappin.circle.fill"
+        }
+    }
+
+    /// Accent colour for each stop kind icon.
+    private func tintColor(for kind: IntentStopKind) -> Color {
+        switch kind {
+        case .cafe:    return .brown
+        case .park:    return .green
+        case .town:    return Color(.systemIndigo)
+        case .service: return .orange
+        case .other:   return .blue
+        }
+    }
+
     // MARK: - Delete Helper
 
     private func deleteWaypoint(id: UUID, index: Int) {
@@ -203,7 +253,6 @@ struct WaypointListSheet: View {
 
     private var emptyPrompt: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Original tap-the-map hint
             HStack(spacing: 8) {
                 Image(systemName: "mappin.and.ellipse")
                     .foregroundStyle(.secondary)
@@ -212,7 +261,6 @@ struct WaypointListSheet: View {
                     .foregroundStyle(.secondary)
             }
 
-            // AI planning entry point — only shown when waypoints are empty
             Divider()
 
             Button {
@@ -303,7 +351,7 @@ struct WaypointListSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(
-                        plan.isRideable ? AnyShapeStyle(Color.blue) : AnyShapeStyle(Color(.systemGray4)),
+                        plan.isRideable ? Color.blue : Color(.systemGray4),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
                     .foregroundStyle(Color.white)
@@ -415,5 +463,23 @@ struct WaypointListSheet: View {
 
     private var elevationString: String {
         String(format: "%.0f m\u{2191}", plan.totalElevationGain)
+    }
+
+    // F-C2: Total outing time = estimated ride time + total dwell across all waypoints.
+    // Ride-time estimate: 15 km/h average cycling speed (conservative urban/mixed pace).
+    // Only shown when there are waypoints and at least one dwell stop.
+    private var outingTimeString: String? {
+        guard !plan.waypoints.isEmpty else { return nil }
+        let totalDwellMin = plan.waypoints.compactMap(\.dwellMinutes).reduce(0, +)
+        guard totalDwellMin > 0 || plan.totalDistance > 0 else { return nil }
+        let rideMinutes = Int((plan.totalDistance / 1000.0) / 15.0 * 60.0)
+        let totalMinutes = rideMinutes + totalDwellMin
+        if totalMinutes < 60 {
+            return "~\(totalMinutes) min"
+        } else {
+            let h = totalMinutes / 60
+            let m = totalMinutes % 60
+            return m == 0 ? "~\(h) h" : "~\(h) h \(m) min"
+        }
     }
 }

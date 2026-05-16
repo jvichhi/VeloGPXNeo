@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 15, 2026 — Sprint 2 complete, Sprint 3 queued
+> Last updated: May 16, 2026 — Sprint 3 in progress, F-C1 complete
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -80,15 +80,15 @@
 > for stop-type icon rendering. When we open `RideView` for F-C2, extract `RideMapLayer` and
 > `RideHUDPanel` at the same time.
 
-- [ ] **F-C1 · RidePlanAssistant — Core**
-  `PlanAssistantEngine` orchestrates: model parses `RidePlanIntent` via `session.generate(from:)`
+- [x] **F-C1 · RidePlanAssistant — Core**
+  `PlanAssistantEngine` orchestrates: model parses `RidePlanIntent` via `session.respond(to:generating:)`
   (structured `@Generable` output) → `MKLocalSearch` resolves stops → `PlanState` + `PlanRouteEngine`
-  computes geometry. `RidePlanAssistantView` inline expandable input in Routes tab.
-  `DisambiguationSheet` for ambiguous place names.
+  computes geometry. `RidePlanAssistantView` sheet with inline disambiguation card.
+  Note: `DisambiguationSheet.swift` was folded inline into `RidePlanAssistantView` — no separate file needed.
   → `FEATURES.md § F-C1`
   **New files:** `iPhone/Services/PlanAssistantEngine.swift`, `iPhone/Services/RidePlanIntent+Generable.swift`,
-  `iPhone/Views/RidePlanAssistantView.swift`, `iPhone/Views/DisambiguationSheet.swift`
-  **Modified:** `RouteLibraryView.swift`, `RouteStore.swift`
+  `iPhone/Views/RidePlanAssistantView.swift`
+  **Modified:** `RouteLibraryView.swift`, `RouteStore.swift`, `WaypointListSheet.swift`
   **Watch target:** None of these files may be added to the Watch target — `FoundationModels` is iPhone-only.
 
 - [ ] **F-C2 · RidePlanAssistant — Polish + partial F-3 `RideView` split**
@@ -133,7 +133,7 @@
 
 - [ ] **MISC-5 · Extract duplicate `bearing()` haversine**
   `bearing()` confirmed still present in both `RideSessionStore.swift` and `RideView.swift` (May 15 source search).
-  Extract to `Shared/Extensions/CLLocationCoordinate2D+Bearing.swift`. Use `GPXCueEngine`’s `nonisolated` version as the canonical one; delete the duplicate from `RideSessionStore`.
+  Extract to `Shared/Extensions/CLLocationCoordinate2D+Bearing.swift`. Use `GPXCueEngine`'s `nonisolated` version as the canonical one; delete the duplicate from `RideSessionStore`.
   → `TECH_DEBT.md § MISC-5`
 
 - [ ] **P3 · `MapStyle` cycling overlay toggle in Settings**
@@ -163,7 +163,7 @@
 Sprint 1: ✅ COMPLETE
 Sprint 2: ✅ COMPLETE
 
-Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ──► F-C2 + partial F-3 RideView split
+Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ✅ ──► F-C2 + partial F-3 RideView split
 
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
           Pre-submission polish items (no feature dependencies)
