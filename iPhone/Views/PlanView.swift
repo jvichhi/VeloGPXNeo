@@ -25,6 +25,10 @@ struct PlanView: View {
     @State private var isPitchEnabled: Bool = true
     @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
+    @State private var showAssistant = false
+    /// Last known map centre — updated via onMapCameraChange.
+    /// Used to give RidePlanAssistantView a nearby coordinate for searches.
+    @State private var mapCentre: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673)
 
     var body: some View {
         GeometryReader { geo in
@@ -89,6 +93,13 @@ struct PlanView: View {
                     plan.routingError = nil
                 }
             }
+        }
+        .sheet(isPresented: $showAssistant) {
+            RidePlanAssistantView(
+                plan: plan,
+                nearLat: mapCentre.latitude,
+                nearLon: mapCentre.longitude
+            )
         }
     }
 
@@ -159,6 +170,9 @@ struct PlanView: View {
                 : .standard(elevation: .flat)
             )
             .mapControlVisibility(.hidden)
+            .onMapCameraChange { context in
+                mapCentre = context.camera.centerCoordinate
+            }
             .onTapGesture { screenPoint in
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
                 let before = plan.waypoints.count
@@ -200,7 +214,8 @@ struct PlanView: View {
                 onPlanAnother: {
                     plan.clearAll()
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
-                }
+                },
+                showAssistant: $showAssistant
             )
             .padding(.bottom, safeBottom > 0 ? safeBottom : 16)
         }
