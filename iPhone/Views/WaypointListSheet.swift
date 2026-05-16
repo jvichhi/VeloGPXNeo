@@ -19,7 +19,7 @@
 //  Triggers showAssistant binding owned by PlanView, which presents
 //  RidePlanAssistantView as a .sheet.
 //
-//  F-C2 (May 16 2026): stop-type SF Symbol icons per IntentStopKind.
+//  F-C2 (May 16 2026): stop-type SF Symbol icons per WaypointStopKind.
 //  Dwell time chip shown under each AI-planned waypoint name.
 //  Total outing time (ride time + total dwell) added to header stats row.
 //
@@ -213,9 +213,11 @@ struct WaypointListSheet: View {
     }
 
     // MARK: - F-C2: Stop-Type Icon Helpers
+    // Parameter type is WaypointStopKind (Watch-safe mirror of IntentStopKind).
+    // WaypointListSheet must NOT import FoundationModels.
 
-    /// SF Symbol name for each IntentStopKind.
-    private func symbolName(for kind: IntentStopKind) -> String {
+    /// SF Symbol name for each WaypointStopKind.
+    private func symbolName(for kind: WaypointStopKind) -> String {
         switch kind {
         case .cafe:    return "cup.and.saucer.fill"
         case .park:    return "leaf.fill"
@@ -226,7 +228,7 @@ struct WaypointListSheet: View {
     }
 
     /// Accent colour for each stop kind icon.
-    private func tintColor(for kind: IntentStopKind) -> Color {
+    private func tintColor(for kind: WaypointStopKind) -> Color {
         switch kind {
         case .cafe:    return .brown
         case .park:    return .green
