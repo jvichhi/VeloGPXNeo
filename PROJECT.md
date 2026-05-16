@@ -13,6 +13,41 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 
 ---
 
+## Verified Platform Capabilities
+
+> This section exists so AI coding sessions don't re-learn or dispute known platform facts. These are verified.
+
+### MapKit Cycling Directions (Developer Access)
+- `MKDirectionsTransportType.cycling` is a real, supported value for `MKDirections.Request.transportType`.
+  — `developer.apple.com/documentation/mapkit/mkdirectionstransporttype/cycling`
+- Use `.cycling` for all bike-route requests. Apple Maps applies cycling-aware routing: bike lanes, quiet roads, hill avoidance. **Do not assume a third-party routing engine is required for pathfinding.**
+- Apple Maps cycling coverage includes Canada (including Québec / Montréal / Laval area) and is broadly available in all major markets.
+- Apple Maps does **not** expose a native "generate a N km loop" API. Loop planning is app-level logic on top of Apple's point-to-point cycling directions.
+
+### FoundationModels API Surface (iOS 26)
+- `session.respond(to: prompt)` → plain `String` output.
+- `session.respond(to: prompt, generating: SomeType.self)` → typed `@Generable` structured output.
+  — `developer.apple.com/documentation/foundationmodels/languagemodelsession/respond(to:generating:includeschemaInprompt:options:)`
+- Do **not** use `session.stream(from:onPartial:)` — removed in iOS 26.
+- Do **not** use `session.generate(from:)` for plain strings — that's for `@Generable` schema only.
+- The model is for **intent parsing and natural language understanding only**. It does not produce route geometry, coordinates, or spatial data.
+
+### FoundationModels Availability Gate
+- `SystemLanguageModel.default.availability == .available` is the single gate.
+- `VeloAI.isAvailable` wraps this — always use the wrapper, not the framework directly in views.
+- `@AppStorage(VeloAI.enabledKey)` is the user toggle. Check both `VeloAI.isAvailable && aiEnabled` before showing AI UI.
+
+### MKReverseGeocodingRequest (iOS 26)
+- `CLGeocoder` is deprecated on iOS 18+. **Never use it.**
+- Use `MKReverseGeocodingRequest(coordinate:)` → `req.response` (async/await).
+- Returns `MKReverseGeocodingResponse` with `.placemark: MKPlacemark`. Read `.locality` or `.subLocality`.
+
+### MKLocalSearch
+- Correct API for resolving named stops (cafés, parks, boroughs, cities).
+- Requires network connectivity. If offline, surface a friendly fallback.
+
+---
+
 ## Swift File Authoring Rules
 
 ### No Unicode Escape Sequences
@@ -32,7 +67,7 @@ This applies everywhere: string literals, comments, identifiers. The GitHub API 
 
 ### No Invented API Calls
 Before writing a call to any framework method not already used in the codebase, verify it exists in Apple's documentation or a trusted source. Common traps:
-- `MKMapItem` has no `openInMapsActionURL()` — use `maps://` URL scheme instead: `URL(string: "maps://?ll=\(lat),\(lon)&q=\(encodedName)")`
+- `MKMapItem` has no `openInMapsActionURL()` — use `maps://` URL scheme: `URL(string: "maps://?ll=\(lat),\(lon)&q=\(encodedName)")`
 - `MKMapItem` has no `.placemark.coordinate` shortcut on iOS 18+ — use `.location?.coordinate`
 - `CLGeocoder` is deprecated on iOS 18+ — use `MKReverseGeocodingRequest`
 
@@ -57,27 +92,27 @@ When the AI generates a call to a method or property not already present in the 
 
 > ⚠️ **Do not ask an AI tool to read and rewrite large `.md` files in a single operation.**
 
-Some documentation files in this repo are large and will cause AI coding tools to time out mid-write, potentially corrupting the file:
+`FEATURES.md` is now an index file — keep it under 5 KB. Full feature specs live in `Docs/Specs/`.
 
-| File | Size | Risk |
-|---|---|---|
-| `FEATURES.md` | ~39 KB | ⚠️ High — do not full-rewrite |
-| `TECH_DEBT.md` | ~16 KB | ⚠️ Medium |
-| `ROADMAP.md` | ~10 KB | ⚠️ Medium |
-| `DEVLOG.md` | ~9 KB | Low |
+| File | Risk |
+|---|---|
+| `FEATURES.md` | ✅ Safe — index only, keep small |
+| `TECH_DEBT.md` | ⚠️ Medium (~16 KB) |
+| `ROADMAP.md` | ⚠️ Medium (~10 KB) |
+| `DEVLOG.md` | Low (~9 KB) |
+| `Docs/Specs/*.md` | ✅ Safe — scoped per feature |
 
 ### Safe Update Pattern
-Always make **targeted, section-specific edits** to large `.md` files:
-- Tell the AI exactly which section to update (e.g. *"mark F-A1 as complete in FEATURES.md"*)
-- Never ask an AI tool to "update the FEATURES.md file with the latest backlog and status notes" as a single instruction — this triggers a full file read + rewrite that times out after several minutes
-- If a full rewrite is truly needed, split it into multiple focused passes (one section at a time)
+- Tell the AI exactly which section to update.
+- Never ask an AI tool to "update FEATURES.md with the latest backlog" as a single instruction.
+- If a full rewrite is truly needed, split into one section at a time.
 
 ### Recovery
 If an AI tool errors mid-write on a `.md` file:
 ```bash
-git status           # check if file was partially written
-git diff <file>.md   # inspect the damage
-git checkout HEAD -- <file>.md   # restore from last clean commit
+git status
+git diff <file>.md
+git checkout HEAD -- <file>.md
 ```
 
 ---
@@ -95,6 +130,8 @@ iPhone/          — iPhone target only
 Watch/           — Watch target only
   Views/
   Services/
+Docs/
+  Specs/         — one .md per feature spec; linked from FEATURES.md
 ```
 
 ### Watch Target Exclusion List
