@@ -24,6 +24,43 @@ final class RouteStore: ObservableObject {
     /// the Ride tab, then clears it — identical to routeToEditInPlan pattern.
     @Published var pendingRideRoute: RouteModel? = nil
 
+    // MARK: - F-C2: AI Planned Route
+    //
+    // Holds the single in-memory AI-planned route pending a Save / Discard / Start
+    // decision in RouteLibraryView. Only one plan lives here at a time.
+    // A new addAIPlannedRoute call replaces any previous value.
+    //
+    // Intentionally NOT persisted to disk: the user must explicitly save
+    // (saveAIPlannedRoute) for the plan to appear in the permanent route list.
+    // Discarding (discardAIPlannedRoute) or replacing with a new plan are the
+    // only other paths. The value is cleared in all three cases.
+    //
+    // RouteLibraryView shows an "AI Planned" section header card at the top of
+    // the list when this is non-nil, with Save / Discard / Start actions.
+
+    @Published private(set) var aiPlannedRoute: RouteModel? = nil
+
+    /// Store an AI-generated plan for the user to review.
+    /// Replaces any existing pending plan without saving the previous one.
+    func addAIPlannedRoute(_ route: RouteModel) {
+        aiPlannedRoute = route
+    }
+
+    /// Persist the pending AI plan into the permanent route library and clear it.
+    /// Equivalent to calling addPlannedRoute then discarding the in-memory copy.
+    func saveAIPlannedRoute() {
+        guard let route = aiPlannedRoute else { return }
+        aiPlannedRoute = nil
+        addPlannedRoute(route, select: false)
+    }
+
+    /// Discard the pending AI plan without saving. Clears the card in RouteLibraryView.
+    func discardAIPlannedRoute() {
+        aiPlannedRoute = nil
+    }
+
+    // MARK: - Disk
+
     private let directoryName = "ImportedRoutes"
     private let poisDirectoryName = "RoutePOIs"
 
