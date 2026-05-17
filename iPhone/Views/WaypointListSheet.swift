@@ -119,6 +119,20 @@ struct WaypointListSheet: View {
 
             if !isCollapsed {
                 Divider()
+                if let warning = plan.distanceWarning {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Text(warning)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    Divider()
+                }
                 if plan.waypoints.isEmpty { emptyPrompt } else { waypointList }
                 Divider()
                 closeLoopRow
@@ -331,7 +345,7 @@ struct WaypointListSheet: View {
     private var actionRow: some View {
         HStack(spacing: 10) {
             Button {
-                routeName = PlanState.autoName()
+                routeName = plan.suggestedName ?? PlanState.autoName()
                 showSaveAlert = true
             } label: {
                 Label("Save", systemImage: "square.and.arrow.down")
@@ -344,7 +358,7 @@ struct WaypointListSheet: View {
             .disabled(!plan.isRideable)
 
             Button {
-                let route = plan.buildRouteModel(name: PlanState.autoName())
+                let route = plan.buildRouteModel(name: plan.suggestedName ?? PlanState.autoName())
                 routeStore.addPlannedRoute(route, select: true)
                 onRideNow()
             } label: {

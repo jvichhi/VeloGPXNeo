@@ -100,6 +100,12 @@ final class PlanState: ObservableObject {
     /// Reset to 0 at the start of each computeAndApply pass.
     /// RidePlanAssistantView observes this to show a warning banner.
     @Published var routingFailureCount: Int = 0
+    /// LLM-suggested route name from RidePlanIntent (F-C3 distance-matching).
+    @Published var suggestedName: String? = nil
+    /// User-requested target distance in km (F-C3). 0 = not specified.
+    @Published var targetDistanceKm: Double = 0
+    /// Warning when actual distance deviates >15% from target (F-C3).
+    @Published var distanceWarning: String? = nil
 
     // MARK: Derived
 

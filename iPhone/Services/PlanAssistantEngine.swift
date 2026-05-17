@@ -174,8 +174,12 @@ final class PlanAssistantEngine {
 
         // 3. Populate PlanState on @MainActor
         // Pass intentKind and dwellMinutes so WaypointListSheet can show icons + chips.
+        // F-C3: store suggestedName + targetDistanceKm for distance matching.
         await MainActor.run {
             planState.clearAll()
+            planState.suggestedName = intent.suggestedName.isEmpty ? nil : intent.suggestedName
+            planState.targetDistanceKm = intent.targetDistanceKm
+            planState.distanceWarning = nil
             for stop in resolved.compactMap({ $0 }) {
                 planState.addWaypoint(
                     stop.coordinate,

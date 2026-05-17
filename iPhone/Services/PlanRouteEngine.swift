@@ -138,6 +138,9 @@ final class PlanRouteEngine {
     ///
     /// Swift 6 safety: all mutation is isolated — tasks return values only,
     /// state is written on @MainActor inside the main loop. No data races.
+    ///
+    /// F-C3: after routing completes, matchTargetDistance extends loops that are
+    /// too short relative to the user's requested distance.
     private func computeAndApply(pairs: [SegmentPair], state: PlanState) async {
         guard !pairs.isEmpty else { return }
         state.isRouting = true
@@ -179,6 +182,92 @@ final class PlanRouteEngine {
                     inFlight += 1
                 }
             }
+        }
+
+        guard !Task.isCancelled else { return }
+        await matchTargetDistance(in: state)
+    }
+
+    // MARK: - Distance Matching (F-C3)
+
+    /// If the user requested a target distance, check whether the routed result
+    /// is within ±15 %. For loops that are too short, extend by pushing a new
+    /// waypoint perpendicular to the loop-closing segment.
+    ///
+    /// Max 2 extension attempts — each adds one waypoint and re-routes two
+    /// segments. If still off after 2 attempts, sets `distanceWarning`.
+    private func matchTargetDistance(in state: PlanState) async {
+        let target = state.targetDistanceKm
+        guard target > 0 else { return }
+
+        for _ in 1...2 {
+            let actualKm = state.totalDistance / 1000
+            let ratio = actualKm / target
+
+            if ratio >= 0.85 && ratio <= 1.15 {
+                state.distanceWarning = nil
+                return
+            }
+
+            if ratio > 1.15 {
+                state.distanceWarning = String(
+                    format: "Route is %.1f km (target was %.0f km)",
+                    actualKm, target
+                )
+                return
+            }
+
+            // Too short — extend if loop
+            guard state.isLoopClosed,
+                  let first = state.waypoints.first,
+                  let last = state.waypoints.last,
+                  first.id != last.id
+            else {
+                state.distanceWarning = "Add more waypoints to reach \(Int(target)) km."
+                return
+            }
+
+            let shortfall = (target * 1000) - state.totalDistance
+            let pushDistance = min(shortfall / 2, 20_000)  // cap at 20 km per attempt
+
+            let fromCoord = last.coordinate
+            let toCoord = first.coordinate
+            let mid = fromCoord.midpoint(to: toCoord)
+            let b = fromCoord.bearing(to: toCoord)
+            let perpBearing = (b + 90).truncatingRemainder(dividingBy: 360)
+
+            let newCoord = mid.destination(bearing: perpBearing, distance: pushDistance)
+            let newWP = PlanWaypoint(coordinate: newCoord)
+
+            // Remove old loop segment, append new waypoint
+            state.segments.removeAll { $0.isLoop }
+            state.waypoints.append(newWP)
+
+            // Route Wn → newWP (non-loop, nonisolated static calls)
+            if let seg1 = await Self.computeSegment(from: last, to: newWP, isLoop: false) {
+                state.upsertSegment(seg1)
+            } else {
+                state.routingFailureCount += 1
+            }
+
+            // Route newWP → W1 (loop)
+            if let seg2 = await Self.computeSegment(from: newWP, to: first, isLoop: true) {
+                state.upsertSegment(seg2)
+            } else {
+                state.routingFailureCount += 1
+            }
+        }
+
+        // Final check after max attempts
+        let finalKm = state.totalDistance / 1000
+        let finalRatio = finalKm / target
+        if finalRatio < 0.85 || finalRatio > 1.15 {
+            state.distanceWarning = String(
+                format: "Route is %.1f km (target was %.0f km)",
+                finalKm, target
+            )
+        } else {
+            state.distanceWarning = nil
         }
     }
 
