@@ -141,6 +141,33 @@
 
 ---
 
+## Sprint 5 — Draw Route (Strava Parity)
+> Goal: finger-draw road-snapped route creation. User draws on the map; `MKDirections` snaps
+> gesture segments to the cycling road network in real time. Result feeds the existing
+> `AIPendingRouteCard` (Save / Discard / Start) with a green "DRAWN" badge.
+> Requires Sprint 3 `RouteStore.addAIPlannedRoute` ✅ (landed F-C2)
+
+- [ ] **F-D1 · `DrawRouteEngine` actor**
+  Segment stack, spatial + temporal debounce, in-flight guard, `MKDirections` snap,
+  snap failure handling, `undoLastSegment()`, `finaliseTrace()`, `reset()`.
+  → `Docs/Specs/F-D_DrawRoute.md`
+  **New file:** `iPhone/Services/DrawRouteEngine.swift`
+
+- [ ] **F-D2 · `DrawRouteView` full-screen canvas**
+  Map canvas, dual polyline overlay (snapped solid + pending dashed + pulse animation),
+  top bar (Cancel / Undo), bottom bar (stats pill + Done), cancel confirmation dialog,
+  Done → `RouteModel(.drawn)` → `routeStore.addAIPlannedRoute`.
+  → `Docs/Specs/F-D_DrawRoute.md`
+  **New file:** `iPhone/Views/DrawRouteView.swift`
+
+- [ ] **F-D3 · Wire into `RouteLibraryView` + `.drawn` source format**
+  Add `pencil.and.map` toolbar button, `.fullScreenCover` sheet presentation.
+  Add `.drawn` case to `sourceFormat` enum; update `RouteRow` pill to green "DRAWN".
+  → `Docs/Specs/F-D_DrawRoute.md`
+  **Modified:** `RouteLibraryView.swift`, `RouteModel.swift` (or enum source file)
+
+---
+
 ## Backlog — Future
 
 | Item | Where | Notes |
@@ -154,6 +181,7 @@
 | Force-unwrap on coordinate `min()`/`max()` | `RideSummaryView`, `RideHistoryView`, `RideHistoryDetailView` | Optional binding |
 | `RideSessionStore+Spurs.swift` internal property access | — | `private(set)` or dedicated spur service |
 | Generic "Import failed" message | `RouteStore.swift:79` | Differentiate corrupt file vs. I/O failure |
+| Draw Route waypoint-tap mode | F-D2 future | Drop pins, auto-connect — accessibility fallback for VoiceOver users |
 
 ---
 
@@ -168,6 +196,9 @@ Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ✅ ──► F-C2 + partial F-3 Rid
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
           Pre-submission polish items (no feature dependencies)
           MISC-5 bearing() consolidation (do while in RideSessionStore for F-4)
+
+Sprint 5: RouteStore.addAIPlannedRoute (Sprint 3 F-C2 ✅) ──► F-D DrawRoute
+          F-D1 DrawRouteEngine ──► F-D2 DrawRouteView ──► F-D3 wire + .drawn sourceFormat
 ```
 
 ---
@@ -184,6 +215,6 @@ The following must **never** be added to the Watch target in Build Phases:
 - `PlanAssistantEngine.swift` — `FoundationModels` (iOS only, Sprint 3)
 - `RidePlanIntent+Generable.swift` — same (Sprint 3)
 - `RidePlanAssistantView.swift` — same (Sprint 3)
+- `DrawRouteEngine.swift` — iPhone only (Sprint 5)
+- `DrawRouteView.swift` — iPhone only (Sprint 5)
 - Any file with `import FoundationModels`
-
-The Watch target always uses the coordinate-based `deterministicID` fallback for POI identity.
