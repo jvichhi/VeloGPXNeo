@@ -186,6 +186,7 @@ extension RideSessionStore {
         async let outboundResult = fetchLeg(from: poiLat,  poiLon,  to: snapLat, snapLon)
 
         let (inbound, outbound) = await (inboundResult, outboundResult)
+        guard let inbound, let outbound else { return }
 
         let entry = SpurCacheEntry(
             inbound: inbound.coords,
@@ -209,7 +210,7 @@ extension RideSessionStore {
     private func fetchLeg(
         from fLat: Double, _ fLon: Double,
         to tLat: Double, _ tLon: Double
-    ) async -> LegResult {
+    ) async -> LegResult? {
         do {
             let result = try await CyclingRouteService.shared.calculateRoute(
                 from: fLat, fLon,
@@ -221,14 +222,7 @@ extension RideSessionStore {
                 .map    { RerouteStep(instructions: $0.instructions, distanceMeters: $0.distance) }
             return LegResult(coords: coords, distance: result.totalDistance, steps: steps)
         } catch {
-            // Fallback: straight line so the map always shows *something*.
-            let straight = [
-                CLLocationCoordinate2D(latitude: fLat, longitude: fLon),
-                CLLocationCoordinate2D(latitude: tLat, longitude: tLon)
-            ]
-            let dist = CLLocation(latitude: fLat, longitude: fLon)
-                .distance(from: CLLocation(latitude: tLat, longitude: tLon))
-            return LegResult(coords: straight, distance: dist, steps: [])
+            return nil
         }
     }
 

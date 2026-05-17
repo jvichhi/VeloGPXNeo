@@ -6,9 +6,9 @@
 //    • inbound  — nearest route snap point → POI (green dashed when resolved)
 //    • outbound — POI → re-entry point ahead on GPX track (red dashed when resolved)
 //
-//  When isPending == true both arrays hold a straight-line fallback and the
+//  When isPending == true both arrays hold a straight-line placeholder and the
 //  map layer renders them thin and grey while CyclingRouteService computes
-//  the real road-snapped geometry.
+//  the real road-snapped geometry. If MKDirections fails, no spur is shown.
 //
 //  Produced by RideSessionStore+Spurs and consumed by RideView.
 

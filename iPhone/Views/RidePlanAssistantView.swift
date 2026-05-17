@@ -76,7 +76,8 @@ struct RidePlanAssistantView: View {
 
     // MARK: - Stored properties
 
-    private let engine = PlanAssistantEngine()
+    private let assistantEngine = PlanAssistantEngine()
+    private let routingEngine  = PlanRouteEngine()
 
     @State private var prompt = ""
     @State private var phase: Phase = .idle
@@ -376,7 +377,13 @@ struct RidePlanAssistantView: View {
             disambigCandidates = []
         }
 
-        for await event in engine.plan(prompt: trimmed, nearLat: nearLat, nearLon: nearLon, planState: plan) {
+        for await event in assistantEngine.plan(
+            prompt: trimmed,
+            nearLat: nearLat,
+            nearLon: nearLon,
+            planState: plan,
+            routeEngine: routingEngine
+        ) {
             await handleEvent(event)
         }
     }
@@ -419,7 +426,7 @@ struct RidePlanAssistantView: View {
 
     @MainActor
     private func resolveDisambiguation(index: Int, mapItem: MKMapItem) {
-        let name = engine.commitDisambiguatedStop(mapItem: mapItem, planState: plan)
+        let name = assistantEngine.commitDisambiguatedStop(mapItem: mapItem, planState: plan)
         withAnimation {
             if index < resolvedStops.count {
                 resolvedStops[index] = StopRow(id: index, name: name, state: .resolved)

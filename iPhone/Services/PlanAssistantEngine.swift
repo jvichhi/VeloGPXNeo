@@ -86,7 +86,8 @@ final class PlanAssistantEngine {
         prompt: String,
         nearLat: Double,
         nearLon: Double,
-        planState: PlanState
+        planState: PlanState,
+        routeEngine: PlanRouteEngine? = nil
     ) -> AsyncStream<AssistantEvent> {
         AsyncStream { continuation in
             Task {
@@ -95,6 +96,7 @@ final class PlanAssistantEngine {
                     nearLat: nearLat,
                     nearLon: nearLon,
                     planState: planState,
+                    routeEngine: routeEngine,
                     continuation: continuation
                 )
                 continuation.finish()
@@ -125,6 +127,7 @@ final class PlanAssistantEngine {
         nearLat: Double,
         nearLon: Double,
         planState: PlanState,
+        routeEngine: PlanRouteEngine?,
         continuation: AsyncStream<AssistantEvent>.Continuation
     ) async {
         // 1. Parse intent
@@ -191,6 +194,12 @@ final class PlanAssistantEngine {
             if intent.isLoop && planState.waypoints.count >= 2 {
                 planState.isLoopClosed = true
             }
+        }
+
+        // Compute road-snapped segments before yielding .completed,
+        // so the route polyline is ready on the map when the sheet dismisses.
+        if let re = routeEngine {
+            await re.recomputeAll(in: planState)
         }
 
         continuation.yield(.completed)
