@@ -13,7 +13,7 @@ struct RouteLibraryView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if routeStore.routes.isEmpty {
+                if routeStore.routes.isEmpty && routeStore.aiPlannedRoute == nil {
                     emptyState
                 } else {
                     routeList
@@ -70,6 +70,26 @@ struct RouteLibraryView: View {
 
     private var routeList: some View {
         List {
+            // F-C2: AI Planned pending section — shown above all saved routes when
+            // an AI-generated plan is awaiting a Save / Discard / Start decision.
+            // Condition: routeStore.aiPlannedRoute is non-nil.
+            // Layout: distinct card with a sparkles badge + route stats + 3 action buttons.
+            // Disappears (animated) when the user taps Save, Discard, or Start.
+            if let pending = routeStore.aiPlannedRoute {
+                Section {
+                    AIPendingRouteCard(route: pending)
+                } header: {
+                    Label("AI Planned", systemImage: "sparkles")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.purple)
+                        .textCase(nil)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+            }
+
+            // Existing saved routes — unchanged
             ForEach(routeStore.routes) { route in
                 let isSelected = routeStore.selectedRoute?.id == route.id
                 let isPlanned  = route.sourceFormat == .planned
@@ -185,6 +205,102 @@ struct RouteLibraryView: View {
     }
 }
 
+// MARK: - F-C2: AI Pending Route Card
+//
+// Displayed at the top of the Routes list when routeStore.aiPlannedRoute is non-nil.
+// Three actions: Start (sets pendingRideRoute), Save (persists to library), Discard.
+// All three clear aiPlannedRoute from the store, making the card disappear.
+//
+// Does NOT use NavigationLink — tapping the card does nothing; actions are the three buttons.
+// Uses @EnvironmentObject RouteStore so it stays up-to-date without prop drilling.
+
+private struct AIPendingRouteCard: View {
+    let route: RouteModel
+    @EnvironmentObject private var routeStore: RouteStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+
+            // Header row: sparkles badge + name
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.purple)
+                Text(route.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            // Stats row: distance + elevation
+            HStack(spacing: 8) {
+                PillBadge(
+                    icon: "arrow.left.and.right",
+                    label: String(format: "%.1f km", route.totalDistance / 1000)
+                )
+                PillBadge(
+                    icon: "mountain.2",
+                    label: String(format: "%.0f m", route.elevationGain)
+                )
+                PillBadge(
+                    icon: "map.fill",
+                    label: "AI PLANNED",
+                    color: .purple,
+                    filled: true
+                )
+            }
+
+            Divider()
+
+            // Action buttons: Start / Save / Discard
+            HStack(spacing: 8) {
+                // Start — ride immediately, don’t save to library
+                Button {
+                    routeStore.pendingRideRoute = route
+                    routeStore.discardAIPlannedRoute()
+                } label: {
+                    Label("Start", systemImage: "bicycle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(.blue, in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(.white)
+                }
+
+                // Save — persist to library, don’t start riding
+                Button {
+                    routeStore.saveAIPlannedRoute()
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(.primary)
+                }
+
+                // Discard — throw away, no save
+                Button(role: .destructive) {
+                    withAnimation { routeStore.discardAIPlannedRoute() }
+                } label: {
+                    Label("Discard", systemImage: "trash")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.purple.opacity(0.3), lineWidth: 1.5)
+        }
+    }
+}
+
 // MARK: - F-A2: Route Rename Sheet
 
 private struct RouteRenameSheet: View {
@@ -288,7 +404,7 @@ private struct RouteRenameSheet: View {
 
                                 case .done:
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Text("Tap a suggestion to use it — you can still edit before saving.")
+                                        Text("Tap a suggestion to use it \u2014 you can still edit before saving.")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 
