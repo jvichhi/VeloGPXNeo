@@ -254,7 +254,7 @@ private struct AIPendingRouteCard: View {
 
             // Action buttons: Start / Save / Discard
             HStack(spacing: 8) {
-                // Start — ride immediately, don’t save to library
+                // Start — ride immediately, don't save to library
                 Button {
                     routeStore.pendingRideRoute = route
                     routeStore.discardAIPlannedRoute()
@@ -267,7 +267,7 @@ private struct AIPendingRouteCard: View {
                         .foregroundStyle(.white)
                 }
 
-                // Save — persist to library, don’t start riding
+                // Save — persist to library, don't start riding
                 Button {
                     routeStore.saveAIPlannedRoute()
                 } label: {
@@ -395,7 +395,7 @@ private struct RouteRenameSheet: View {
                                         ProgressView()
                                             .controlSize(.small)
                                             .tint(.purple)
-                                        Text("Finding route names\u{2026}")
+                                        Text("Finding route names…")
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
@@ -404,7 +404,7 @@ private struct RouteRenameSheet: View {
 
                                 case .done:
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Text("Tap a suggestion to use it \u2014 you can still edit before saving.")
+                                        Text("Tap a suggestion to use it — you can still edit before saving.")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 
