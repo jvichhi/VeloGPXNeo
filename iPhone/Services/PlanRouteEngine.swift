@@ -4,8 +4,23 @@
 //
 //  Chains CyclingRouteService calls between consecutive PlanWaypoints.
 //  Dirty-segment detection avoids recomputing unchanged pairs.
-//  A failed segment falls back to a straight-line stub so planning
-//  is never blocked by a routing error.
+//
+//  CONCURRENCY NOTE (fix, May 16 2026):
+//  MKDirections throttles aggressively beyond ~3 concurrent per-app requests.
+//  The previous withTaskGroup fired all segments simultaneously, causing
+//  excess requests to fail silently — those failures were replaced with
+//  straight-line stubs, producing the phantom 208 km straight-line routes.
+//
+//  Fix: a single withTaskGroup with a sliding-window cap of 2 concurrent
+//  MKDirections requests. As each task completes the next pair is enqueued,
+//  keeping exactly 2 in-flight at all times. This is the standard Apple
+//  pattern for rate-limited batched network work and does NOT cause Swift 6
+//  build errors — all mutation stays isolated; tasks return values only.
+//
+//  FALLBACK REMOVED:
+//  computeSegment now returns PlanSegment? (nil on failure) instead of
+//  silently substituting a straight-line stub. Failures are counted on
+//  PlanState.routingFailureCount so the UI can surface a warning banner.
 //
 
 import Foundation
@@ -108,30 +123,73 @@ final class PlanRouteEngine {
 
     // MARK: - Computation
 
+    /// Executes routing for each pair with a sliding-window concurrency cap of 2.
+    ///
+    /// Why a cap instead of full parallelism:
+    ///   MKDirections throttles at ~3 concurrent requests per app. Firing all
+    ///   segments simultaneously caused excess requests to throw, which the old
+    ///   code silently replaced with straight-line stubs.
+    ///
+    /// Why not a plain serial `for` loop:
+    ///   A bare `for pair in pairs { await ... }` doesn't respect task cancellation
+    ///   between iterations — the loop would block until every segment resolved
+    ///   even after the user changed the plan. The task group approach lets us
+    ///   call group.cancelAll() the moment Task.isCancelled is detected.
+    ///
+    /// Swift 6 safety: all mutation is isolated — tasks return values only,
+    /// state is written on @MainActor inside the main loop. No data races.
     private func computeAndApply(pairs: [SegmentPair], state: PlanState) async {
         guard !pairs.isEmpty else { return }
         state.isRouting = true
+        state.routingFailureCount = 0
         defer { state.isRouting = false }
 
         await withTaskGroup(of: PlanSegment?.self) { group in
-            for pair in pairs {
+            var inFlight = 0
+            var iterator = pairs.makeIterator()
+
+            // Seed the first 2 tasks (or fewer if pairs.count < 2)
+            while inFlight < 2, let pair = iterator.next() {
+                let (from, to, isLoop) = (pair.from, pair.to, pair.isLoop)
                 group.addTask {
-                    await Self.computeSegment(from: pair.from, to: pair.to, isLoop: pair.isLoop)
+                    await Self.computeSegment(from: from, to: to, isLoop: isLoop)
                 }
+                inFlight += 1
             }
+
+            // As each task finishes, apply its result and schedule the next pair
             for await segment in group {
-                guard !Task.isCancelled else { continue }
-                guard let seg = segment else { continue }
-                await MainActor.run { state.upsertSegment(seg) }
+                guard !Task.isCancelled else {
+                    group.cancelAll()
+                    break
+                }
+                if let seg = segment {
+                    state.upsertSegment(seg)
+                } else {
+                    // nil = MKDirections threw for this segment; count for UI warning
+                    state.routingFailureCount += 1
+                }
+                inFlight -= 1
+
+                if let pair = iterator.next() {
+                    let (from, to, isLoop) = (pair.from, pair.to, pair.isLoop)
+                    group.addTask {
+                        await Self.computeSegment(from: from, to: to, isLoop: isLoop)
+                    }
+                    inFlight += 1
+                }
             }
         }
     }
 
+    /// Returns a routed PlanSegment, or nil if MKDirections failed.
+    /// Returning nil (instead of a straight-line stub) ensures failures
+    /// are visible in the UI rather than silently inflating the total distance.
     private static func computeSegment(
         from: PlanWaypoint,
         to: PlanWaypoint,
         isLoop: Bool
-    ) async -> PlanSegment {
+    ) async -> PlanSegment? {
         // Pass raw lat/lon Doubles — calculateRoute no longer accepts CLLocationCoordinate2D
         // directly, since CLLocationCoordinate2D.init is @MainActor on iOS 26+.
         let fLat = from.coordinate.latitude,  fLon = from.coordinate.longitude
@@ -152,16 +210,9 @@ final class PlanRouteEngine {
                 isLoop: isLoop
             )
         } catch {
-            // Straight-line fallback so the user is never blocked.
-            let dist = from.coordinate.planDistance(to: to.coordinate)
-            return PlanSegment(
-                fromWaypointID: from.id,
-                toWaypointID: to.id,
-                coordinates: [from.coordinate, to.coordinate],
-                distance: dist,
-                elevationGain: 0,
-                isLoop: isLoop
-            )
+            // Return nil — no silent straight-line fallback.
+            // computeAndApply increments routingFailureCount so the view can warn the user.
+            return nil
         }
     }
 
