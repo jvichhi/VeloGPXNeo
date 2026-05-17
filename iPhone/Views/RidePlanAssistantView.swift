@@ -14,11 +14,11 @@
 //    .idle        — text field + primary button visible
 //    .planning    — ProgressView spinner, streaming stop list appears
 //    .disambiguation(index, candidates) — inline picker for ambiguous stop
-//    .done        — brief "Route ready ✓" then auto-dismiss
+//    .done        — brief “Route ready ✓” then auto-dismiss
 //    .failed(msg) — inline error, user can retry
 //
 //  DOES NOT:
-//  — Touch PlanView's ZStack, map controls, or drawerCard
+//  — Touch PlanView’s ZStack, map controls, or drawerCard
 //  — Add new map annotations or overlays
 //  — Present additional sheets on top of itself (disambiguation is inline)
 //
@@ -26,6 +26,10 @@
 //  Disambiguation subtitle is built via MKMapItem.placemark (CLPlacemark),
 //  which exposes locality, administrativeArea, and country. MKMapItem itself
 //  does NOT have these properties — they live on the placemark.
+//
+//  Fix (May 16 2026): routingWarningBanner shown when plan.routingFailureCount > 0
+//  after routing completes. Tells the user how many segments couldn’t be routed
+//  and suggests adjusting stops.
 //
 
 import SwiftUI
@@ -98,6 +102,11 @@ struct RidePlanAssistantView: View {
                     }
                     if case .failed(let msg) = phase {
                         errorRow(message: msg)
+                    }
+                    // Show routing failure warning after engine completes
+                    // if one or more segments couldn’t be snapped to cycling roads.
+                    if plan.routingFailureCount > 0 {
+                        routingWarningBanner
                     }
                 }
                 .padding(.horizontal, 20)
@@ -305,6 +314,33 @@ struct RidePlanAssistantView: View {
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    // MARK: - Routing Warning Banner
+
+    /// Shown when PlanRouteEngine reports one or more segments it could not route.
+    /// Appears below the stops list after routing completes.
+    /// Guides the user to adjust stops rather than leaving them confused by a
+    /// partial or empty map preview.
+    private var routingWarningBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .font(.system(size: 15))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(plan.routingFailureCount == 1
+                     ? "1 segment couldn’t be routed"
+                     : "\(plan.routingFailureCount) segments couldn’t be routed")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text("Try adjusting your stops or check your connection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Error Row
