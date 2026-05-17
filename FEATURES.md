@@ -12,6 +12,7 @@
 
 ## Backlog Specs
 
+- [F-D — Draw Route](Docs/Specs/F-D_DrawRoute.md) — Sprint 5 — Finger-draw road-snapped route creation (Strava parity)
 - [F-B — Unified Maps URLs + Apple Place IDs](Docs/Specs/F-B_PlaceIDs.md)
 
 ## Historical
