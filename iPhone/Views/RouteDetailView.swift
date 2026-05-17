@@ -273,10 +273,6 @@ struct RouteDetailView: View {
                     .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
                 }
 
-                // CyclingRouteOverlay removed — section had no clear purpose
-                // and confused users. CyclingRouteOverlay.swift retained in
-                // project for potential future reuse.
-
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

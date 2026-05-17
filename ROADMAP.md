@@ -123,9 +123,11 @@
   `RideSummaryView.swift:296`, `RideHistoryView.swift:231`, `RideHistoryDetailView.swift:266,346`.
   Log + surface via toast.
 
-- [ ] **P2 · `RouteNoticeView` — wire or delete**
-  Wire into `CyclingRouteService` result + `topBanners`, or delete.
-  Decide alongside `CyclingRouteOverlay`.
+- [x] **P2 · `RouteNoticeView` + `CyclingRouteOverlay` — deleted** ✅ May 17
+  Both were dead views with zero callers. RouteNoticeView (38 loc), CyclingRouteOverlay (260 loc).
+  ROADMAP said "wire or delete" → chose delete. Also deleted: NextPOIBanner, ReverseGeocodingService,
+  root MKMapItem+POI.swift (stale, not compiled), 5 uncalled methods, 3 dead properties.
+  → See `TECH_DEBT.md` for full list.
 
 - [ ] **P2 · Merge `POIDiscoverySheet` + `NearbySearchSheet`**
   One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before submission.

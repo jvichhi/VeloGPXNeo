@@ -36,35 +36,6 @@ public enum ClimbCategory: Int, Codable, Comparable, Sendable {
         }
     }
 
-    public var minGrade: Double {
-        switch self {
-        case .four:  return 2.0
-        case .three: return 3.0
-        case .two:   return 4.0
-        case .one:   return 6.0
-        case .hc:    return 8.0
-        }
-    }
-
-    public var minDistance: Double {
-        switch self {
-        case .four:  return 800
-        case .three: return 1500
-        case .two:   return 3000
-        case .one:   return 5000
-        case .hc:    return 8000
-        }
-    }
-
-    public var minElevation: Double {
-        switch self {
-        case .four:  return 50
-        case .three: return 100
-        case .two:   return 200
-        case .one:   return 400
-        case .hc:    return 600
-        }
-    }
 }
 
 public struct ClimbSegment: Codable, Equatable, Sendable {

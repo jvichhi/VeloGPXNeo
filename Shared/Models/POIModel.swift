@@ -65,7 +65,7 @@ public struct POIModel: Codable, Identifiable, Sendable, Equatable {
     }
 }
 
-public enum POICategory: String, Codable, CaseIterable, Sendable {
+public enum POICategory: String, Codable, Sendable {
     case cafe
     case restaurant
     case water

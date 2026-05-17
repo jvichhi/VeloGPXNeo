@@ -124,28 +124,6 @@ final class RouteStore: ObservableObject {
         }
     }
 
-    func importRoute(data: Data, filename: String) async throws {
-        let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
-        let route: RouteModel
-        if ext == "gpx" {
-            route = try GPXParser.parse(data: data, filename: filename)
-            // Resolve waypoint coordinates to canonical place names via
-            // PlaceDescriptorService (iOS 26+ MKReverseGeocodingRequest,
-            // CLGeocoder fallback, then MKLocalSearch fallback).
-            let resolved = await PlaceDescriptorService.shared.resolveAll(route.waypoints)
-            selectedPOIs = resolved.map { rw in
-                POIModel(name: rw.name, category: .custom, coordinate: rw.coordinate)
-            }
-        } else {
-            let result = try GeoJSONParser.parse(data: data, filename: filename)
-            guard let parsedRoute = result.route else { throw NSError(domain: "VeloGPX", code: 3) }
-            route = parsedRoute
-            selectedPOIs = result.pois
-        }
-        try save(route)
-        loadFromDisk()
-    }
-
     func addPlannedRoute(_ route: RouteModel, select: Bool = true) {
         do {
             try save(route)

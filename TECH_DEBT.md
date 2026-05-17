@@ -33,16 +33,14 @@
 
 ### MK-2 — `MKMapItem.placemark` reads → `.location` / `.address` — ✅ Resolved May 13, 2026
 
-`NearbySearchSheet`, `POIDiscoverySheet`, `PlaceDescriptorService`, and `ReverseGeocodingService` all use `mapItem.location?.coordinate` and `mapItem.name`. No `.placemark` reads remain. Discovered in code review.
+`NearbySearchSheet`, `POIDiscoverySheet`, and `PlaceDescriptorService` all use `mapItem.location?.coordinate` and `mapItem.name`. No `.placemark` reads remain. Discovered in code review. (ReverseGeocodingService deleted May 2026 — superseded by PlaceDescriptorService.)
 
 ---
 
 ### MK-3 — `CLGeocoder` → `MKReverseGeocodingRequest` — ✅ Resolved May 13, 2026
 
-`ReverseGeocodingService` uses `MKReverseGeocodingRequest` as the iOS 26+ primary path.
-`CLGeocoder` retained as a properly `@available(iOS, deprecated: 26.0)` gated fallback only.
 `PlaceDescriptorService` uses `MKReverseGeocodingRequest` exclusively (no `CLGeocoder` at all).
-Discovered in code review.
+Discovered in code review. (ReverseGeocodingService deleted May 2026 — superseded.)
 
 ---
 
@@ -224,7 +222,7 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 
 **Remaining POI follow-ups (not blocking):**
 - `POIDiscoverySheet` vs `NearbySearchSheet` — merge into one sheet with `mode: .preRide | .midRide` before 1.0.
-- `RouteStore+POI.swift` is thin (866 B) — POI persistence scattered. Consolidate before 1.0.
+- POI persistence scattered across `RouteStore` call sites. Consolidate before 1.0.
 
 ---
 
@@ -269,13 +267,11 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 
 - [x] **`PlaceDescriptorService` wired to `WaypointListSheet`** — ✅ Resolved May 13, 2026
 
-- [x] **`NextPOIBanner.swift` stub deleted** — ✅ Resolved May 13, 2026
+- [x] **`NextPOIBanner.swift` deleted** — ✅ Resolved May 17, 2026
 
-- [ ] **`RouteNoticeView.swift` — kept but unconnected**
-  Wire into `CyclingRouteService` result + `topBanners`, or delete before 1.0.
+- [x] **`RouteNoticeView.swift` deleted** — ✅ Resolved May 17, 2026 (zero callers)
 
-- [ ] **`CyclingRouteOverlay.swift` — removed from `RouteDetailView`**
-  Consider surfacing in `PlanView`. `RouteNoticeView` should be wired alongside.
+- [x] **`CyclingRouteOverlay.swift` deleted** — ✅ Resolved May 17, 2026 (zero callers)
 
 - [ ] **`MapStyle` — expose cycling overlay toggle**
   Add setting: `.standard` / `.hybrid(elevation: .realistic)` / cycling lane style.
@@ -306,7 +302,7 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 - [ ] **`RideHistoryStore` has no pagination**
 - [ ] **Hardcoded English strings — not using `LocalizationManager`**
 - [ ] **No unit tests for core logic**
-- [ ] **Dead views (`CyclingRouteOverlay`, `RouteNoticeView`)** — use or delete before 1.0
+- [x] **Dead views (`CyclingRouteOverlay`, `RouteNoticeView`)** — ✅ Deleted May 17, 2026
 - [ ] **`RideSessionStore+Spurs.swift` accesses internal properties** — use `private(set)` or extract
 - [ ] **`AppleLanguages` UserDefaults key is fragile** — `LocalizationManager.swift:126`
 - [ ] **Implicitly unwrapped optional `CLLocationManager`** — `RideSessionStore.swift:37`
@@ -326,7 +322,6 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 | `HUDHeightKey` PreferenceKey replaces `asyncAfter` hack | Apr 26, 2026 |
 | Error surfacing via `lastError` + dismissible HUD banner | Apr 26, 2026 |
 | `MapCameraAnimation` for smooth camera transitions | Apr 26, 2026 |
-| `NextPOIBanner.swift` stub deleted | Apr 26, 2026 |
 | POI overhaul + route line plan documented | May 2, 2026 |
 | **F-1** All MapPolyline stroke widths doubled (5 pairs) | May 2, 2026 |
 | **F-2a–f** Full POI overhaul landed | May 2, 2026 |
@@ -345,7 +340,6 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 | **P0** `POIDiscoverySheet` category detection upgraded | May 12, 2026 |
 | **P1** Watch haptic loop fixed (`didAlertOffRoute` flag) | May 13, 2026 |
 | **P2** `PlaceDescriptorService` wired to `WaypointListSheet` | May 13, 2026 |
-| **P2** `NextPOIBanner.swift` deleted | May 13, 2026 |
 | **MK-1** `MKPlacemark/init(placemark:)` → `MKMapItem(location:address:)` | May 13, 2026 |
 | **MK-2** `MKMapItem.placemark` reads → `.location`/`.address` | May 13, 2026 |
 | **MK-3** `CLGeocoder` → `MKReverseGeocodingRequest` | May 13, 2026 |
@@ -363,3 +357,10 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 | **F-A2** `RouteLibraryView.swift` rewrite — rename swipe + context menu + `RouteRenameSheet` + `FlowLayout` | May 15, 2026 |
 | **Bug** FlowLayout regression fixed — `_FlowLayout: Layout` must never hold `@ViewBuilder` storage | May 15, 2026 |
 | **Sprint 2** All F-A items complete, clean build confirmed (zero warnings, zero errors) | May 15, 2026 |
+| **Dead code** `CyclingRouteOverlay.swift` deleted (260 loc) | May 17, 2026 |
+| **Dead code** `RouteNoticeView.swift` deleted (38 loc) | May 17, 2026 |
+| **Dead code** `NextPOIBanner.swift` deleted (29 loc) | May 17, 2026 |
+| **Dead code** `ReverseGeocodingService.swift` deleted (37 loc) | May 17, 2026 |
+| **Dead code** Root `MKMapItem+POI.swift` deleted (73 loc, not compiled) | May 17, 2026 |
+| **Dead code** 5 uncalled methods removed (searchAlongRoute, calculateAlternativeRoutes, importRoute(data:), stop(), clearError) | May 17, 2026 |
+| **Dead code** `TimeInterval.formattedDuration`, `ClimbCategory` thresholds, `POICategory.CaseIterable` removed | May 17, 2026 |

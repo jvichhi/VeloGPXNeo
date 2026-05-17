@@ -73,45 +73,6 @@ actor CyclingRouteService {
         }
     }
 
-    func calculateAlternativeRoutes(
-        from sourceLat: Double, _ sourceLon: Double,
-        to destLat: Double, _ destLon: Double
-    ) async throws -> [CyclingRouteResult] {
-        let (sourceItem, destItem, request) = await MainActor.run { () -> (MKMapItem, MKMapItem, MKDirections.Request) in
-            let src = MKMapItem(
-                location: CLLocation(latitude: sourceLat, longitude: sourceLon),
-                address: nil
-            )
-            let dst = MKMapItem(
-                location: CLLocation(latitude: destLat, longitude: destLon),
-                address: nil
-            )
-            let req = MKDirections.Request()
-            req.source = src
-            req.destination = dst
-            req.requestsAlternateRoutes = true
-            req.transportType = .cycling
-            return (src, dst, req)
-        }
-
-        let directions = MKDirections(request: request)
-        let response = try await directions.calculate()
-
-        return await MainActor.run {
-            response.routes.prefix(3).map { route in
-                CyclingRouteResult(
-                    route: route,
-                    steps: route.steps.map { ($0.instructions, $0.distance) },
-                    totalDistance: route.distance,
-                    expectedTravelTime: route.expectedTravelTime,
-                    routeName: route.name.isEmpty ? nil : route.name,
-                    matchedSource: sourceItem,
-                    matchedDestination: destItem,
-                    isCycling: true
-                )
-            }
-        }
-    }
 }
 
 // MARK: - Errors

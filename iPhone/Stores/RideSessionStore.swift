@@ -241,11 +241,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         sendWatchUpdate()
     }
 
-    func clearError() {
-        errorClearTask?.cancel()
-        lastError = nil
-    }
-
     @discardableResult
     func stopAndBuildSummary() -> RideSummary? {
         if rideState.isPaused { resume() }
@@ -267,10 +262,6 @@ final class RideSessionStore: NSObject, ObservableObject, CLLocationManagerDeleg
         )
         historyStore?.save(summary)
         return summary
-    }
-
-    func stop() {
-        endLocationUpdates()
     }
 
     func setHistoryStore(_ store: RideHistoryStore) {

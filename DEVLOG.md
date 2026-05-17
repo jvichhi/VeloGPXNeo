@@ -4,24 +4,41 @@
 
 ---
 
-## Current State — May 15, 2026 (end of night)
+## Current State — May 17, 2026
 
 **Build:** ✅ Clean — zero warnings, zero errors (iOS 26+, SwiftUI / MapKit / CoreLocation / FoundationModels)
 
-**Sprint 1:** ✅ Complete — all 15 items verified in source.
-**Sprint 2:** ✅ Complete — all F-A items shipped. FlowLayout regression fixed. Clean build confirmed.
+**Sprint 1:** ✅ Complete
+**Sprint 2:** ✅ Complete
+**Sprint 3:** ✅ Complete
+**Sprint 4:** In progress — dead code cleanup landed; perf fixes + god-object splits remaining.
 
-**Next session starts at:** Sprint 3 · F-C1 — `PlanAssistantEngine` + `RidePlanIntent+Generable`.
-
-### Before writing a single line of code in the next session:
-```
-git pull && git log --oneline -10   # confirm you're on latest
-Product → Clean Build Folder → Build # confirm zero errors
-```
-Then read: `DEVLOG.md` → `ROADMAP.md` → `FEATURES.md § F-C` before touching any file.
+**Next session starts at:** Sprint 4 · P2 perf fixes — `updateNextPOI` hot-path, `buildSnapIndexCache` offload, `elevationSamples` cache.
 
 ---
+## Session Summary — May 17, 2026
 
+| Item | Status | Notes |
+|---|---|---|
+| Dead code audit | ✅ | Full scan of all Swift files — 15 dead items identified |
+| `CyclingRouteOverlay.swift` | Deleted | 260 loc, zero callers since removed from RouteDetailView |
+| `RouteNoticeView.swift` | Deleted | 38 loc, never wired |
+| `NextPOIBanner.swift` | Deleted | 29 loc, zero callers (TECH_DEBT claimed deleted but was on disk) |
+| `ReverseGeocodingService.swift` | Deleted | 37 loc, superseded by PlaceDescriptorService |
+| Root `MKMapItem+POI.swift` | Deleted | 73 loc, not compiled (stale #available copy) |
+| `POISearchService.searchAlongRoute()` | Removed | Zero callers + orphan `Array.middle` helper |
+| `CyclingRouteService.calculateAlternativeRoutes()` | Removed | Zero callers |
+| `RouteStore.importRoute(data:filename:)` | Removed | Only URL overload used |
+| `RideSessionStore.stop()` + `clearError()` | Removed | Zero callers each |
+| `TimeInterval.formattedDuration` | Removed | Zero callers (use `.hhmm` instead) |
+| `ClimbCategory.minGrade/minDistance/minElevation` | Removed | Zero callers (RouteModel.classifyClimb hardcodes) |
+| `POICategory.CaseIterable` | Removed | allCases never called |
+| pbxproj cleanup | ✅ | 16 references to deleted files removed |
+| TECH_DEBT.md, ROADMAP.md | Updated | Dead views/items checked off |
+
+**581 lines deleted across 14 files.** Zero risk — all items confirmed zero external references before deletion.
+
+---
 ## Session Summary — May 14–15, 2026 (late night)
 
 | Item | Status | Commit | Notes |
