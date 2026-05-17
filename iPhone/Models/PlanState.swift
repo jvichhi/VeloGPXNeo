@@ -6,6 +6,10 @@
 //  WaypointStopKind mirrors IntentStopKind but lives here with no
 //  FoundationModels dependency, keeping this file Watch-safe.
 //
+//  Fix (May 16 2026): routingFailureCount added so PlanRouteEngine can
+//  report the number of segments that MKDirections failed to route.
+//  RidePlanAssistantView shows a warning banner when count > 0.
+//
 
 import SwiftUI
 import Combine
@@ -92,6 +96,10 @@ final class PlanState: ObservableObject {
     @Published var isLoopClosed: Bool = false
     @Published var isRouting: Bool = false
     @Published var routingError: String? = nil
+    /// Number of segments PlanRouteEngine could not route via MKDirections.
+    /// Reset to 0 at the start of each computeAndApply pass.
+    /// RidePlanAssistantView observes this to show a warning banner.
+    @Published var routingFailureCount: Int = 0
 
     // MARK: Derived
 
@@ -164,11 +172,12 @@ final class PlanState: ObservableObject {
         isLoopClosed = false
         isRouting = false
         routingError = nil
+        routingFailureCount = 0
     }
 
     /// Reconstruct waypoints from an existing RouteModel.
     /// WaypointPoint.coordinate and TrackPoint.coordinate are typed as the
-    /// app's own `Coordinate` struct — use .clCoordinate to get CLLocationCoordinate2D.
+    /// app’s own `Coordinate` struct — use .clCoordinate to get CLLocationCoordinate2D.
     @MainActor
     func loadFrom(route: RouteModel) {
         clearAll()
