@@ -27,11 +27,19 @@
 //  • MKMapItem.location is CLLocation (non-optional) — use .coordinate directly.
 //  • CLLocationCoordinate2D is a plain C struct — safe to construct on any actor/thread.
 //  • PlanState.addWaypoint IS @MainActor — wrapped in MainActor.run below.
+//  • MKLocalSearch.Request.resultTypes = [.address] is the correct iOS 13+ API for
+//    resolving civic addresses (e.g. "2284 rue Kenneth-Patrick"). No deprecated APIs needed.
 //
 //  DEPRECATIONS TO AVOID:
-//  ❌ mapItem.placemark — deprecated iOS 26
+//  ❌ mapItem.placemark — deprecated iOS 26; use mapItem.placemark.locality etc (CLPlacemark)
 //  ❌ CLGeocoder — deprecated iOS 18+
 //  ❌ session.stream(from:onPartial:) — removed iOS 26
+//
+//  STOP RESOLUTION STRATEGY:
+//  • Civic address queries (start with digits, e.g. "2284 Kenneth-Patrick Laval") →
+//    MKLocalSearch with resultTypes = [.address] for precise geocoding.
+//  • All other queries (named POIs, neighbourhoods, cities) →
+//    POISearchService.shared.search() which applies category filters where applicable.
 //
 //  F-C2 (May 16 2026): engine now passes kind + dwellMinutes through to
 //  PlanWaypoint so WaypointListSheet can show stop-type icons and dwell chips.
@@ -190,7 +198,7 @@ final class PlanAssistantEngine {
         let systemPrompt = """
         You are a cycling route planning assistant.
         Extract the stops, target distance, loop preference, and a suggested route name
-        from the user’s request. For each stop include a natural-language search query
+        from the user's request. For each stop include a natural-language search query
         suitable for finding it on Apple Maps (include city or region context where mentioned).
         If the user did not specify a distance, set targetDistanceKm to 0.
         If the user did not specify dwell time for a stop, set dwellMinutes to -1.
@@ -210,11 +218,42 @@ final class PlanAssistantEngine {
         _ stop: IntentStop,
         near centre: CLLocationCoordinate2D
     ) async -> [MKMapItem] {
-        (try? await POISearchService.shared.search(
+        // Civic address queries (e.g. "2284 rue Kenneth-Patrick Laval") need
+        // resultTypes = [.address] for accurate geocoding. MKLocalSearch handles
+        // both POIs and addresses via this flag — no deprecated CLGeocoder needed.
+        // Detection: query starts with one or more digits followed by a space.
+        if Self.looksLikeCivicAddress(stop.searchQuery) {
+            return await searchAddress(stop.searchQuery, near: centre)
+        }
+        return (try? await POISearchService.shared.search(
             query: stop.searchQuery,
             near: centre,
             radius: 30_000
         )) ?? []
+    }
+
+    /// Address-mode search using `resultTypes = [.address]`.
+    /// Uses a wide region so a full civic address anywhere near the ride area is found.
+    private func searchAddress(
+        _ query: String,
+        near centre: CLLocationCoordinate2D
+    ) async -> [MKMapItem] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        request.resultTypes = [.address]
+        request.region = MKCoordinateRegion(
+            center: centre,
+            latitudinalMeters: 50_000,
+            longitudinalMeters: 50_000
+        )
+        let results = try? await MKLocalSearch(request: request).start()
+        return results?.mapItems ?? []
+    }
+
+    /// Returns true when the query looks like a civic address:
+    /// starts with one or more digits then a space (e.g. "2284 Kenneth-Patrick").
+    private static func looksLikeCivicAddress(_ query: String) -> Bool {
+        query.first?.isNumber == true
     }
 
     // MARK: - Helpers
