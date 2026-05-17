@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 16, 2026 — Sprint 3 in progress, F-C1 complete
+> Last updated: May 16, 2026 — Sprint 3 complete, F-C1 + F-C2 shipped
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -72,13 +72,11 @@
 
 ---
 
-## Sprint 3 — RidePlanAssistant (FoundationModels + MKLocalSearch, iOS 26)
-> Goal: natural language → multi-stop route in the Routes tab. Targets v1.4.
-> Requires F-A shared session wrapper from Sprint 2 ✅
->
-> **F-3 (`RideView` split) — do incrementally here.** F-C2 polish requires touching `RideView` anyway
-> for stop-type icon rendering. When we open `RideView` for F-C2, extract `RideMapLayer` and
-> `RideHUDPanel` at the same time.
+## ✅ Sprint 3 — RidePlanAssistant (FoundationModels + MKLocalSearch, iOS 26)
+> **COMPLETE** as of May 16, 2026. F-C1 + F-C2 shipped.
+> F-3 RideView split deferred — will happen incrementally in Sprint 4 when RideView is opened for perf fixes.
+> Bugs fixed: civic address resolution uses `MKLocalSearch resultTypes=[.address]`;
+> `placardSubtitle` reads address fields via `item.placemark` (CLPlacemark), not directly on MKMapItem.
 
 - [x] **F-C1 · RidePlanAssistant — Core**
   `PlanAssistantEngine` orchestrates: model parses `RidePlanIntent` via `session.respond(to:generating:)`
@@ -91,13 +89,14 @@
   **Modified:** `RouteLibraryView.swift`, `RouteStore.swift`, `WaypointListSheet.swift`
   **Watch target:** None of these files may be added to the Watch target — `FoundationModels` is iPhone-only.
 
-- [ ] **F-C2 · RidePlanAssistant — Polish + partial F-3 `RideView` split**
-  Stop-type icons in `WaypointListSheet`. Dwell time estimation per stop intent.
-  Total outing time in `WaypointListSheet` header. "AI Planned" temp section in Routes tab
-  (Save / Discard / Start).
-  While touching `RideView` for this: extract `RideMapLayer` and `RideHUDPanel` as separate views.
-  → `FEATURES.md § F-C2` · `TECH_DEBT.md § F-3`
-  **Modified:** `WaypointListSheet.swift`, `PlanState.swift`, `RouteStore.swift`, `RideView.swift`
+- [x] **F-C2 · RidePlanAssistant — Polish**
+  Stop-type SF Symbol icons + tint colour per `WaypointStopKind` in `WaypointListSheet`.
+  Dwell time chip ("`X min`" capsule) rendered under each AI-planned waypoint name.
+  Total outing time (ride time @ 15 km/h + total dwell) in `WaypointListSheet` header stats row.
+  "AI Planned" temporary section in Routes tab with Save / Discard / Start actions; one plan at a time.
+  → `FEATURES.md § F-C2`
+  **Modified:** `WaypointListSheet.swift`, `PlanState.swift`, `RouteStore.swift`
+  **F-3 RideView split:** deferred to Sprint 4.
 
 ---
 
@@ -106,6 +105,9 @@
 >
 > **F-4 (`RideSessionStore` split) — do incrementally here.** P2 perf fixes require opening
 > `RideSessionStore` anyway. Extract `POITrackingEngine` while making those fixes.
+>
+> **F-3 (`RideView` split) — pick up here.** Deferred from Sprint 3. Extract `RideMapLayer`
+> and `RideHUDPanel` when first opening `RideView` for any Sprint 4 item.
 
 - [ ] **P2 · `updateNextPOI` hot-path — pre-compute snap indices + partial F-4 `RideSessionStore` split**
   Pre-compute POI snap indices once when POIs change. While in `RideSessionStore`: extract `POITrackingEngine`.
@@ -190,14 +192,14 @@
 ```
 Sprint 1: ✅ COMPLETE
 Sprint 2: ✅ COMPLETE
-
-Sprint 3: F-A (Sprint 2 ✅) ──► F-C1 ✅ ──► F-C2 + partial F-3 RideView split
+Sprint 3: ✅ COMPLETE
 
 Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
+          F-3 RideView split (deferred from Sprint 3) ──► extract RideMapLayer + RideHUDPanel
           Pre-submission polish items (no feature dependencies)
           MISC-5 bearing() consolidation (do while in RideSessionStore for F-4)
 
-Sprint 5: RouteStore.addAIPlannedRoute (Sprint 3 F-C2 ✅) ──► F-D DrawRoute
+Sprint 5: RouteStore.addAIPlannedRoute (Sprint 3 ✅) ──► F-D DrawRoute
           F-D1 DrawRouteEngine ──► F-D2 DrawRouteView ──► F-D3 wire + .drawn sourceFormat
 ```
 
