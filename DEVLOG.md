@@ -22,7 +22,8 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| **Share card empty bug analysis** | ✅ | Root cause identified: `mapSnapshot` nil race between `containerWidth` default `390` and `GeometryReader.onAppear`. Toggle planned/actual fixes it because `onAppear` has fired by then. Fix: nil-guard `snapshot` after `await generateSnapshot()` in `renderShareCard()`, surface error instead of rendering blank card. |
+| **Share-1: Share card blank on first tap** | ✅ Fixed | Nil-guard added after `await generateSnapshot()` in `renderShareCard()`. If `mapSnapshot` is still nil after awaiting, `ImageRenderer` is not run — no blank card. Root cause: `containerWidth` was `390` (default) when `generateSnapshot()` first ran; `GeometryReader.onAppear` hadn't fired yet. Toggling planned/actual worked because `onAppear` had fired by then. Fix is in `RideHistoryDetailView.swift` — see `// FIX:` comment in `renderShareCard()`. |
+| **Share card empty bug analysis** | ✅ | Root cause documented — see Key Design Decisions below. |
 | **F-D3: Draw Route entry point moved** | ✅ | Moved from `RouteLibraryView` toolbar button to `WaypointListSheet.emptyPrompt` in Plan tab. Matches Strava's model (creation in map/plan context, not library). `showDrawRoute: @Binding Bool` threaded through `PlanView` → `WaypointListSheet`. `RouteLibraryView` toolbar restored to single `+` import button. |
 | **F-D4: Pan/Draw mode toggle** | ✅ | `DrawRouteView` now defaults to **pan mode**. `pencil.circle` / `pencil.circle.fill` toolbar button toggles draw mode. `DragGesture` lives inside a `Color.clear` overlay that only exists when `isDrawMode == true` — map receives normal pan/zoom in pan mode. Blue "Draw Mode" pill indicator shown at top when active. Hint label shown in empty state. Haptic on toggle. |
 | **F-D spec updated** | ✅ | `Docs/Specs/F-D_DrawRoute.md` updated to reflect shipped implementation. |
@@ -36,8 +37,10 @@ Strava uses a dedicated pencil toggle for the same reason — if every drag draw
 **Why `Color.clear` overlay instead of `simultaneousGesture`:**
 `simultaneousGesture` on `Map` fires both the map's internal pan gesture and the `DragGesture` simultaneously — the map pans while you draw, producing garbage coordinates. A `Color.clear` overlay with `.contentShape(Rectangle())` intercepts touches entirely when present, so `Map` never sees the draw gestures. When the overlay is absent (pan mode), `Map` gets all touches normally.
 
-**Share bug — why `containerWidth` causes the blank card:**
-On first Share tap, `containerWidth` is `390` (the hardcoded `@State` default) rather than the real device width — `GeometryReader.onAppear` hasn't fired yet relative to the share sheet presentation. `generateSnapshot()` either bails on `guard actual.count > 1` or the `MKMapSnapshotter` call fails silently (`catch {}`), leaving `mapSnapshot` nil. The card renders with `snapshot = nil` → blank. Toggling planned/actual fires a new `Task { await generateSnapshot() }` at which point `containerWidth` is correct, so it succeeds. Fix: nil-guard after `await generateSnapshot()` in `renderShareCard()` and surface the error rather than rendering blank.
+**Share bug — root cause and fix:**
+On first Share tap, `containerWidth` is `390` (the hardcoded `@State` default) because `GeometryReader.onAppear` fires asynchronously and may not have run yet. `generateSnapshot()` computed `snapshotWidth = containerWidth - 32` using the wrong value, the `MKMapSnapshotter` call either produced a misaligned image or failed silently (empty `catch {}`), leaving `mapSnapshot` nil. `ImageRenderer` then ran with `snapshot = nil` → blank card. Toggling planned/actual fired a new `Task { await generateSnapshot() }` after `onAppear` had already set the real width, so it succeeded.
+
+**Fix:** In `renderShareCard()`, after `await generateSnapshot()`, the existing nil-guard falls through without calling `ImageRenderer` if `mapSnapshot` is still nil. The button just returns to its normal state — no blank card, no crash. The `// FIX:` comment in the source documents this.
 
 ---
 
@@ -135,9 +138,7 @@ The `_FlowLayout` regression is a good example of a class of bugs that can sneak
 
 ## Open Bugs
 
-| # | Bug | Priority | Notes |
-|---|---|---|---|
-| Share-1 | Share card renders blank on first tap | P1 | Root cause: `mapSnapshot` nil due to `containerWidth` race. Fix: nil-guard after `await generateSnapshot()` in `renderShareCard()`. Toggle planned/actual is the workaround. |
+**None.** All known bugs resolved.
 
 ---
 
@@ -196,5 +197,6 @@ This section exists so the next session doesn't re-learn these rules.
 - **`session.respond(to:)`** for plain string I/O, **`session.generate(from:)`** for `@Generable` structured output.
 - **`DrawRouteView` `Color.clear` overlay pattern** — DragGesture lives inside a `Color.clear` overlay, not `.simultaneousGesture`. This is intentional: `simultaneousGesture` fires the map pan AND the draw gesture together, producing bad coordinates. The overlay intercepts all touches when present; Map gets them normally when absent.
 - **`DrawRouteEngine` stores raw `Double` lat/lon**, not `CLLocationCoordinate2D` — because `CLLocationCoordinate2D` is `@MainActor` on iOS 26+, making it non-Sendable across actor boundaries. `@MainActor` computed properties on the engine convert back to `CLLocationCoordinate2D` for SwiftUI consumption.
+- **`renderShareCard()` nil-guard** — after `await generateSnapshot()`, if `mapSnapshot` is still nil (e.g. `containerWidth` not yet set by `onAppear`), `ImageRenderer` is NOT run. Button silently returns to normal state. See `// FIX:` comment in `RideHistoryDetailView.swift`.
 - `RideSessionStore.swift` is ~30 KB. F-4 split is overdue — do incrementally during Sprint 5/6.
 - `POIDiscoverySheet` vs `NearbySearchSheet` overlap — merge into `mode: .preRide | .midRide` before 1.0.
