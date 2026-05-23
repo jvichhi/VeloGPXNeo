@@ -15,9 +15,7 @@ struct RideHistoryDetailView: View {
     @State private var mapSnapshot: UIImage?
     @State private var showPlannedOverlay = false
     @State private var exportPOIs = true
-    @State private var showShareGPX = false
-    @State private var gpxFileURL: URL?
-    @State private var shareCardImage: ShareableImage?
+    @State private var activeSheet: ActiveSheet?       // single source of truth for all sheets
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
@@ -61,11 +59,13 @@ struct RideHistoryDetailView: View {
             } message: {
                 Text("This cannot be undone.")
             }
-            .sheet(isPresented: $showShareGPX) {
-                if let url = gpxFileURL { ShareSheet(items: [url]) }
-            }
-            .sheet(item: $shareCardImage) { item in
-                ShareSheet(items: [item.image])
+            // Single .sheet modifier — fixes the dual-sheet suppression bug where
+            // two stacked .sheet modifiers caused the share card sheet to never present.
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .gpxExport(let url): ShareSheet(items: [url])
+                case .shareCard(let img): ShareSheet(items: [img])
+                }
             }
             .onAppear { containerWidth = geo.size.width }
             .task { await generateSnapshot() }
@@ -279,8 +279,7 @@ struct RideHistoryDetailView: View {
             .appendingPathComponent("\(filename)_ride.gpx")
         do {
             try gpxString.write(to: url, atomically: true, encoding: .utf8)
-            gpxFileURL = url
-            showShareGPX = true
+            activeSheet = .gpxExport(url)
         } catch {}
     }
 
@@ -313,7 +312,7 @@ struct RideHistoryDetailView: View {
         let renderer = ImageRenderer(content: cardView)
         renderer.scale = displayScale
         if let img = renderer.uiImage {
-            shareCardImage = ShareableImage(image: img)
+            activeSheet = .shareCard(img)
         }
     }
 
@@ -383,5 +382,22 @@ struct RideHistoryDetailView: View {
             }
             mapSnapshot = img
         } catch {}
+    }
+}
+
+// MARK: - ActiveSheet
+
+/// Consolidates all sheet presentations in RideHistoryDetailView into a single
+/// .sheet(item:) modifier, avoiding the SwiftUI limitation where only the first
+/// of multiple stacked .sheet modifiers on the same view is reliably presented.
+private enum ActiveSheet: Identifiable {
+    case gpxExport(URL)
+    case shareCard(UIImage)
+
+    var id: String {
+        switch self {
+        case .gpxExport: return "gpxExport"
+        case .shareCard: return "shareCard"
+        }
     }
 }
