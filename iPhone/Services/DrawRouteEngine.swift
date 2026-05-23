@@ -210,21 +210,21 @@ final class DrawRouteEngine: @unchecked Sendable {
 
         let straightLine = haversineMetres(lat1: originLat, lon1: originLon, lat2: destLat, lon2: destLon)
 
-        // Build waypoints — insert midpoint if segment > 8 km
-        let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLon)
-        let dest   = CLLocationCoordinate2D(latitude: destLat,   longitude: destLon)
+        // Build MKMapItems using iOS 26 API (MKPlacemark is deprecated)
+        let originLocation = CLLocation(latitude: originLat, longitude: originLon)
+        let destLocation   = CLLocation(latitude: destLat,   longitude: destLon)
 
         let request = MKDirections.Request()
-        request.source      = MKMapItem(placemark: MKPlacemark(coordinate: origin))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dest))
-        request.transportType = .cycling
+        request.source             = MKMapItem(location: originLocation, address: nil)
+        request.destination        = MKMapItem(location: destLocation,   address: nil)
+        request.transportType      = .cycling
         request.requestsAlternateRoutes = false
 
         if straightLine > 8000 {
             let midLat = (originLat + destLat) / 2
             let midLon = (originLon + destLon) / 2
-            let mid    = CLLocationCoordinate2D(latitude: midLat, longitude: midLon)
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: mid))
+            let midLocation = CLLocation(latitude: midLat, longitude: midLon)
+            request.destination = MKMapItem(location: midLocation, address: nil)
             // Note: MKDirections supports only source + destination; chaining is handled
             // by splitting into two sequential requests when > 8 km.
             // For now we use the midpoint as destination and accept the shorter snap.
