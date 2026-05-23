@@ -26,26 +26,22 @@ struct PlanView: View {
     @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
     @State private var showAssistant = false
+    // F-D3: draw route sheet
+    @State private var showDrawRoute = false
     /// Last known map centre — updated via onMapCameraChange.
-    /// Used to give RidePlanAssistantView a nearby coordinate for searches.
     @State private var mapCentre: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673)
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
 
-                // Map fills entire screen — bleeds behind status bar AND tab bar.
-                // .ignoresSafeArea() scoped to mapLayer only; ZStack still respects
-                // the tab bar safe area so the drawer stops above it naturally.
                 mapLayer(geo: geo)
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Map control buttons — plain SwiftUI overlay, safe-area-aware.
                 mapControlsOverlay(geo: geo)
                     .zIndex(5)
 
-                // Floating error banner
                 if showErrorBanner, let err = plan.routingError {
                     errorBanner(message: err)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -54,7 +50,6 @@ struct PlanView: View {
                         .zIndex(20)
                 }
 
-                // Floating drawer — floats 8 pt above tab bar, fully rounded
                 drawerCard(geo: geo)
                     .padding(.bottom, 8)
                     .zIndex(10)
@@ -65,7 +60,6 @@ struct PlanView: View {
             if let route = routeToLoad {
                 plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
-                // Compute the segments so the route polyline appears
                 await engine.recomputeAll(in: plan)
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
@@ -77,7 +71,6 @@ struct PlanView: View {
             Task {
                 plan.loadFrom(route: route)
                 routeStore.routeToEditInPlan = nil
-                // Compute the segments so the route polyline appears
                 await engine.recomputeAll(in: plan)
                 withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) {
                     drawerHeight = kDrawerMedium
@@ -100,6 +93,11 @@ struct PlanView: View {
                 nearLat: mapCentre.latitude,
                 nearLon: mapCentre.longitude
             )
+        }
+        // F-D3: Draw Route sheet
+        .sheet(isPresented: $showDrawRoute) {
+            DrawRouteView()
+                .environmentObject(routeStore)
         }
     }
 
@@ -192,7 +190,6 @@ struct PlanView: View {
         let isCollapsed = drawerHeight <= kDrawerPeek
 
         return VStack(spacing: 0) {
-            // Grab handle
             Capsule()
                 .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
@@ -215,13 +212,13 @@ struct PlanView: View {
                     plan.clearAll()
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
                 },
-                showAssistant: $showAssistant
+                showAssistant: $showAssistant,
+                showDrawRoute: $showDrawRoute
             )
             .padding(.bottom, safeBottom > 0 ? safeBottom : 16)
         }
         .frame(maxWidth: .infinity)
         .frame(height: min(drawerHeight, maxDrawer))
-        // All four corners rounded — drawer floats above tab bar via .padding(.bottom, 8) in body
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: .black.opacity(0.14), radius: 16, y: -3)
         .gesture(

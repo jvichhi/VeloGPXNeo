@@ -23,6 +23,9 @@
 //  Dwell time chip shown under each AI-planned waypoint name.
 //  Total outing time (ride time + total dwell) added to header stats row.
 //
+//  F-D3 (May 2026): "Draw Route" button added to emptyPrompt.
+//  Triggers showDrawRoute binding owned by PlanView.
+//
 
 import SwiftUI
 import CoreLocation
@@ -39,6 +42,8 @@ struct WaypointListSheet: View {
     let onPlanAnother: () -> Void
     /// Controls presentation of RidePlanAssistantView in PlanView.
     @Binding var showAssistant: Bool
+    /// F-D3: Controls presentation of DrawRouteView in PlanView.
+    @Binding var showDrawRoute: Bool
 
     @EnvironmentObject private var routeStore: RouteStore
 
@@ -168,7 +173,6 @@ struct WaypointListSheet: View {
                     waypointBadge(index: index, total: plan.waypoints.count)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 5) {
-                            // F-C2: stop-type icon for AI-planned waypoints
                             if let kind = wp.intentKind {
                                 Image(systemName: symbolName(for: kind))
                                     .font(.system(size: 11, weight: .medium))
@@ -182,7 +186,6 @@ struct WaypointListSheet: View {
                             Text(coordinateLabel(wp.coordinate))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
-                            // F-C2: dwell time chip
                             if let dwell = wp.dwellMinutes, dwell > 0 {
                                 Text("\(dwell) min")
                                     .font(.caption2.weight(.medium))
@@ -195,9 +198,7 @@ struct WaypointListSheet: View {
                     }
                     Spacer()
                     if resolvedNames[wp.id] == nil && wp.name == nil {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .transition(.opacity)
+                        ProgressView().scaleEffect(0.6).transition(.opacity)
                     }
                 }
                 .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 14))
@@ -235,10 +236,7 @@ struct WaypointListSheet: View {
     }
 
     // MARK: - F-C2: Stop-Type Icon Helpers
-    // Parameter type is WaypointStopKind (Watch-safe mirror of IntentStopKind).
-    // WaypointListSheet must NOT import FoundationModels.
 
-    /// SF Symbol name for each WaypointStopKind.
     private func symbolName(for kind: WaypointStopKind) -> String {
         switch kind {
         case .cafe:    return "cup.and.saucer.fill"
@@ -249,7 +247,6 @@ struct WaypointListSheet: View {
         }
     }
 
-    /// Accent colour for each stop kind icon.
     private func tintColor(for kind: WaypointStopKind) -> Color {
         switch kind {
         case .cafe:    return .brown
@@ -287,16 +284,38 @@ struct WaypointListSheet: View {
 
             Divider()
 
+            // F-C1: Plan with AI
             Button {
                 showAssistant = true
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.purple)
                     Text("Plan with AI")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.purple)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            // F-D3: Draw Route
+            Button {
+                showDrawRoute = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "pencil.and.map")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.teal)
+                    Text("Draw Route")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.teal)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -489,9 +508,6 @@ struct WaypointListSheet: View {
         String(format: "%.0f m\u{2191}", plan.totalElevationGain)
     }
 
-    // F-C2: Total outing time = estimated ride time + total dwell across all waypoints.
-    // Ride-time estimate: 15 km/h average cycling speed (conservative urban/mixed pace).
-    // Only shown when there are waypoints and at least one dwell stop.
     private var outingTimeString: String? {
         guard !plan.waypoints.isEmpty else { return nil }
         let totalDwellMin = plan.waypoints.compactMap(\.dwellMinutes).reduce(0, +)

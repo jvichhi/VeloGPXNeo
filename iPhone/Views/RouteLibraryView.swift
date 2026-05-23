@@ -9,8 +9,6 @@ struct RouteLibraryView: View {
     @State private var showImportAlert = false
     // F-A2: rename sheet
     @State private var routeToRename: RouteModel? = nil
-    // F-D3: draw route sheet
-    @State private var showDrawRoute = false
 
     var body: some View {
         NavigationStack {
@@ -24,17 +22,7 @@ struct RouteLibraryView: View {
             .navigationTitle("Routes")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    // F-D3: Draw route
-                    Button { showDrawRoute = true } label: {
-                        Image(systemName: "pencil.and.map")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(width: 32, height: 32)
-                            .background(.tint.opacity(0.12), in: Circle())
-                    }
-                    .accessibilityLabel("Draw a route")
-
-                    // Import GPX / GeoJSON
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { isImporterPresented = true } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
@@ -76,11 +64,6 @@ struct RouteLibraryView: View {
                 routeStore.renameRoute(route, to: newName)
             }
             .environmentObject(routeStore)
-        }
-        // F-D3: Draw route sheet
-        .sheet(isPresented: $showDrawRoute) {
-            DrawRouteView()
-                .environmentObject(routeStore)
         }
     }
 
@@ -224,13 +207,6 @@ struct RouteLibraryView: View {
 }
 
 // MARK: - F-C2: AI Pending Route Card
-//
-// Displayed at the top of the Routes list when routeStore.aiPlannedRoute is non-nil.
-// Three actions: Start (sets pendingRideRoute), Save (persists to library), Discard.
-// All three clear aiPlannedRoute from the store, making the card disappear.
-//
-// Does NOT use NavigationLink — tapping the card does nothing; actions are the three buttons.
-// Uses @EnvironmentObject RouteStore so it stays up-to-date without prop drilling.
 
 private struct AIPendingRouteCard: View {
     let route: RouteModel
@@ -238,8 +214,6 @@ private struct AIPendingRouteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-
-            // Header row: sparkles badge + name
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 13, weight: .semibold))
@@ -249,8 +223,6 @@ private struct AIPendingRouteCard: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
             }
-
-            // Stats row: distance + elevation
             HStack(spacing: 8) {
                 PillBadge(
                     icon: "arrow.left.and.right",
@@ -267,12 +239,8 @@ private struct AIPendingRouteCard: View {
                     filled: true
                 )
             }
-
             Divider()
-
-            // Action buttons: Start / Save / Discard
             HStack(spacing: 8) {
-                // Start — ride immediately, don't save to library
                 Button {
                     routeStore.pendingRideRoute = route
                     routeStore.discardAIPlannedRoute()
@@ -284,8 +252,6 @@ private struct AIPendingRouteCard: View {
                         .background(.blue, in: RoundedRectangle(cornerRadius: 10))
                         .foregroundStyle(.white)
                 }
-
-                // Save — persist to library, don't start riding
                 Button {
                     routeStore.saveAIPlannedRoute()
                 } label: {
@@ -296,8 +262,6 @@ private struct AIPendingRouteCard: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
                         .foregroundStyle(.primary)
                 }
-
-                // Discard — throw away, no save
                 Button(role: .destructive) {
                     withAnimation { routeStore.discardAIPlannedRoute() }
                 } label: {
@@ -346,14 +310,11 @@ private struct RouteRenameSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-
-                    // MARK: Name field
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Route Name")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
-
                         TextField("Route name", text: $draftName)
                             .font(.body)
                             .padding(.horizontal, 14)
@@ -362,11 +323,8 @@ private struct RouteRenameSheet: View {
                                         in: RoundedRectangle(cornerRadius: 12))
                             .autocorrectionDisabled()
                     }
-
-                    // MARK: AI Suggestions (F-A2)
                     if VeloAI.isAvailable && aiEnabled {
                         VStack(spacing: 0) {
-                            // Header
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 12, weight: .semibold))
@@ -388,10 +346,7 @@ private struct RouteRenameSheet: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
                             .background(Color(.systemGray6).opacity(0.6))
-
                             Divider()
-
-                            // Body
                             Group {
                                 switch suggestionState {
                                 case .idle:
@@ -407,25 +362,18 @@ private struct RouteRenameSheet: View {
                                             .foregroundStyle(.purple)
                                     }
                                     .padding(14)
-
                                 case .loading:
                                     HStack(spacing: 8) {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                            .tint(.purple)
+                                        ProgressView().controlSize(.small).tint(.purple)
                                         Text("Finding route names…")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
+                                            .font(.subheadline).foregroundStyle(.secondary)
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(14)
-
                                 case .done:
                                     VStack(alignment: .leading, spacing: 10) {
                                         Text("Tap a suggestion to use it — you can still edit before saving.")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-
+                                            .font(.caption).foregroundStyle(.secondary)
                                         FlowLayout(spacing: 8) {
                                             ForEach(suggestions, id: \.self) { name in
                                                 Button {
@@ -436,35 +384,23 @@ private struct RouteRenameSheet: View {
                                                         .padding(.horizontal, 14)
                                                         .padding(.vertical, 9)
                                                         .background(
-                                                            draftName == name
-                                                                ? Color.purple
-                                                                : Color(.systemGray5),
+                                                            draftName == name ? Color.purple : Color(.systemGray5),
                                                             in: Capsule()
                                                         )
-                                                        .foregroundStyle(
-                                                            draftName == name ? .white : .primary
-                                                        )
-                                                        .animation(.spring(duration: 0.2),
-                                                                   value: draftName)
+                                                        .foregroundStyle(draftName == name ? .white : .primary)
+                                                        .animation(.spring(duration: 0.2), value: draftName)
                                                 }
                                             }
                                         }
                                     }
                                     .padding(14)
-
                                 case .failed(let msg):
                                     HStack(spacing: 8) {
-                                        Image(systemName: "exclamationmark.triangle")
-                                            .foregroundStyle(.orange)
-                                        Text(msg)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                                        Text(msg).font(.caption).foregroundStyle(.secondary)
                                         Spacer()
-                                        Button("Retry") {
-                                            Task { await fetchSuggestions() }
-                                        }
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.purple)
+                                        Button("Retry") { Task { await fetchSuggestions() } }
+                                            .font(.caption.weight(.semibold)).foregroundStyle(.purple)
                                     }
                                     .padding(14)
                                 }
@@ -495,7 +431,6 @@ private struct RouteRenameSheet: View {
                     .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            // Auto-fetch on appear when AI is available
             .task {
                 guard VeloAI.isAvailable && aiEnabled else { return }
                 await fetchSuggestions()
@@ -515,63 +450,36 @@ private struct RouteRenameSheet: View {
     }
 }
 
-// MARK: - FlowLayout (wrapping pill row)
+// MARK: - FlowLayout
 
-/// A simple left-to-right wrapping layout for the suggestion pills.
-/// FlowLayout is a View that owns the @ViewBuilder content storage.
-/// _FlowLayout is a pure Layout — it must NOT hold any view storage.
-/// The SwiftUI engine passes subviews to _FlowLayout automatically via
-/// sizeThatFits/placeSubviews; no @ViewBuilder property is needed or allowed.
 private struct FlowLayout<Content: View>: View {
     let spacing: CGFloat
     @ViewBuilder let content: Content
-
-    var body: some View {
-        _FlowLayout(spacing: spacing) { content }
-    }
+    var body: some View { _FlowLayout(spacing: spacing) { content } }
 }
 
 private struct _FlowLayout: Layout {
     let spacing: CGFloat
-
     struct Cache {}
     func makeCache(subviews: Subviews) -> Cache { Cache() }
-
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
         let width = proposal.width ?? .infinity
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var maxWidth: CGFloat = 0
+        var x: CGFloat = 0; var y: CGFloat = 0; var rowHeight: CGFloat = 0; var maxWidth: CGFloat = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > width, x > 0 {
-                y += rowHeight + spacing
-                x = 0
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            maxWidth = max(maxWidth, x)
+            if x + size.width > width, x > 0 { y += rowHeight + spacing; x = 0; rowHeight = 0 }
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height); maxWidth = max(maxWidth, x)
         }
         y += rowHeight
         return CGSize(width: max(0, maxWidth - spacing), height: y)
     }
-
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
+        var x = bounds.minX; var y = bounds.minY; var rowHeight: CGFloat = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                y += rowHeight + spacing
-                x = bounds.minX
-                rowHeight = 0
-            }
+            if x + size.width > bounds.maxX, x > bounds.minX { y += rowHeight + spacing; x = bounds.minX; rowHeight = 0 }
             subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height)
         }
     }
 }
@@ -580,59 +488,34 @@ private struct _FlowLayout: Layout {
 
 private struct ImportTipCard: View {
     private struct TipRow: Identifiable {
-        let id = UUID()
-        let icon: String
-        let text: String
+        let id = UUID(); let icon: String; let text: String
     }
-
     private let rows: [TipRow] = [
-        .init(icon: "doc.badge.arrow.up",
-              text: "Export a GPX or GeoJSON file from any route planning app."),
-        .init(icon: "globe",
-              text: "Search online for \"GPX cycling routes [your city]\" to find free files shared by local riders."),
-        .init(icon: "square.and.arrow.down",
-              text: "Tap + above or the Import button, then pick the file from Files, Mail, or AirDrop."),
-        .init(icon: "map",
-              text: "Prefer to build your own? Head to the Plan tab to draw a route from scratch."),
+        .init(icon: "doc.badge.arrow.up",      text: "Export a GPX or GeoJSON file from any route planning app."),
+        .init(icon: "globe",                   text: "Search online for \"GPX cycling routes [your city]\" to find free files shared by local riders."),
+        .init(icon: "square.and.arrow.down",   text: "Tap + above or the Import button, then pick the file from Files, Mail, or AirDrop."),
+        .init(icon: "map",                     text: "Prefer to build your own? Head to the Plan tab to draw a route from scratch."),
     ]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.orange)
-                Text("How to add routes")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.primary)
+                Image(systemName: "lightbulb.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(.orange)
+                Text("How to add routes").font(.footnote.weight(.semibold)).foregroundStyle(.primary)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
-
+            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
             Divider().padding(.horizontal, 16)
-
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(rows) { row in
                     HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: row.icon)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20)
-                        Text(row.text)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Image(systemName: row.icon).font(.system(size: 14)).foregroundStyle(.secondary).frame(width: 20)
+                        Text(row.text).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
             .padding(16)
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
-        }
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Color(.systemGray4), lineWidth: 0.5) }
     }
 }
 
@@ -641,7 +524,6 @@ private struct ImportTipCard: View {
 private struct RouteRow: View {
     let route: RouteModel
     let isActive: Bool
-
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
@@ -652,59 +534,40 @@ private struct RouteRow: View {
                     .font(.system(size: 19))
                     .foregroundStyle(isActive ? iconTint : iconTint.opacity(0.7))
             }
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(route.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
                 HStack(spacing: 5) {
-                    PillBadge(icon: "arrow.left.and.right",
-                              label: String(format: "%.1f km", route.totalDistance / 1000))
-                    PillBadge(icon: "mountain.2",
-                              label: String(format: "%.0f m", route.elevationGain))
+                    PillBadge(icon: "arrow.left.and.right", label: String(format: "%.1f km", route.totalDistance / 1000))
+                    PillBadge(icon: "mountain.2",          label: String(format: "%.0f m",  route.elevationGain))
                     if isPlanned {
-                        PillBadge(icon: "map.fill", label: "PLANNED",
-                                  color: .purple, filled: true)
+                        PillBadge(icon: "map.fill",        label: "PLANNED", color: .purple, filled: true)
                     } else if isDrawn {
-                        PillBadge(icon: "pencil.and.map", label: "DRAWN",
-                                  color: .teal, filled: true)
+                        PillBadge(icon: "pencil.and.map",  label: "DRAWN",   color: .teal,   filled: true)
                     } else {
-                        PillBadge(icon: "doc",
-                                  label: route.sourceFormat.rawValue.uppercased())
+                        PillBadge(icon: "doc",             label: route.sourceFormat.rawValue.uppercased())
                     }
                 }
             }
-
             Spacer()
-
             if isActive {
                 ZStack {
                     Circle().fill(Color.blue).frame(width: 22, height: 22)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.white)
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white)
                 }
                 .transition(.scale.combined(with: .opacity))
             } else {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12).padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    isActive ? Color.blue.opacity(0.4) : Color.clear,
-                    lineWidth: 1.5
-                )
+                .strokeBorder(isActive ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1.5)
         }
         .animation(.spring(duration: 0.25), value: isActive)
     }
-
     private var isPlanned: Bool   { route.sourceFormat == .planned }
     private var isDrawn: Bool     { route.sourceFormat == .drawn }
     private var routeIcon: String {
@@ -726,11 +589,8 @@ private struct RouteRow: View {
 // MARK: - Pill Badge
 
 private struct PillBadge: View {
-    let icon: String
-    let label: String
-    var color: Color = .blue
-    var filled: Bool = false
-
+    let icon: String; let label: String
+    var color: Color = .blue; var filled: Bool = false
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 9, weight: .semibold))
