@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 17, 2026 — Sprint 4 in progress, F-C3 distance matching shipped
+> Last updated: May 23, 2026 — Sprint 5 core shipped (F-D Draw Route), Share-1 fixed
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -162,30 +162,39 @@
 
 ---
 
-## Sprint 5 — Draw Route (Strava Parity)
+## 🚧 Sprint 5 — Draw Route (Strava Parity)
 > Goal: finger-draw road-snapped route creation. User draws on the map; `MKDirections` snaps
 > gesture segments to the cycling road network in real time. Result feeds the existing
-> `AIPendingRouteCard` (Save / Discard / Start) with a green "DRAWN" badge.
+> `AIPendingRouteCard` (Save / Discard / Start) with a teal "DRAWN" badge.
 > Requires Sprint 3 `RouteStore.addAIPlannedRoute` ✅ (landed F-C2)
 
-- [ ] **F-D1 · `DrawRouteEngine` actor**
-  Segment stack, spatial + temporal debounce, in-flight guard, `MKDirections` snap,
-  snap failure handling, `undoLastSegment()`, `finaliseTrace()`, `reset()`.
-  → `Docs/Specs/F-D_DrawRoute.md`
-  **New file:** `iPhone/Services/DrawRouteEngine.swift`
+- [x] **F-D1 · `DrawRouteEngine`** ✅ May 23
+  `@Observable final class`, raw lat/lon Double storage (CLLocationCoordinate2D is @MainActor on iOS 26+),
+  segment stack, spatial debounce (180 m), temporal debounce (300 ms), in-flight guard,
+  `MKDirections(.cycling)` snap, snap failure handling, `undoLastSegment()`, `finaliseTrace()`, `reset()`.
+  → `Docs/Specs/F-D_DrawRoute.md` · **File:** `iPhone/Services/DrawRouteEngine.swift`
 
-- [ ] **F-D2 · `DrawRouteView` full-screen canvas**
-  Map canvas, dual polyline overlay (snapped solid + pending dashed + pulse animation),
-  top bar (Cancel / Undo), bottom bar (stats pill + Done), cancel confirmation dialog,
+- [x] **F-D2 · `DrawRouteView` full-screen canvas** ✅ May 23
+  Dual polyline overlay (snapped solid blue + pending dashed), top bar (Cancel / mode toggle / Undo),
+  bottom bar (hint label + stats pill + Done), cancel confirmation dialog,
   Done → `RouteModel(.drawn)` → `routeStore.addAIPlannedRoute`.
-  → `Docs/Specs/F-D_DrawRoute.md`
-  **New file:** `iPhone/Views/DrawRouteView.swift`
+  → `Docs/Specs/F-D_DrawRoute.md` · **File:** `iPhone/Views/DrawRouteView.swift`
 
-- [ ] **F-D3 · Wire into `RouteLibraryView` + `.drawn` source format**
-  Add `pencil.and.map` toolbar button, `.fullScreenCover` sheet presentation.
-  Add `.drawn` case to `sourceFormat` enum; update `RouteRow` pill to green "DRAWN".
+- [x] **F-D3 · Entry point → Plan tab** ✅ May 23
+  Entry point moved from `RouteLibraryView` toolbar to `WaypointListSheet.emptyPrompt`.
+  `showDrawRoute: @Binding Bool` threaded through `PlanView` → `WaypointListSheet`.
+  `.drawn` case added to `sourceFormat` enum; `RouteRow` renders teal "DRAWN" pill.
+  → `Docs/Specs/F-D_DrawRoute.md` · **Modified:** `PlanView.swift`, `WaypointListSheet.swift`, `RouteModel.swift`
+
+- [x] **F-D4 · Pan / Draw mode toggle** ✅ May 23
+  `DrawRouteView` defaults to pan mode. `pencil.circle` / `pencil.circle.fill` toolbar button toggles.
+  `Color.clear` overlay intercepts touches only in draw mode — Map pans normally otherwise.
+  Blue "Draw Mode" pill indicator at top of canvas. Haptic on toggle.
   → `Docs/Specs/F-D_DrawRoute.md`
-  **Modified:** `RouteLibraryView.swift`, `RouteModel.swift` (or enum source file)
+
+- [ ] **F-D5 · Inline route naming on Done** — _remaining Sprint 5 item_
+  `commitRoute()` currently hardcodes `"Drawn Route"`. Add inline `TextField` before commit,
+  or present `RouteRenameSheet` immediately after dismiss.
 
 ---
 
@@ -202,7 +211,8 @@
 | Force-unwrap on coordinate `min()`/`max()` | `RideSummaryView`, `RideHistoryView`, `RideHistoryDetailView` | Optional binding |
 | `RideSessionStore+Spurs.swift` internal property access | — | `private(set)` or dedicated spur service |
 | Generic "Import failed" message | `RouteStore.swift:79` | Differentiate corrupt file vs. I/O failure |
-| Draw Route waypoint-tap mode | F-D2 future | Drop pins, auto-connect — accessibility fallback for VoiceOver users |
+| Draw Route waypoint-tap mode | F-D future | Drop pins, auto-connect — accessibility fallback for VoiceOver users |
+| **Road surface annotation** | Post-ride enrichment | ⛔ **Parked — MapKit does not expose road surface type.** `MKRoute`/`MKRoute.Step` have no `isPaved`, `roadSurface`, or surface classification API. Apple Maps uses this data internally but does not expose it. All third-party implementations (Komoot, RideWithGPS, Strava) use OpenStreetMap `surface=` tags via Overpass API or Mapbox — both require external network calls. **Not viable for an on-device Apple-only stack.** Revisit only if Apple adds surface metadata to a future MapKit API. |
 
 ---
 
@@ -212,14 +222,13 @@
 Sprint 1: ✅ COMPLETE
 Sprint 2: ✅ COMPLETE
 Sprint 3: ✅ COMPLETE
-
-Sprint 4: Performance fixes in RideSessionStore ──► partial F-4 POITrackingEngine extract
-          F-3 RideView split (deferred from Sprint 3) ──► extract RideMapLayer + RideHUDPanel
-          Pre-submission polish items (no feature dependencies)
-          MISC-5 bearing() consolidation (do while in RideSessionStore for F-4)
+Sprint 4: ✅ COMPLETE
 
 Sprint 5: RouteStore.addAIPlannedRoute (Sprint 3 ✅) ──► F-D DrawRoute
-          F-D1 DrawRouteEngine ──► F-D2 DrawRouteView ──► F-D3 wire + .drawn sourceFormat
+          F-D1 DrawRouteEngine ✅ ──► F-D2 DrawRouteView ✅ ──► F-D3 entry point ✅ ──► F-D4 toggle ✅
+          Remaining: F-D5 inline naming
+
+Sprint 6: TBD — plan after F-D5 ships
 ```
 
 ---
