@@ -1,5 +1,5 @@
 # VeloGPXNeo — Roadmap
-> Last updated: May 16, 2026 — Sprint 3 complete, F-C1 + F-C2 shipped
+> Last updated: May 17, 2026 — Sprint 4 in progress, F-C3 distance matching shipped
 > Source of truth for sprint order. Each session: open this file first, pick the next item off the top, build it.
 > For implementation details → `DEVLOG.md` (current sprint), `FEATURES.md` (feature specs), `TECH_DEBT.md` (debt catalogue).
 
@@ -128,6 +128,23 @@
   ROADMAP said "wire or delete" → chose delete. Also deleted: NextPOIBanner, ReverseGeocodingService,
   root MKMapItem+POI.swift (stale, not compiled), 5 uncalled methods, 3 dead properties.
   → See `TECH_DEBT.md` for full list.
+
+- [x] **F-C3 · Distance-matching layer for AI route planning** ✅ May 17
+  LLM's `targetDistanceKm` and `suggestedName` were parsed but never read. Now wired through PlanState
+  → PlanRouteEngine.matchTargetDistance. Within ±15% tolerance: accept. Too short + loop: extend by
+  pushing return-segment midpoint perpendicular (max 2 attempts, 20 km push cap). Too short + P2P: warn.
+  Also fixed: AI assistant now triggers routing after waypoint population (was showing pins without polylines).
+  Also fixed: POI spur straight-line fallback removed (RideSessionStore+Spurs returns nil on MKDirections failure).
+  → `FEATURES.md § F-C` · New files touched: PlanState, PlanAssistantEngine, PlanRouteEngine, WaypointListSheet
+
+- [x] **MISC-5 · Partial: canonical `bearing(to:)` on CLLocationCoordinate2D** ✅ May 17
+  `bearing(to:)`, `midpoint(to:)`, `destination(bearing:distance:)` added to
+  `Shared/Extensions/CLLocationCoordinate2D+Extensions.swift`. Duplicates in RideSessionStore and
+  GPXCueEngine still remain — full dedup deferred to when those files are opened for Sprint 4 perf work.
+
+- [x] **UI · Reorder button → Re-route button** ✅ May 17
+  WaypointListSheet: replaced redundant drag-to-reorder toggle with Re-route button that calls
+  `engine.recomputeAll(in:)` — useful when MKDirections segments fail.
 
 - [ ] **P2 · Merge `POIDiscoverySheet` + `NearbySearchSheet`**
   One sheet with `mode: .preRide | .midRide`. Eliminates overlapping purpose before submission.

@@ -93,12 +93,20 @@ struct WaypointListSheet: View {
 
                 if plan.waypoints.count >= 2 && !isCollapsed {
                     Button {
-                        editMode = editMode == .active ? .inactive : .active
+                        Task { await engine.recomputeAll(in: plan) }
                     } label: {
-                        Text(editMode == .active ? "Done" : "Reorder")
-                            .font(.subheadline)
-                            .foregroundStyle(.blue)
+                        if plan.isRouting {
+                            HStack(spacing: 4) {
+                                ProgressView().scaleEffect(0.7)
+                                Text("Routing")
+                            }
+                        } else {
+                            Label("Re-route", systemImage: "arrow.triangle.2.circlepath")
+                        }
                     }
+                    .font(.subheadline)
+                    .foregroundStyle(.blue)
+                    .disabled(plan.isRouting)
                     .padding(.trailing, 8)
                 }
 

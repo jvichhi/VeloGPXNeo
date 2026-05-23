@@ -4,18 +4,33 @@
 
 ---
 
-## Current State — May 17, 2026
+## Current State — May 17, 2026 (end of night)
 
 **Build:** ✅ Clean — zero warnings, zero errors (iOS 26+, SwiftUI / MapKit / CoreLocation / FoundationModels)
 
 **Sprint 1:** ✅ Complete
 **Sprint 2:** ✅ Complete
 **Sprint 3:** ✅ Complete
-**Sprint 4:** In progress — dead code cleanup landed; perf fixes + god-object splits remaining.
+**Sprint 4:** In progress — dead code cleared, F-C3 distance matching landed, straight-line bugs fixed.
 
 **Next session starts at:** Sprint 4 · P2 perf fixes — `updateNextPOI` hot-path, `buildSnapIndexCache` offload, `elevationSamples` cache.
+(Sprint 5 F-D DrawRoute also unblocked — all prerequisites in place.)
 
 ---
+
+## Session Summary — May 17, 2026 (continued)
+
+| Item | Status | Notes |
+|---|---|---|
+| **F-C3** Distance-matching layer | ✅ | LLM's `targetDistanceKm` + `suggestedName` now wired. Loop extension algorithm pushes return-segment midpoint perpendicular when too short. ±15% tolerance, max 2 attempts, 20 km push cap. |
+| `CLLocationCoordinate2D` helpers | Added | `bearing(to:)`, `midpoint(to:)`, `destination(bearing:distance:)` — partial MISC-5 (canonical bearing now in extension; duplicates remain) |
+| PlanState fields | Added | `suggestedName`, `targetDistanceKm`, `distanceWarning` |
+| **Bug fix** AI assistant not triggering routing | ✅ | `PlanAssistantEngine` now calls `PlanRouteEngine.recomputeAll` after waypoint population. Fixes map showing pins without route polylines after AI plan. |
+| **Bug fix** POI spur straight-line fallback | ✅ | `RideSessionStore+Spurs.fetchLeg` returns nil on MKDirections failure instead of straight-line stub. Caller skips cache entry. |
+| Reorder → Re-route button | ✅ | WaypointListSheet Reorder button replaced with Re-route (triggers `recomputeAll`). |
+| README.md | Rewritten | Full rewrite for public GitHub: features, architecture, build steps, commit conventions. |
+| TECH_DEBT.md, ROADMAP.md | Updated | F-C3 entries added; dead code items checked off. |
+
 ## Session Summary — May 17, 2026
 
 | Item | Status | Notes |

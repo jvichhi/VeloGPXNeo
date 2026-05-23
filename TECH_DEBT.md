@@ -169,24 +169,16 @@ Either use it or replace with `_`.
 
 ---
 
-### MISC-5 — Duplicated `bearing()` haversine function [ 🔲 Open ]
+### MISC-5 — Duplicated `bearing()` haversine function [ 🔲 Partial — canonical added, duplicates remain ]
 
 **Affects:** `RideSessionStore.swift` · `RideView.swift` (confirmed via source search May 15, 2026)
 
 > ⚠️ **Was incorrectly marked resolved in ROADMAP.md** — reopened after source search confirmed `bearing()` present in both files.
 
-Extract to:
-```swift
-// Shared/Extensions/CLLocationCoordinate2D+Bearing.swift
-extension CLLocationCoordinate2D {
-    func bearing(to destination: CLLocationCoordinate2D) -> Double {
-        // single canonical implementation
-    }
-}
-```
-`GPXCueEngine` already has a `nonisolated` version — use that as the canonical one.
-Delete the duplicate from `RideSessionStore` and `RideView`.
-Scheduled for Sprint 4 alongside `RideSessionStore` F-4 split.
+**Progress May 17:** `bearing(to:)`, `midpoint(to:)`, and `destination(bearing:distance:)` added to
+`Shared/Extensions/CLLocationCoordinate2D+Extensions.swift` as part of F-C3 distance matching.
+These are the canonical implementations. Duplicates in `RideSessionStore` and `GPXCueEngine`
+still remain — full dedup deferred to when those files are opened for Sprint 4 perf work.
 
 ---
 
@@ -364,3 +356,9 @@ Add `private var notificationsGranted = false` and gate all `UNUserNotificationC
 | **Dead code** Root `MKMapItem+POI.swift` deleted (73 loc, not compiled) | May 17, 2026 |
 | **Dead code** 5 uncalled methods removed (searchAlongRoute, calculateAlternativeRoutes, importRoute(data:), stop(), clearError) | May 17, 2026 |
 | **Dead code** `TimeInterval.formattedDuration`, `ClimbCategory` thresholds, `POICategory.CaseIterable` removed | May 17, 2026 |
+| **F-C3** Distance-matching layer — `targetDistanceKm` + `suggestedName` wired, loop extension algorithm | May 17, 2026 |
+| **Bug fix** AI assistant now triggers routing after waypoint population | May 17, 2026 |
+| **Bug fix** POI spur straight-line fallback removed (nil on MKDirections failure) | May 17, 2026 |
+| **UI** Reorder button → Re-route button in WaypointListSheet | May 17, 2026 |
+| **README** Full rewrite for public GitHub | May 17, 2026 |
+| **MISC-5** Partial: canonical `bearing(to:)` added to CLLocationCoordinate2D extension | May 17, 2026 |
