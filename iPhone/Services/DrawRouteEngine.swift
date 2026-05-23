@@ -73,6 +73,7 @@ final class DrawRouteEngine: @unchecked Sendable {
 
     /// Short user-readable error from the last failed snap attempt.
     /// Shown as a 2-second toast; does not block drawing.
+    /// Use clearSnapError() to dismiss from outside this class.
     private(set) var lastSnapError: String? = nil
 
     // MARK: Private snap state
@@ -148,7 +149,6 @@ final class DrawRouteEngine: @unchecked Sendable {
             guard let self else { return }
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            // Only fire if we haven't already fired spatially and have content
             await self.handlePauseTimeout(destLat: capLat, destLon: capLon)
         }
     }
@@ -170,7 +170,6 @@ final class DrawRouteEngine: @unchecked Sendable {
     func undoLastSegment() {
         guard !segments.isEmpty else { return }
         segments.removeLast()
-        // Reset anchor to end of previous segment, or clear if stack now empty
         if let prev = segments.last, let lastLat = prev.latitudes.last, let lastLon = prev.longitudes.last {
             anchorLat = lastLat
             anchorLon = lastLon
@@ -189,6 +188,12 @@ final class DrawRouteEngine: @unchecked Sendable {
         isSnapping = false
         lastSnapError = nil
         hasAnchor = false
+    }
+
+    /// Clears the snap error toast. Called by DrawRouteView after the 2-second display.
+    @MainActor
+    func clearSnapError() {
+        lastSnapError = nil
     }
 
     // MARK: - Snap
@@ -225,10 +230,6 @@ final class DrawRouteEngine: @unchecked Sendable {
             let midLon = (originLon + destLon) / 2
             let midLocation = CLLocation(latitude: midLat, longitude: midLon)
             request.destination = MKMapItem(location: midLocation, address: nil)
-            // Note: MKDirections supports only source + destination; chaining is handled
-            // by splitting into two sequential requests when > 8 km.
-            // For now we use the midpoint as destination and accept the shorter snap.
-            // Full multi-leg chaining is out of scope for F-D.
         }
 
         do {
@@ -242,16 +243,9 @@ final class DrawRouteEngine: @unchecked Sendable {
             var coords = [CLLocationCoordinate2D](repeating: .init(), count: pointCount)
             route.polyline.getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
 
-            // Elevation gain from step altitude delta (best-effort; MKRoute.steps may have nil altitudes)
-            let gain = route.steps.reduce(0.0) { acc, step in
-                let pts = step.polyline.pointCount
-                guard pts >= 2 else { return acc }
-                var sc = [CLLocationCoordinate2D](repeating: .init(), count: pts)
-                step.polyline.getCoordinates(&sc, range: NSRange(location: 0, length: pts))
-                // MKRoute steps don't carry altitude — gain will be 0 unless CLLocation is used.
-                // Elevation is shown post-save in RouteDetailView via stored track points.
-                return acc
-            }
+            // Elevation gain — MKRoute steps don't carry altitude; gain will be 0.
+            // Elevation shown post-save in RouteDetailView via stored track points.
+            let gain = 0.0
 
             let segment = SnappedSegment(
                 coordinates: coords,
@@ -279,7 +273,7 @@ final class DrawRouteEngine: @unchecked Sendable {
     private func handlePauseTimeout(destLat: Double, destLon: Double) async {
         guard hasAnchor, !isSnapping, !pendingLats.isEmpty else { return }
         let distFromAnchor = haversineMetres(lat1: anchorLat, lon1: anchorLon, lat2: destLat, lon2: destLon)
-        guard distFromAnchor >= 5 else { return }   // ignore micro-jitter
+        guard distFromAnchor >= 5 else { return }
         await snapSegment(originLat: anchorLat, originLon: anchorLon,
                          destLat: destLat, destLon: destLon)
     }

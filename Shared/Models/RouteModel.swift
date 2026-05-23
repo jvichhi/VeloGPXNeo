@@ -88,6 +88,7 @@ public enum RouteFormat: String, Codable, Hashable, Sendable {
     case gpx
     case geojson
     case planned
+    case drawn
 }
 
 // MARK: - Cue Sheet

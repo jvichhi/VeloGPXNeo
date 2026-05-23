@@ -85,7 +85,7 @@ struct DrawRouteView: View {
                     .onAppear {
                         Task {
                             try? await Task.sleep(for: .seconds(2))
-                            engine.lastSnapError = nil
+                            engine.clearSnapError()
                         }
                     }
             }
@@ -120,8 +120,6 @@ struct DrawRouteView: View {
                 MapUserLocationButton()
                 MapCompass()
             }
-            // Disable default map pan during active draw stroke
-            // so the gesture goes to our DragGesture, not MapKit
             .simultaneousGesture(
                 DragGesture(minimumDistance: 2, coordinateSpace: .local)
                     .onChanged { value in
@@ -186,7 +184,6 @@ struct DrawRouteView: View {
                 guard !isDone else { return }
                 isDone = true
                 Task {
-                    // Finalise any remaining pending trace
                     await engine.finaliseTrace()
                     await commitRoute()
                     isDone = false
