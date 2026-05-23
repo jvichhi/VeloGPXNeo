@@ -5,10 +5,17 @@ import MapKit
 
 /// Full-screen sheet for finger-drawing a road-snapped cycling route (F-D).
 ///
-/// Entry point: `pencil.and.map` toolbar button in RouteLibraryView.
+/// Entry point: "Draw Route" row in WaypointListSheet emptyPrompt (PlanView).
 /// Exit paths:
 ///   - Cancel (with confirmation if content exists) → dismiss, no change
 ///   - Done → finalise snap → build RouteModel → routeStore.addAIPlannedRoute → dismiss
+///
+/// F-D4 (May 2026): Pan/Draw mode toggle.
+///   - Default state is PAN — map scrolls and zooms normally.
+///   - Tap the pencil toolbar button to enter DRAW mode — finger gestures
+///     are captured by DragGesture and fed to DrawRouteEngine; the map
+///     does NOT pan or zoom while draw mode is active.
+///   - Tap pencil again (or tap the map without drawing) to return to pan mode.
 struct DrawRouteView: View {
     @EnvironmentObject private var routeStore: RouteStore
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +24,10 @@ struct DrawRouteView: View {
     @State private var showCancelConfirm = false
     @State private var isDone = false
     @State private var mapPosition: MapCameraPosition = .userLocation(fallback: .automatic)
+    /// F-D4: false = pan mode (default), true = draw mode
+    @State private var isDrawMode: Bool = false
+
+    private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
         NavigationStack {
@@ -24,6 +35,15 @@ struct DrawRouteView: View {
 
                 // MARK: Map canvas
                 mapCanvas
+
+                // MARK: Mode indicator pill
+                if isDrawMode {
+                    drawModeIndicator
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
 
                 // MARK: Bottom bar
                 bottomBar
@@ -49,11 +69,23 @@ struct DrawRouteView: View {
                     .accessibilityLabel("Cancel drawing")
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // F-D4: Draw/Pan toggle
+                    Button {
+                        isDrawMode.toggle()
+                        haptic.impactOccurred()
+                    } label: {
+                        Image(systemName: isDrawMode ? "pencil.circle.fill" : "pencil.circle")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(isDrawMode ? Color.blue : Color.primary)
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel(isDrawMode ? "Switch to pan mode" : "Switch to draw mode")
+
+                    // Undo
                     Button {
                         engine.undoLastSegment()
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 15, weight: .semibold))
@@ -76,7 +108,6 @@ struct DrawRouteView: View {
                 Button("Keep Drawing", role: .cancel) {}
             }
         }
-        // Error toast
         .overlay(alignment: .top) {
             if let err = engine.lastSnapError {
                 snapErrorToast(err)
@@ -91,6 +122,23 @@ struct DrawRouteView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: engine.lastSnapError)
+        .animation(.spring(duration: 0.22), value: isDrawMode)
+    }
+
+    // MARK: - Draw Mode Indicator
+
+    private var drawModeIndicator: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "pencil")
+                .font(.system(size: 11, weight: .bold))
+            Text("Draw Mode — drag to trace your route")
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(Color.blue.opacity(0.88), in: Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
     }
 
     // MARK: - Map Canvas
@@ -120,16 +168,24 @@ struct DrawRouteView: View {
                 MapUserLocationButton()
                 MapCompass()
             }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 2, coordinateSpace: .local)
-                    .onChanged { value in
-                        guard let coord = proxy.convert(value.location, from: .local) else { return }
-                        engine.addGesturePoint(lat: coord.latitude, lon: coord.longitude)
-                    }
-                    .onEnded { _ in
-                        Task { await engine.finaliseTrace() }
-                    }
-            )
+            // F-D4: Only intercept drag when draw mode is active.
+            // When isDrawMode is false the Map receives gestures normally (pan/zoom).
+            .overlay {
+                if isDrawMode {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 2, coordinateSpace: .local)
+                                .onChanged { value in
+                                    guard let coord = proxy.convert(value.location, from: .local) else { return }
+                                    engine.addGesturePoint(lat: coord.latitude, lon: coord.longitude)
+                                }
+                                .onEnded { _ in
+                                    Task { await engine.finaliseTrace() }
+                                }
+                        )
+                }
+            }
         }
         .ignoresSafeArea()
     }
@@ -139,7 +195,6 @@ struct DrawRouteView: View {
     private var bottomBar: some View {
         VStack(spacing: 10) {
 
-            // Stats pill — hidden until first point placed
             if engine.hasContent {
                 HStack(spacing: 12) {
                     Label(
@@ -179,7 +234,18 @@ struct DrawRouteView: View {
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
 
-            // Done button
+            // Draw mode toggle hint — shown when map is empty and not yet in draw mode
+            if !engine.hasContent && !isDrawMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "pencil.circle")
+                        .foregroundStyle(.secondary)
+                    Text("Tap the pencil to start drawing")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .transition(.opacity)
+            }
+
             Button {
                 guard !isDone else { return }
                 isDone = true
@@ -191,8 +257,7 @@ struct DrawRouteView: View {
             } label: {
                 ZStack {
                     if isDone {
-                        ProgressView()
-                            .tint(.white)
+                        ProgressView().tint(.white)
                     } else {
                         Text("Done")
                             .font(.body.weight(.semibold))
@@ -210,6 +275,7 @@ struct DrawRouteView: View {
             .accessibilityLabel("Finish and save route")
         }
         .animation(.spring(duration: 0.25), value: engine.hasContent)
+        .animation(.spring(duration: 0.25), value: isDrawMode)
     }
 
     // MARK: - Snap error toast
