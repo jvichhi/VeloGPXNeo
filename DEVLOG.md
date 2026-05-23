@@ -4,21 +4,44 @@
 
 ---
 
-## Current State — May 17, 2026 (end of night)
+## Current State — May 23, 2026 (end of night)
 
 **Build:** ✅ Clean — zero warnings, zero errors (iOS 26+, SwiftUI / MapKit / CoreLocation / FoundationModels)
 
 **Sprint 1:** ✅ Complete
 **Sprint 2:** ✅ Complete
 **Sprint 3:** ✅ Complete
-**Sprint 4:** In progress — dead code cleared, F-C3 distance matching landed, straight-line bugs fixed.
+**Sprint 4:** ✅ Complete (stability pass + perf fixes)
+**Sprint 5 (F-D Draw Route):** ✅ Core shipped — `DrawRouteEngine` + `DrawRouteView` landed. F-D3 entry point moved. F-D4 pan/draw toggle landed.
 
-**Next session starts at:** Sprint 4 · P2 perf fixes — `updateNextPOI` hot-path, `buildSnapIndexCache` offload, `elevationSamples` cache.
-(Sprint 5 F-D DrawRoute also unblocked — all prerequisites in place.)
+**Next session starts at:** Sprint 5 remaining polish — inline route naming on Done (currently hardcodes `"Drawn Route"`), then Sprint 6 planning.
 
 ---
 
-## Session Summary — May 17, 2026 (continued)
+## Session Summary — May 23, 2026
+
+| Item | Status | Notes |
+|---|---|---|
+| **Share card empty bug analysis** | ✅ | Root cause identified: `mapSnapshot` nil race between `containerWidth` default `390` and `GeometryReader.onAppear`. Toggle planned/actual fixes it because `onAppear` has fired by then. Fix: nil-guard `snapshot` after `await generateSnapshot()` in `renderShareCard()`, surface error instead of rendering blank card. |
+| **F-D3: Draw Route entry point moved** | ✅ | Moved from `RouteLibraryView` toolbar button to `WaypointListSheet.emptyPrompt` in Plan tab. Matches Strava's model (creation in map/plan context, not library). `showDrawRoute: @Binding Bool` threaded through `PlanView` → `WaypointListSheet`. `RouteLibraryView` toolbar restored to single `+` import button. |
+| **F-D4: Pan/Draw mode toggle** | ✅ | `DrawRouteView` now defaults to **pan mode**. `pencil.circle` / `pencil.circle.fill` toolbar button toggles draw mode. `DragGesture` lives inside a `Color.clear` overlay that only exists when `isDrawMode == true` — map receives normal pan/zoom in pan mode. Blue "Draw Mode" pill indicator shown at top when active. Hint label shown in empty state. Haptic on toggle. |
+| **F-D spec updated** | ✅ | `Docs/Specs/F-D_DrawRoute.md` updated to reflect shipped implementation. |
+| **FEATURES.md updated** | ✅ | F-D moved from Backlog to Active/Shipped. |
+
+### Key Design Decisions This Session
+
+**Why pan mode is the default (not draw mode):**
+Strava uses a dedicated pencil toggle for the same reason — if every drag draws, there's no way to navigate the map to find the area you want to ride before starting. Default to pan so users can orient themselves first, then switch to draw.
+
+**Why `Color.clear` overlay instead of `simultaneousGesture`:**
+`simultaneousGesture` on `Map` fires both the map's internal pan gesture and the `DragGesture` simultaneously — the map pans while you draw, producing garbage coordinates. A `Color.clear` overlay with `.contentShape(Rectangle())` intercepts touches entirely when present, so `Map` never sees the draw gestures. When the overlay is absent (pan mode), `Map` gets all touches normally.
+
+**Share bug — why `containerWidth` causes the blank card:**
+On first Share tap, `containerWidth` is `390` (the hardcoded `@State` default) rather than the real device width — `GeometryReader.onAppear` hasn't fired yet relative to the share sheet presentation. `generateSnapshot()` either bails on `guard actual.count > 1` or the `MKMapSnapshotter` call fails silently (`catch {}`), leaving `mapSnapshot` nil. The card renders with `snapshot = nil` → blank. Toggling planned/actual fires a new `Task { await generateSnapshot() }` at which point `containerWidth` is correct, so it succeeds. Fix: nil-guard after `await generateSnapshot()` in `renderShareCard()` and surface the error rather than rendering blank.
+
+---
+
+## Session Summary — May 17, 2026 (end of night)
 
 | Item | Status | Notes |
 |---|---|---|
@@ -112,7 +135,9 @@ The `_FlowLayout` regression is a good example of a class of bugs that can sneak
 
 ## Open Bugs
 
-*(None — all P0/P1 bugs resolved. FlowLayout regression fixed in `aa6c614`.)*
+| # | Bug | Priority | Notes |
+|---|---|---|---|
+| Share-1 | Share card renders blank on first tap | P1 | Root cause: `mapSnapshot` nil due to `containerWidth` race. Fix: nil-guard after `await generateSnapshot()` in `renderShareCard()`. Toggle planned/actual is the workaround. |
 
 ---
 
@@ -120,14 +145,11 @@ The `_FlowLayout` regression is a good example of a class of bugs that can sneak
 
 | # | Feature | Sprint | Notes |
 |---|---|---|---|
-| F-C1 | RidePlanAssistant core | **3 — next** | `PlanAssistantEngine`, `RidePlanIntent+Generable`, `RidePlanAssistantView`, `DisambiguationSheet` |
-| F-C2 | RidePlanAssistant polish + partial F-3 | 3 | Stop icons, dwell time, Save/Discard UX; extract `RideMapLayer` + `RideHUDPanel` while in `RideView` |
-| F-3 | `RideView` god view split | 3 (incremental) | Extract `RideMapLayer` + `RideHUDPanel` during F-C2 |
-| F-4 | `RideSessionStore` god object split | 4 (incremental) | Extract `POITrackingEngine` during P2 perf fixes |
+| F-D polish | Draw Route — inline naming | 5 | `commitRoute()` currently hardcodes `"Drawn Route"`. Add inline `TextField` on Done, or a rename prompt post-dismiss. |
 
 ---
 
-## Remaining Warnings (Xcode) — End of May 15
+## Remaining Warnings (Xcode)
 
 **None.** Zero warnings, zero errors. Clean build confirmed.
 
@@ -141,36 +163,38 @@ This section exists so the next session doesn't re-learn these rules.
 - **`SystemLanguageModel.default`** — the on-device model. Never instantiate your own model.
 - **`LanguageModelSession(model:)`** — create a new session per request (they're lightweight). Do NOT hold a session as a long-lived `@State` or stored property on an actor.
 - **`session.respond(to: prompt)`** — use for plain `String` prompts where you want a plain `String` back. This is what `RideSummaryGenerator` and `RouteNameSuggester` use.
-- **`session.generate(from: schema)`** — use for `@Generable` structured output. This is what `RidePlanIntent+Generable` will use in Sprint 3.
+- **`session.generate(from: schema)`** — use for `@Generable` structured output. This is what `RidePlanIntent+Generable` uses.
 - **DO NOT use** `session.stream(from:onPartial:)` — removed in iOS 26 beta. The replacement is `respond(to:)` for strings and `generate(from:)` for structured types.
 
 ### Availability pattern
 - **`SystemLanguageModel.default.availability == .available`** — the single gate. Check this before creating any session.
-- **`nonisolated`** — any property that reads `SystemLanguageModel.default.availability` must be `nonisolated` if it might be called from a non-main-actor context (e.g., inside `.task {}` blocks, background actors).
+- **`nonisolated`** — any property that reads `SystemLanguageModel.default.availability` must be `nonisolated` if it might be called from a non-main-actor context.
 - **`@AppStorage(VeloAI.enabledKey)`** — user toggle. Always check `VeloAI.isAvailable && aiEnabled` together before showing AI UI or calling any service.
-- **Do NOT add `@available(iOS 26, *)`** to service structs — the deployment target is iOS 26. That annotation is redundant and was removed in `2f426ba`.
+- **Do NOT add `@available(iOS 26, *)`** to service structs — the deployment target is iOS 26.
 
 ### Watch target exclusion
-`FoundationModels` is an **iPhone-only framework**. The following files must **never** be added to the Watch target in Build Phases:
+`FoundationModels` is an **iPhone-only framework**. The following files must **never** be added to the Watch target:
 - `VeloAI.swift`
 - `RouteNameSuggester.swift`
 - `RideSummaryGenerator.swift`
 - `POIRankingEngine.swift`
-- (Sprint 3) `PlanAssistantEngine.swift`, `RidePlanIntent+Generable.swift`
+- `PlanAssistantEngine.swift`, `RidePlanIntent+Generable.swift`
 
 ### MKReverseGeocodingRequest (iOS 26)
-- **`CLGeocoder` is deprecated on iOS 18+.** Never use it. PROJECT.md flags this explicitly.
-- Use `MKReverseGeocodingRequest(coordinate:)` → `req.response` (async/await, no completion handler).
-- Returns `MKReverseGeocodingResponse` with a `.placemark: MKPlacemark`. Read `.locality` or `.subLocality` for city/neighbourhood names.
+- **`CLGeocoder` is deprecated on iOS 18+.** Never use it.
+- Use `MKReverseGeocodingRequest(coordinate:)` → `req.response` (async/await).
+- Returns `MKReverseGeocodingResponse` with a `.placemark: MKPlacemark`. Read `.locality` or `.subLocality`.
 
 ---
 
 ## Notes / Watch-outs
 
-- **iOS 26+ only.** No backward-compatibility shims. Gate with `#available` only for Watch-target-safe files (e.g., `MKMapItem.identifier`).
-- **`FoundationModels` is iOS only** — never add AI service files to the Watch target (see above).
-- **`_FlowLayout` must never hold `@ViewBuilder` storage** — it conforms to `Layout`, not `View`. The `FlowLayout` View wrapper owns the content; `_FlowLayout` receives subviews from the engine.
+- **iOS 26+ only.** No backward-compatibility shims.
+- **`FoundationModels` is iOS only** — never add AI service files to the Watch target.
+- **`_FlowLayout` must never hold `@ViewBuilder` storage** — conforms to `Layout`, not `View`.
 - **`CLGeocoder` is deprecated** — use `MKReverseGeocodingRequest` everywhere.
 - **`session.respond(to:)`** for plain string I/O, **`session.generate(from:)`** for `@Generable` structured output.
-- `RideSessionStore.swift` is ~30 KB. F-4 split is overdue — do incrementally during Sprint 4.
+- **`DrawRouteView` `Color.clear` overlay pattern** — DragGesture lives inside a `Color.clear` overlay, not `.simultaneousGesture`. This is intentional: `simultaneousGesture` fires the map pan AND the draw gesture together, producing bad coordinates. The overlay intercepts all touches when present; Map gets them normally when absent.
+- **`DrawRouteEngine` stores raw `Double` lat/lon**, not `CLLocationCoordinate2D` — because `CLLocationCoordinate2D` is `@MainActor` on iOS 26+, making it non-Sendable across actor boundaries. `@MainActor` computed properties on the engine convert back to `CLLocationCoordinate2D` for SwiftUI consumption.
+- `RideSessionStore.swift` is ~30 KB. F-4 split is overdue — do incrementally during Sprint 5/6.
 - `POIDiscoverySheet` vs `NearbySearchSheet` overlap — merge into `mode: .preRide | .midRide` before 1.0.
