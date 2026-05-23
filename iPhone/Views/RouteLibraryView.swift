@@ -9,6 +9,8 @@ struct RouteLibraryView: View {
     @State private var showImportAlert = false
     // F-A2: rename sheet
     @State private var routeToRename: RouteModel? = nil
+    // F-D3: draw route sheet
+    @State private var showDrawRoute = false
 
     var body: some View {
         NavigationStack {
@@ -22,13 +24,24 @@ struct RouteLibraryView: View {
             .navigationTitle("Routes")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // F-D3: Draw route
+                    Button { showDrawRoute = true } label: {
+                        Image(systemName: "pencil.and.map")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 32, height: 32)
+                            .background(.tint.opacity(0.12), in: Circle())
+                    }
+                    .accessibilityLabel("Draw a route")
+
+                    // Import GPX / GeoJSON
                     Button { isImporterPresented = true } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
                             .frame(width: 32, height: 32)
                             .background(.tint.opacity(0.12), in: Circle())
                     }
+                    .accessibilityLabel("Import a route file")
                 }
             }
             .fileImporter(
@@ -63,6 +76,11 @@ struct RouteLibraryView: View {
                 routeStore.renameRoute(route, to: newName)
             }
             .environmentObject(routeStore)
+        }
+        // F-D3: Draw route sheet
+        .sheet(isPresented: $showDrawRoute) {
+            DrawRouteView()
+                .environmentObject(routeStore)
         }
     }
 
@@ -649,6 +667,9 @@ private struct RouteRow: View {
                     if isPlanned {
                         PillBadge(icon: "map.fill", label: "PLANNED",
                                   color: .purple, filled: true)
+                    } else if isDrawn {
+                        PillBadge(icon: "pencil.and.map", label: "DRAWN",
+                                  color: .teal, filled: true)
                     } else {
                         PillBadge(icon: "doc",
                                   label: route.sourceFormat.rawValue.uppercased())
@@ -685,8 +706,21 @@ private struct RouteRow: View {
     }
 
     private var isPlanned: Bool   { route.sourceFormat == .planned }
-    private var routeIcon: String { isPlanned ? "map.fill" : "figure.outdoor.cycle" }
-    private var iconTint: Color   { isPlanned ? .purple : .blue }
+    private var isDrawn: Bool     { route.sourceFormat == .drawn }
+    private var routeIcon: String {
+        switch route.sourceFormat {
+        case .planned: return "map.fill"
+        case .drawn:   return "pencil.and.map"
+        default:       return "figure.outdoor.cycle"
+        }
+    }
+    private var iconTint: Color {
+        switch route.sourceFormat {
+        case .planned: return .purple
+        case .drawn:   return .teal
+        default:       return .blue
+        }
+    }
 }
 
 // MARK: - Pill Badge
