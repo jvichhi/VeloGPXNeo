@@ -46,6 +46,15 @@ final class RouteStore: ObservableObject {
         aiPlannedRoute = route
     }
 
+    /// Rename the in-memory pending AI/drawn plan without persisting.
+    /// Called from RouteRenameSheet's onSave closure (F-D5).
+    /// The new name will be persisted when saveAIPlannedRoute() is called.
+    func renameAIPlannedRoute(to newName: String) {
+        guard var route = aiPlannedRoute else { return }
+        route.name = newName
+        aiPlannedRoute = route
+    }
+
     /// Persist the pending AI plan into the permanent route library and clear it.
     /// Equivalent to calling addPlannedRoute then discarding the in-memory copy.
     func saveAIPlannedRoute() {

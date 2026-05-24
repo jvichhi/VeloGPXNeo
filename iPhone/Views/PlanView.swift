@@ -123,12 +123,16 @@ struct PlanView: View {
                 nearLon: mapCentre.longitude
             )
         }
-        // F-D5: Name the drawn route immediately after commit
-        .sheet(item: $drawnRouteToRename) { route in
-            RouteRenameSheet(route: route) { newName in
-                routeStore.renameAIPlannedRoute(to: newName)
+        // F-D5: Name the drawn route immediately after commit.
+        // Capture routeStore as a local constant so the closure does not
+        // reference the @EnvironmentObject wrapper directly, which causes
+        // the "Referencing subscript requires EnvironmentObject.Wrapper" error.
+        .sheet(item: $drawnRouteToRename) { _ in
+            let store = routeStore
+            RouteRenameSheet(route: drawnRouteToRename!) { newName in
+                store.renameAIPlannedRoute(to: newName)
             }
-            .environmentObject(routeStore)
+            .environmentObject(store)
         }
     }
 
@@ -374,7 +378,7 @@ struct PlanView: View {
         routeStore.addAIPlannedRoute(route)
         drawEngine.reset()
         withAnimation(.spring(duration: 0.25)) { isDrawModeActive = false }
-        // Present rename sheet — drawnRouteToRename drives .sheet(item:)
+        // Trigger F-D5 rename sheet
         drawnRouteToRename = route
     }
 
