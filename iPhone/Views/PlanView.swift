@@ -35,6 +35,9 @@ struct PlanView: View {
     @State private var isDrawDone: Bool = false
     private let drawHaptic = UIImpactFeedbackGenerator(style: .medium)
 
+    // MARK: F-D5 — route naming after draw commit
+    @State private var drawnRouteToRename: RouteModel? = nil
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -119,6 +122,13 @@ struct PlanView: View {
                 nearLat: mapCentre.latitude,
                 nearLon: mapCentre.longitude
             )
+        }
+        // F-D5: Name the drawn route immediately after commit
+        .sheet(item: $drawnRouteToRename) { route in
+            RouteRenameSheet(route: route) { newName in
+                routeStore.renameAIPlannedRoute(to: newName)
+            }
+            .environmentObject(routeStore)
         }
     }
 
@@ -346,7 +356,10 @@ struct PlanView: View {
         .padding(.bottom, geo.safeAreaInsets.bottom > 0 ? geo.safeAreaInsets.bottom : 16)
     }
 
-    // MARK: - Commit drawn route
+    // MARK: - Commit drawn route (F-D5)
+    // Builds a temporary RouteModel with a placeholder name, commits it to the
+    // aiPlannedRoute slot, then hands it to RouteRenameSheet so the user can
+    // pick a proper name (with AI suggestions) before the pending card appears.
 
     @MainActor
     private func commitDrawnRoute() async {
@@ -361,6 +374,8 @@ struct PlanView: View {
         routeStore.addAIPlannedRoute(route)
         drawEngine.reset()
         withAnimation(.spring(duration: 0.25)) { isDrawModeActive = false }
+        // Present rename sheet — drawnRouteToRename drives .sheet(item:)
+        drawnRouteToRename = route
     }
 
     // MARK: - Snap error toast
