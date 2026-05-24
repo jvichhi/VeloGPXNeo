@@ -38,6 +38,12 @@ struct PlanView: View {
     // MARK: F-D5 — route naming after draw commit
     @State private var drawnRouteToRename: RouteModel? = nil
 
+    // MARK: Canvas preview state
+    // Stored separately as plain [CGPoint] so the Canvas overlay can redraw
+    // every frame without going through MapProxy on each render pass.
+    @State private var liveStrokePoints: [CGPoint] = []
+    @State private var mapProxyRef: MapProxy? = nil
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -45,6 +51,15 @@ struct PlanView: View {
                 mapLayer(geo: geo)
                     .ignoresSafeArea()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // F-D: Canvas live-preview overlay.
+                // Only present in draw mode — zero cost during normal planning.
+                if isDrawModeActive {
+                    drawCanvasOverlay(geo: geo)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .zIndex(3)
+                }
 
                 mapControlsOverlay(geo: geo)
                     .zIndex(5)
@@ -124,9 +139,6 @@ struct PlanView: View {
             )
         }
         // F-D5: Name the drawn route immediately after commit.
-        // Capture routeStore as a local constant so the closure does not
-        // reference the @EnvironmentObject wrapper directly, which causes
-        // the "Referencing subscript requires EnvironmentObject.Wrapper" error.
         .sheet(item: $drawnRouteToRename) { _ in
             let store = routeStore
             RouteRenameSheet(route: drawnRouteToRename!) { newName in
@@ -134,6 +146,37 @@ struct PlanView: View {
             }
             .environmentObject(store)
         }
+    }
+
+    // MARK: - Canvas live preview
+    //
+    // Draws the current finger stroke as a dashed teal line directly in screen
+    // space. Because this is a plain SwiftUI Canvas (not MapPolyline inside Map
+    // content), it observes @Observable drawEngine mutations immediately and
+    // redraws every time addGesturePoint is called — no SwiftUI map-content
+    // scheduling delay.
+    //
+    // liveStrokePoints are CGPoints in the local coordinate space of the overlay,
+    // captured directly from DragGesture.value.location so no MapProxy conversion
+    // is needed for the preview path.
+
+    private func drawCanvasOverlay(geo: GeometryProxy) -> some View {
+        Canvas { context, size in
+            guard liveStrokePoints.count >= 2 else { return }
+
+            var path = Path()
+            path.move(to: liveStrokePoints[0])
+            for pt in liveStrokePoints.dropFirst() {
+                path.addLine(to: pt)
+            }
+
+            context.stroke(
+                path,
+                with: .color(.teal.opacity(0.75)),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: [10, 6])
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Map Controls Overlay
@@ -168,7 +211,10 @@ struct PlanView: View {
             Button {
                 withAnimation(.spring(duration: 0.25)) {
                     isDrawModeActive.toggle()
-                    if !isDrawModeActive { drawEngine.reset() }
+                    if !isDrawModeActive {
+                        drawEngine.reset()
+                        liveStrokePoints = []
+                    }
                 }
                 drawHaptic.impactOccurred()
             } label: {
@@ -192,7 +238,7 @@ struct PlanView: View {
     private func mapLayer(geo: GeometryProxy) -> some View {
         MapReader { proxy in
             Map(position: $position) {
-                // Waypoint planning polyline
+                // Waypoint planning polyline — unchanged
                 if !plan.routePolyline.isEmpty {
                     MapPolyline(coordinates: plan.routePolyline)
                         .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
@@ -214,17 +260,12 @@ struct PlanView: View {
                     }
                 }
 
-                // F-D inline draw polylines
+                // F-D: snapped segments only (solid teal).
+                // Pending live preview is handled by Canvas overlay above —
+                // removed MapPolyline for pending coords (was the source of the delay).
                 if drawEngine.allSnappedCoordinates.count >= 2 {
                     MapPolyline(coordinates: drawEngine.allSnappedCoordinates)
                         .stroke(.teal, lineWidth: 4)
-                }
-                if drawEngine.pendingCoordinates.count >= 2 {
-                    MapPolyline(coordinates: drawEngine.pendingCoordinates)
-                        .stroke(
-                            .teal.opacity(drawEngine.isSnapping ? 0.4 : 0.65),
-                            style: StrokeStyle(lineWidth: 2, dash: [6, 4])
-                        )
                 }
 
                 UserAnnotation()
@@ -237,7 +278,7 @@ struct PlanView: View {
             .onMapCameraChange { context in
                 mapCentre = context.camera.centerCoordinate
             }
-            // Tap-to-waypoint: disabled in draw mode
+            // Tap-to-waypoint: disabled in draw mode — unchanged
             .onTapGesture { screenPoint in
                 guard !isDrawModeActive else { return }
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
@@ -247,18 +288,27 @@ struct PlanView: View {
                     Task { await engine.refreshSegments(in: plan, affectedWaypointIndices: [before]) }
                 }
             }
-            // F-D: draw gesture overlay — only active in draw mode
+            // F-D: draw gesture overlay — only active in draw mode.
+            // .onChanged appends to liveStrokePoints (CGPoint screen space) for
+            // immediate Canvas preview AND sends lat/lon to drawEngine for snap.
+            // .onEnded clears liveStrokePoints and fires finaliseStroke().
             .overlay {
                 if isDrawModeActive {
                     Color.clear
                         .contentShape(Rectangle())
                         .gesture(
-                            DragGesture(minimumDistance: 2, coordinateSpace: .local)
+                            DragGesture(minimumDistance: 0, coordinateSpace: .local)
                                 .onChanged { value in
+                                    // 1. Append screen point for instant Canvas preview
+                                    liveStrokePoints.append(value.location)
+                                    // 2. Convert to map coordinate for engine
                                     guard let coord = proxy.convert(value.location, from: .local) else { return }
                                     drawEngine.addGesturePoint(lat: coord.latitude, lon: coord.longitude)
                                 }
                                 .onEnded { _ in
+                                    // Clear preview immediately so Canvas goes blank
+                                    // while the snap request is in flight
+                                    liveStrokePoints = []
                                     Task { await drawEngine.finaliseStroke() }
                                 }
                         )
@@ -361,9 +411,6 @@ struct PlanView: View {
     }
 
     // MARK: - Commit drawn route (F-D5)
-    // Builds a temporary RouteModel with a placeholder name, commits it to the
-    // aiPlannedRoute slot, then hands it to RouteRenameSheet so the user can
-    // pick a proper name (with AI suggestions) before the pending card appears.
 
     @MainActor
     private func commitDrawnRoute() async {
@@ -377,8 +424,8 @@ struct PlanView: View {
         )
         routeStore.addAIPlannedRoute(route)
         drawEngine.reset()
+        liveStrokePoints = []
         withAnimation(.spring(duration: 0.25)) { isDrawModeActive = false }
-        // Trigger F-D5 rename sheet
         drawnRouteToRename = route
     }
 

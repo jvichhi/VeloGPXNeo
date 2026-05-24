@@ -5,11 +5,12 @@
 //  F-D: Draw Route engine.
 //  CHANGED (Sprint 5 · F-D5 overhaul):
 //    - Removed spatial debounce (180 m) and temporal debounce (300 ms).
-//    - Snap now fires ONLY on gesture lift (.onEnded) via finaliseStroke().
-//      This eliminates mid-stroke zigzag detours (see screenshot 3 analysis).
-//    - finaliseTrace() renamed → finaliseStroke() for clarity; same semantics.
-//    - pauseTask / handlePauseTimeout removed entirely.
-//    - finaliseTrace() compatibility alias removed (DrawRouteView deleted).
+//    - Snap fires ONLY on gesture lift (.onEnded) via finaliseStroke().
+//    - finaliseTrace() compat alias removed (DrawRouteView deleted).
+//  FIX (draw preview + 100m snap bug):
+//    - pendingLats/pendingLons cleared AFTER dest coords captured in finaliseStroke.
+//    - snapSegment clears pending array at start but receives origin/dest as
+//      explicit params — no dependency on array state during async execution.
 
 import Foundation
 import CoreLocation
@@ -51,10 +52,13 @@ struct SnappedSegment: Sendable {
 
 /// Observable engine for the finger-draw route builder (F-D).
 ///
-/// Gesture pipeline (snap-on-lift model — matches Strava UX):
-///   DragGesture .onChange  → addGesturePoint()   — accumulates pendingLats/pendingLons ONLY
-///   DragGesture .onEnded   → finaliseStroke()     — snaps full pending trace as one MKDirections call
-///   Done button            → finaliseStroke()     — flushes any open stroke before commit
+/// Gesture pipeline (snap-on-lift — Strava model):
+///   DragGesture .onChange  → addGesturePoint()  — accumulates pendingLats/pendingLons ONLY
+///   DragGesture .onEnded   → finaliseStroke()    — snaps full pending trace as one MKDirections call
+///   Done button            → finaliseStroke()    — flushes any open stroke before commit
+///
+/// Live preview is handled by a Canvas overlay in PlanView using screen-space
+/// CGPoints from DragGesture directly — no MapPolyline scheduling delay.
 ///
 /// Concurrency:
 ///   CLLocationCoordinate2D is @MainActor on iOS 26+ — never stored in Sendable types.
@@ -101,7 +105,7 @@ final class DrawRouteEngine: @unchecked Sendable {
 
     // MARK: - Gesture Input
 
-    /// Called on every DragGesture .onChange point (coordinate already converted by MapProxy).
+    /// Called on every DragGesture .onChange point.
     /// ONLY accumulates the pending trace — no snap fires mid-stroke.
     @MainActor
     func addGesturePoint(lat: Double, lon: Double) {
@@ -116,11 +120,16 @@ final class DrawRouteEngine: @unchecked Sendable {
 
     /// Called on DragGesture .onEnded — snaps the full pending stroke as one segment.
     /// Also called by the Done button to flush any open stroke.
+    /// Captures origin/dest BEFORE clearing the pending arrays.
     @MainActor
     func finaliseStroke() async {
         guard hasAnchor, !pendingLats.isEmpty else { return }
+        // Capture dest coords before any clearing happens
         guard let destLat = pendingLats.last, let destLon = pendingLons.last else { return }
         guard !isSnapping else { return }
+        // Clear pending display immediately (Canvas already cleared by PlanView on .onEnded)
+        pendingLats = []
+        pendingLons = []
         await snapSegment(originLat: anchorLat, originLon: anchorLon,
                           destLat: destLat, destLon: destLon)
     }
@@ -157,17 +166,15 @@ final class DrawRouteEngine: @unchecked Sendable {
     // MARK: - Snap
 
     /// Fires one MKDirections(.cycling) request origin→destination.
-    /// Inserts a midpoint waypoint when the straight-line distance exceeds 8 km.
+    /// origin and dest are passed as explicit params — no dependency on
+    /// pendingLats/pendingLons state during async execution.
+    /// Inserts a midpoint waypoint when straight-line distance exceeds 8 km.
     @MainActor
     private func snapSegment(originLat: Double, originLon: Double,
                               destLat: Double, destLon: Double) async {
         guard !isSnapping else { return }
         isSnapping = true
         defer { isSnapping = false }
-
-        // Clear pending trace so UI doesn't linger
-        pendingLats = []
-        pendingLons = []
 
         let straightLine = haversineMetres(lat1: originLat, lon1: originLon, lat2: destLat, lon2: destLon)
 
@@ -200,12 +207,14 @@ final class DrawRouteEngine: @unchecked Sendable {
             let segment = SnappedSegment(coordinates: coords, distance: route.distance, elevationGain: 0)
             segments.append(segment)
 
+            // Advance anchor to end of this segment for next stroke
             anchorLat = destLat
             anchorLon = destLon
             lastSnapError = nil
 
         } catch {
             lastSnapError = "Couldn't snap to road — try drawing closer to a path"
+            // Still advance anchor so next stroke has a valid origin
             anchorLat = destLat
             anchorLon = destLon
         }
