@@ -9,6 +9,7 @@
 //      This eliminates mid-stroke zigzag detours (see screenshot 3 analysis).
 //    - finaliseTrace() renamed → finaliseStroke() for clarity; same semantics.
 //    - pauseTask / handlePauseTimeout removed entirely.
+//    - finaliseTrace() compatibility alias removed (DrawRouteView deleted).
 
 import Foundation
 import CoreLocation
@@ -151,15 +152,6 @@ final class DrawRouteEngine: @unchecked Sendable {
     @MainActor
     func clearSnapError() {
         lastSnapError = nil
-    }
-
-    // MARK: - Compatibility alias
-
-    /// Deprecated — kept so DrawRouteView compiles during step-by-step migration.
-    /// Will be removed when DrawRouteView is replaced by inline draw mode in PlanView.
-    @MainActor
-    func finaliseTrace() async {
-        await finaliseStroke()
     }
 
     // MARK: - Snap
