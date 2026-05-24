@@ -26,10 +26,16 @@ struct PlanView: View {
     @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
     @State private var showAssistant = false
-    // F-D3: draw route sheet
+    // F-D3: legacy draw route sheet (kept for Step 2 build verification; removed in Step 3)
     @State private var showDrawRoute = false
     /// Last known map centre — updated via onMapCameraChange.
     @State private var mapCentre: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673)
+
+    // MARK: Inline draw mode (F-D overhaul)
+    @State private var drawEngine = DrawRouteEngine()
+    @State private var isDrawModeActive: Bool = false
+    @State private var isDrawDone: Bool = false
+    private let drawHaptic = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
         GeometryReader { geo in
@@ -50,11 +56,34 @@ struct PlanView: View {
                         .zIndex(20)
                 }
 
-                drawerCard(geo: geo)
-                    .padding(.bottom, 8)
-                    .zIndex(10)
+                // Draw mode snap-error toast
+                if let snapErr = drawEngine.lastSnapError {
+                    snapErrorToast(snapErr)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 56)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(20)
+                        .onAppear {
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                drawEngine.clearSnapError()
+                            }
+                        }
+                }
+
+                if isDrawModeActive {
+                    // Draw mode replaces drawer with a slim bottom bar
+                    drawBottomBar(geo: geo)
+                        .zIndex(10)
+                } else {
+                    drawerCard(geo: geo)
+                        .padding(.bottom, 8)
+                        .zIndex(10)
+                }
             }
         }
+        .animation(.spring(duration: 0.28), value: isDrawModeActive)
+        .animation(.spring(duration: 0.3), value: drawEngine.lastSnapError)
         .task {
             let routeToLoad = routeStore.routeToEditInPlan ?? preloadRoute
             if let route = routeToLoad {
@@ -94,7 +123,7 @@ struct PlanView: View {
                 nearLon: mapCentre.longitude
             )
         }
-        // F-D3: Draw Route sheet
+        // F-D3 legacy sheet — kept for Step 2 build verification; removed in Step 3
         .sheet(isPresented: $showDrawRoute) {
             DrawRouteView()
                 .environmentObject(routeStore)
@@ -128,6 +157,23 @@ struct PlanView: View {
                     .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
             }
             .accessibilityLabel(isPitchEnabled ? "Switch to flat map" : "Switch to 3D map")
+
+            // F-D inline draw toggle
+            Button {
+                withAnimation(.spring(duration: 0.25)) {
+                    isDrawModeActive.toggle()
+                    if !isDrawModeActive { drawEngine.reset() }
+                }
+                drawHaptic.impactOccurred()
+            } label: {
+                Image(systemName: isDrawModeActive ? "pencil.circle.fill" : "pencil.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(isDrawModeActive ? Color.blue : Color.primary)
+                    .frame(width: 42, height: 42)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            }
+            .accessibilityLabel(isDrawModeActive ? "Exit draw mode" : "Enter draw mode")
         }
         .padding(.top, geo.safeAreaInsets.top + 8)
         .padding(.trailing, 12)
@@ -140,6 +186,7 @@ struct PlanView: View {
     private func mapLayer(geo: GeometryProxy) -> some View {
         MapReader { proxy in
             Map(position: $position) {
+                // Waypoint planning polyline
                 if !plan.routePolyline.isEmpty {
                     MapPolyline(coordinates: plan.routePolyline)
                         .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
@@ -161,6 +208,19 @@ struct PlanView: View {
                     }
                 }
 
+                // F-D inline draw polylines
+                if drawEngine.allSnappedCoordinates.count >= 2 {
+                    MapPolyline(coordinates: drawEngine.allSnappedCoordinates)
+                        .stroke(.teal, lineWidth: 4)
+                }
+                if drawEngine.pendingCoordinates.count >= 2 {
+                    MapPolyline(coordinates: drawEngine.pendingCoordinates)
+                        .stroke(
+                            .teal.opacity(drawEngine.isSnapping ? 0.4 : 0.65),
+                            style: StrokeStyle(lineWidth: 2, dash: [6, 4])
+                        )
+                }
+
                 UserAnnotation()
             }
             .mapStyle(isPitchEnabled
@@ -171,7 +231,9 @@ struct PlanView: View {
             .onMapCameraChange { context in
                 mapCentre = context.camera.centerCoordinate
             }
+            // Tap-to-waypoint: disabled in draw mode so taps don't drop waypoints
             .onTapGesture { screenPoint in
+                guard !isDrawModeActive else { return }
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
                 let before = plan.waypoints.count
                 plan.addWaypoint(coord)
@@ -179,7 +241,152 @@ struct PlanView: View {
                     Task { await engine.refreshSegments(in: plan, affectedWaypointIndices: [before]) }
                 }
             }
+            // F-D: draw gesture overlay — only active in draw mode
+            .overlay {
+                if isDrawModeActive {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 2, coordinateSpace: .local)
+                                .onChanged { value in
+                                    guard let coord = proxy.convert(value.location, from: .local) else { return }
+                                    drawEngine.addGesturePoint(lat: coord.latitude, lon: coord.longitude)
+                                }
+                                .onEnded { _ in
+                                    Task { await drawEngine.finaliseStroke() }
+                                }
+                        )
+                }
+            }
         }
+    }
+
+    // MARK: - Draw mode bottom bar
+
+    private func drawBottomBar(geo: GeometryProxy) -> some View {
+        VStack(spacing: 10) {
+
+            // Draw mode label
+            HStack(spacing: 6) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 11, weight: .bold))
+                Text("Draw Mode — drag to trace your route")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.teal.opacity(0.88), in: Capsule())
+
+            // Stats + Undo + Done row
+            HStack(spacing: 12) {
+                if drawEngine.hasContent {
+                    Label(
+                        String(format: "%.1f km", drawEngine.totalDistance / 1000),
+                        systemImage: "arrow.left.and.right"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Divider().frame(height: 14)
+
+                    Label(
+                        String(format: "%.0f m", drawEngine.totalElevationGain),
+                        systemImage: "mountain.2"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    if drawEngine.isSnapping {
+                        Divider().frame(height: 14)
+                        ProgressView().controlSize(.mini).tint(.secondary)
+                    }
+
+                    Spacer()
+                } else {
+                    Text("Lift finger to snap each stroke")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+
+                // Undo
+                Button {
+                    drawEngine.undoLastSegment()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 36, height: 36)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .disabled(!drawEngine.canUndo)
+                .accessibilityLabel("Undo last segment")
+
+                // Done
+                Button {
+                    guard !isDrawDone else { return }
+                    isDrawDone = true
+                    Task {
+                        await drawEngine.finaliseStroke()
+                        await commitDrawnRoute()
+                        isDrawDone = false
+                    }
+                } label: {
+                    ZStack {
+                        if isDrawDone {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Done")
+                                .font(.body.weight(.semibold))
+                        }
+                    }
+                    .frame(width: 72)
+                    .padding(.vertical, 10)
+                    .background(
+                        drawEngine.segments.isEmpty ? Color(.systemGray4) : Color.teal,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .foregroundStyle(.white)
+                }
+                .disabled(drawEngine.segments.isEmpty || isDrawDone)
+                .accessibilityLabel("Finish and save drawn route")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.12), radius: 8, y: -2)
+            .padding(.horizontal, 16)
+        }
+        .padding(.bottom, geo.safeAreaInsets.bottom > 0 ? geo.safeAreaInsets.bottom : 16)
+    }
+
+    // MARK: - Commit drawn route
+
+    @MainActor
+    private func commitDrawnRoute() async {
+        let coords = drawEngine.allSnappedCoordinates
+        guard coords.count >= 2 else { return }
+        let trackPoints = coords.map { TrackPoint(coordinate: $0, elevation: nil, timestamp: nil) }
+        let route = RouteModel(
+            name: "Drawn Route",
+            sourceFormat: .drawn,
+            trackPoints: trackPoints
+        )
+        routeStore.addAIPlannedRoute(route)
+        drawEngine.reset()
+        withAnimation(.spring(duration: 0.25)) { isDrawModeActive = false }
+    }
+
+    // MARK: - Snap error toast
+
+    private func snapErrorToast(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(message).font(.subheadline)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
     }
 
     // MARK: - Drawer
