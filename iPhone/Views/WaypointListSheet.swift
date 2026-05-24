@@ -23,8 +23,9 @@
 //  Dwell time chip shown under each AI-planned waypoint name.
 //  Total outing time (ride time + total dwell) added to header stats row.
 //
-//  F-D3 (May 2026): "Draw Route" button added to emptyPrompt.
-//  Triggers showDrawRoute binding owned by PlanView.
+//  F-D (May 2026): "Draw Route" button in emptyPrompt now calls
+//  onDrawRoute() callback (owned by PlanView) instead of a binding,
+//  activating the inline draw mode on the plan map.
 //
 
 import SwiftUI
@@ -42,8 +43,8 @@ struct WaypointListSheet: View {
     let onPlanAnother: () -> Void
     /// Controls presentation of RidePlanAssistantView in PlanView.
     @Binding var showAssistant: Bool
-    /// F-D3: Controls presentation of DrawRouteView in PlanView.
-    @Binding var showDrawRoute: Bool
+    /// F-D: Activates inline draw mode on the plan map (PlanView toggles isDrawModeActive).
+    var onDrawRoute: () -> Void = {}
 
     @EnvironmentObject private var routeStore: RouteStore
 
@@ -305,9 +306,9 @@ struct WaypointListSheet: View {
 
             Divider()
 
-            // F-D3: Draw Route
+            // F-D: Draw Route — activates inline draw mode on the plan map
             Button {
-                showDrawRoute = true
+                onDrawRoute()
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "pencil.and.map")
@@ -509,7 +510,7 @@ struct WaypointListSheet: View {
     }
 
     private var outingTimeString: String? {
-        guard !plan.waypoints.isEmpty else { return nil }
+        guard !plan.waypoints.isEmpty else { return nil } 
         let totalDwellMin = plan.waypoints.compactMap(\.dwellMinutes).reduce(0, +)
         guard totalDwellMin > 0 || plan.totalDistance > 0 else { return nil }
         let rideMinutes = Int((plan.totalDistance / 1000.0) / 15.0 * 60.0)
