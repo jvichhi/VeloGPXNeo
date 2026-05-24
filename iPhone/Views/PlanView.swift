@@ -26,8 +26,6 @@ struct PlanView: View {
     @State private var drawerHeight: CGFloat = kDrawerMedium
     @State private var showErrorBanner = false
     @State private var showAssistant = false
-    // F-D3: legacy draw route sheet (kept for Step 2 build verification; removed in Step 3)
-    @State private var showDrawRoute = false
     /// Last known map centre — updated via onMapCameraChange.
     @State private var mapCentre: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673)
 
@@ -72,7 +70,6 @@ struct PlanView: View {
                 }
 
                 if isDrawModeActive {
-                    // Draw mode replaces drawer with a slim bottom bar
                     drawBottomBar(geo: geo)
                         .zIndex(10)
                 } else {
@@ -122,11 +119,6 @@ struct PlanView: View {
                 nearLat: mapCentre.latitude,
                 nearLon: mapCentre.longitude
             )
-        }
-        // F-D3 legacy sheet — kept for Step 2 build verification; removed in Step 3
-        .sheet(isPresented: $showDrawRoute) {
-            DrawRouteView()
-                .environmentObject(routeStore)
         }
     }
 
@@ -231,7 +223,7 @@ struct PlanView: View {
             .onMapCameraChange { context in
                 mapCentre = context.camera.centerCoordinate
             }
-            // Tap-to-waypoint: disabled in draw mode so taps don't drop waypoints
+            // Tap-to-waypoint: disabled in draw mode
             .onTapGesture { screenPoint in
                 guard !isDrawModeActive else { return }
                 guard let coord = proxy.convert(screenPoint, from: .local) else { return }
@@ -265,8 +257,6 @@ struct PlanView: View {
 
     private func drawBottomBar(geo: GeometryProxy) -> some View {
         VStack(spacing: 10) {
-
-            // Draw mode label
             HStack(spacing: 6) {
                 Image(systemName: "pencil")
                     .font(.system(size: 11, weight: .bold))
@@ -278,7 +268,6 @@ struct PlanView: View {
             .padding(.vertical, 7)
             .background(Color.teal.opacity(0.88), in: Capsule())
 
-            // Stats + Undo + Done row
             HStack(spacing: 12) {
                 if drawEngine.hasContent {
                     Label(
@@ -308,7 +297,6 @@ struct PlanView: View {
                     Spacer()
                 }
 
-                // Undo
                 Button {
                     drawEngine.undoLastSegment()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -321,7 +309,6 @@ struct PlanView: View {
                 .disabled(!drawEngine.canUndo)
                 .accessibilityLabel("Undo last segment")
 
-                // Done
                 Button {
                     guard !isDrawDone else { return }
                     isDrawDone = true
@@ -420,7 +407,10 @@ struct PlanView: View {
                     withAnimation(.interpolatingSpring(stiffness: 280, damping: 28)) { drawerHeight = kDrawerMedium }
                 },
                 showAssistant: $showAssistant,
-                showDrawRoute: $showDrawRoute
+                onDrawRoute: {
+                    withAnimation(.spring(duration: 0.25)) { isDrawModeActive = true }
+                    drawHaptic.impactOccurred()
+                }
             )
             .padding(.bottom, safeBottom > 0 ? safeBottom : 16)
         }
