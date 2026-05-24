@@ -1,3 +1,7 @@
+//
+//  RouteLibraryView.swift
+//  VeloGPX
+//
 import SwiftUI
 import UniformTypeIdentifiers
 // FoundationModels import removed — this view delegates all AI calls to VeloAI.swift
@@ -283,9 +287,10 @@ private struct AIPendingRouteCard: View {
     }
 }
 
-// MARK: - F-A2: Route Rename Sheet
+// MARK: - F-A2 / F-D5: Route Rename Sheet
+// Internal (not private) so PlanView can present it after a drawn route is committed.
 
-private struct RouteRenameSheet: View {
+struct RouteRenameSheet: View {
     let route: RouteModel
     let onSave: (String) -> Void
 
@@ -451,14 +456,15 @@ private struct RouteRenameSheet: View {
 }
 
 // MARK: - FlowLayout
+// Internal so RouteRenameSheet is usable from PlanView (same module).
 
-private struct FlowLayout<Content: View>: View {
+struct FlowLayout<Content: View>: View {
     let spacing: CGFloat
     @ViewBuilder let content: Content
     var body: some View { _FlowLayout(spacing: spacing) { content } }
 }
 
-private struct _FlowLayout: Layout {
+struct _FlowLayout: Layout {
     let spacing: CGFloat
     struct Cache {}
     func makeCache(subviews: Subviews) -> Cache { Cache() }
