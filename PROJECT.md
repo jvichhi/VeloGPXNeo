@@ -39,8 +39,17 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 
 ### MKReverseGeocodingRequest (iOS 26)
 - `CLGeocoder` is deprecated on iOS 18+. **Never use it.**
-- Use `MKReverseGeocodingRequest(coordinate:)` → `req.response` (async/await).
-- Returns `MKReverseGeocodingResponse` with `.placemark: MKPlacemark`. Read `.locality` or `.subLocality`.
+- Initialiser takes a `CLLocation`: `MKReverseGeocodingRequest(location: clLocation)`.
+- Await `.mapItems` (returns `[MKMapItem]`) — **not** `.response`:
+
+  ```swift
+  let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+  guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
+  let items = try await request.mapItems
+  let item = items.first
+  ```
+
+- Read address fields via `item.placemark.locality`, `.administrativeArea`, etc. (see MKMapItem section below).
 
 ### MKPlacemark / MKMapItem — Deprecated Properties (iOS 26)
 - **`MKPlacemark.title` is deprecated in iOS 26.** Do not use it for display strings.
