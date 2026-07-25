@@ -17,10 +17,9 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 
 > This section exists so AI coding sessions don't re-learn or dispute known platform facts. These are verified.
 
-### MapKit Cycling Directions (Developer Access)
+### MapKit Cycling Directions
 - `MKDirectionsTransportType.cycling` is a real, supported value for `MKDirections.Request.transportType`.
-  — `developer.apple.com/documentation/mapkit/mkdirectionstransporttype/cycling`
-- Use `.cycling` for all bike-route requests. Apple Maps applies cycling-aware routing: bike lanes, quiet roads, hill avoidance. **Do not assume a third-party routing engine is required for pathfinding.**
+- Use `.cycling` for all bike-route requests. Apple Maps applies cycling-aware routing: bike lanes, quiet roads, hill avoidance.
 - Apple Maps cycling coverage includes Canada (including Québec / Montréal / Laval area) and is broadly available in all major markets.
 - Apple Maps does **not** expose a native "generate a N km loop" API. Loop planning is app-level logic on top of Apple's point-to-point cycling directions.
 
@@ -29,8 +28,13 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 - `session.respond(to: prompt, generating: SomeType.self)` → typed `@Generable` structured output.
   — `developer.apple.com/documentation/foundationmodels/languagemodelsession/respond(to:generating:includeschemaInprompt:options:)`
 - Do **not** use `session.stream(from:onPartial:)` — removed in iOS 26.
-- Do **not** use `session.generate(from:)` for plain strings — that's for `@Generable` schema only.
+- Do **not** use `session.generate(from:)` — not a valid method. Use `respond(to:generating:)` for structured types.
 - The model is for **intent parsing and natural language understanding only**. It does not produce route geometry, coordinates, or spatial data.
+
+### FoundationModels — Dynamic Profiles (WWDC26)
+- iOS 26 adds **Dynamic Profiles** to `LanguageModelSession` — the model can adapt behaviour based on structured user context passed at session init.
+- Do not use Dynamic Profiles for spatial/routing decisions. Safe use: personalising ride summary tone based on past ride history metadata.
+- API surface is additive — existing `respond(to:)` calls are unaffected.
 
 ### FoundationModels Availability Gate
 - `SystemLanguageModel.default.availability == .available` is the single gate.
@@ -49,7 +53,7 @@ Rules for AI-assisted development on this repo. Both the human developer and the
   let item = items.first
   ```
 
-- Read address fields via `item.placemark.locality`, `.administrativeArea`, etc. (see MKMapItem section below).
+- Read address fields via `item.placemark.locality`, `.administrativeArea`, etc.
 
 ### MKPlacemark / MKMapItem — Deprecated Properties (iOS 26)
 - **`MKPlacemark.title` is deprecated in iOS 26.** Do not use it for display strings.
@@ -62,7 +66,7 @@ Rules for AI-assisted development on this repo. Both the human developer and the
   ```
 
 - Other still-valid `MKPlacemark` fields: `name`, `locality`, `subLocality`, `administrativeArea`, `postalCode`, `country`, `isoCountryCode`.
-- If you need a full formatted address, use `MKMapItem.placemark.formattedAddress` (available iOS 26+) in preference to manually assembling fields.
+- If you need a full formatted address, use `MKMapItem.placemark.formattedAddress` (available iOS 26+).
 
 ### MKMapItem — Address Fields Live on the Placemark
 - `MKMapItem` itself has **no** address properties (`locality`, `administrativeArea`, `country`, etc.).
@@ -70,18 +74,26 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 - **Always go via `.placemark`:**
 
   ```swift
-  // WRONG — MKMapItem has no address properties
+  // WRONG
   let city = item.locality
 
   // CORRECT
   let city = item.placemark.locality
   let region = item.placemark.administrativeArea
-  let country = item.placemark.country
   ```
 
 ### MKLocalSearch
 - Correct API for resolving named stops (cafés, parks, boroughs, cities).
 - Requires network connectivity. If offline, surface a friendly fallback.
+
+### App Intents + Siri AI (WWDC26)
+- The updated **App Intents** framework (iOS 26) connects app content to Siri AI, personal context, onscreen awareness, and systemwide actions.
+- Use `AppIntent` conformance to expose ride actions (start ride, stop ride, query history) to Siri.
+- Use `IndexedEntity` + `CSSearchableItem` to contribute `RouteModel` and `PersistedRideSummary` records to Spotlight so users can query ride history in natural language.
+- **`@Parameter`** on intent properties drives Siri's slot-filling — e.g. `@Parameter(title: "Route") var route: RouteEntity`.
+- App Intents run in a separate extension process — do not assume `@MainActor` or access live `@Observable` stores directly. Pass data via `AppEntity` value types.
+- `FoundationModels` is **not** available inside App Intent extensions. All AI calls stay in the main app target.
+- Do not implement App Intents until Sprint 12 (F-K). This section is for awareness only.
 
 ---
 
@@ -91,30 +103,28 @@ Rules for AI-assisted development on this repo. Both the human developer and the
 **Never use `\uXXXX` unicode escape sequences in Swift source files.** Swift source is UTF-8; write the literal character directly.
 
 ```swift
-// WRONG — \u00e9 is a JSON/Java escape, not valid Swift
+// WRONG
 let label = "Caf\u00e9"
-let ellipsis = "Searching\u2026"
 
-// CORRECT — write the character as-is
+// CORRECT
 let label = "Café"
-let ellipsis = "Searching…"
 ```
 
-This applies everywhere: string literals, comments, identifiers. The GitHub API transmits files as UTF-8 so the literal characters survive perfectly.
+This applies everywhere: string literals, comments, identifiers.
 
 ### No Invented API Calls
 Before writing a call to any framework method not already used in the codebase, verify it exists in Apple's documentation or a trusted source. Common traps:
-- `MKMapItem` has no `openInMapsActionURL()` — use `maps://` URL scheme: `URL(string: "maps://?ll=\(lat),\(lon)&q=\(encodedName)")`
-- `MKMapItem` has no `.placemark.coordinate` shortcut on iOS 18+ — use `.location?.coordinate`
+- `MKMapItem` has no `openInMapsActionURL()` — use `maps://` URL scheme
 - `CLGeocoder` is deprecated on iOS 18+ — use `MKReverseGeocodingRequest`
-- `MKPlacemark.title` is deprecated in iOS 26 — compose a subtitle from `.locality`, `.administrativeArea`, `.country` instead (see Verified Platform Capabilities above)
-- `MKMapItem` has no address properties directly — always go via `item.placemark` (see MKMapItem — Address Fields Live on the Placemark above)
+- `MKPlacemark.title` is deprecated in iOS 26 — compose subtitle from `.locality`, `.administrativeArea`, `.country`
+- `MKMapItem` has no address properties directly — always go via `item.placemark`
+- `session.generate(from:)` does not exist — use `session.respond(to:generating:)` for `@Generable` output
 
 ### No Force-Unwraps in New Code
 Use `guard let` or `if let`. If a value is truly guaranteed, add a comment explaining why.
 
 ### No `UIScreen.main`
-Use `@Environment(\.displayScale)` or `@Environment(\.horizontalSizeClass)` in SwiftUI. `UIScreen.main` is deprecated.
+Use `@Environment(\.displayScale)` or `@Environment(\.horizontalSizeClass)` in SwiftUI.
 
 ---
 
@@ -122,8 +132,8 @@ Use `@Environment(\.displayScale)` or `@Environment(\.horizontalSizeClass)` in S
 
 When the AI generates a call to a method or property not already present in the codebase:
 1. Check Apple Developer Documentation or search the web before writing the call.
-2. If unsure, implement the equivalent manually (URL construction, custom extension, etc.) rather than calling a method that might not exist.
-3. Note the verification source in a comment on the same line, e.g.: `// maps:// URL scheme — developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference`
+2. If unsure, implement the equivalent manually rather than calling a method that might not exist.
+3. Note the verification source in a comment on the same line.
 
 ---
 
@@ -131,20 +141,17 @@ When the AI generates a call to a method or property not already present in the 
 
 > ⚠️ **Do not ask an AI tool to read and rewrite large `.md` files in a single operation.**
 
-`FEATURES.md` is now an index file — keep it under 5 KB. Full feature specs live in `Docs/Specs/`.
-
 | File | Risk |
 |---|---|
 | `FEATURES.md` | ✅ Safe — index only, keep small |
-| `TECH_DEBT.md` | ⚠️ Medium (~16 KB) |
-| `ROADMAP.md` | ⚠️ Medium (~10 KB) |
-| `DEVLOG.md` | Low (~9 KB) |
+| `TECH_DEBT.md` | ✅ Now slim — open items only |
+| `ROADMAP.md` | ⚠️ Medium (~16 KB) |
+| `DEVLOG.md` | ⚠️ Medium (~10 KB) |
 | `Docs/Specs/*.md` | ✅ Safe — scoped per feature |
 
 ### Safe Update Pattern
 - Tell the AI exactly which section to update.
 - Never ask an AI tool to "update FEATURES.md with the latest backlog" as a single instruction.
-- If a full rewrite is truly needed, split into one section at a time.
 
 ### Recovery
 If an AI tool errors mid-write on a `.md` file:
@@ -179,6 +186,8 @@ These files must **never** be added to the Watch target in Build Phases:
 - `PlanAssistantEngine.swift` — `FoundationModels` is iOS only
 - `RidePlanIntent+Generable.swift` — same
 - `RidePlanAssistantView.swift` — same
+- `SpeechCueService.swift` — `AVAudioSession` not available on watchOS
+- `WeatherService.swift` — WeatherKit entitlement scope
 - Any file with `import FoundationModels`
 - Any file with `#if canImport(UIKit)` guard wrapping the entire content
 
